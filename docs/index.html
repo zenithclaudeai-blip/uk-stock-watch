@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta http-equiv="refresh" content="90">
+<title>UK Stock Watch</title>
+<style>
+body{background:#0f1115;color:#e8eaed;font-family:-apple-system,sans-serif;margin:0;padding:12px;font-size:14px}
+h1{font-size:18px;margin:4px 0} h2{font-size:14px;margin:16px 0 6px}
+h3{font-size:12px;margin:0 0 4px;color:#9aa0a6}
+.screener-grid{display:grid;grid-template-columns:1fr;gap:10px}
+@media(min-width:600px){.screener-grid{grid-template-columns:1fr 1fr 1fr}}
+.heatmap-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:16px}
+@media(min-width:600px){.heatmap-grid{grid-template-columns:repeat(8,1fr)}}
+.heat-cell{border-radius:4px;padding:8px 4px;text-align:center;color:#fff}
+.heat-symbol{font-size:11px;font-weight:700}
+.heat-pct{font-size:10px;opacity:0.9}
+.disclaimer{background:#1c2b25;border:1px solid #274235;color:#9aa0a6;border-radius:6px;padding:8px;font-size:11px;margin-bottom:10px}
+.quotes{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.q{background:#171a21;border:1px solid #2a2e37;border-radius:6px;padding:6px 10px;font-size:12px}
+.up{color:#50dc96} .down{color:#ff6b6b}
+table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12px}
+table td, table th{padding:5px 6px;border-bottom:1px solid #2a2e37;text-align:left}
+.item{background:#171a21;border:1px solid #2a2e37;border-radius:8px;padding:8px;margin-bottom:8px}
+.item a{color:#e8eaed;text-decoration:none;font-size:13px}
+.item a:hover{text-decoration:underline}
+.meta{color:#9aa0a6;font-size:10.5px}
+.badge{border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-right:4px}
+.badge.upgrade{background:#163a2a;color:#50dc96}
+.badge.downgrade{background:#3a1919;color:#ff6b6b}
+.badge.target{background:#2a2a17;color:#e0d267}
+.badge.event{background:#1c2a3a;color:#6ab6ff}
+.badge.news{background:#22262f;color:#9aa0a6}
+.broker{background:#2a1c3a;color:#c69bf0;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-right:4px}
+.lastpoll{color:#9aa0a6;font-size:11px;text-align:right}
+</style></head>
+<body>
+<h1>UK Stock Watch — Live Feed</h1>
+<p class="lastpoll" style="text-align:left;font-size:13px;color:#50dc96;margin:0 0 10px;">🕐 Live as of Thu 27 Aug 2026, 17:20 BST (16:20 UTC) — this page auto-refreshes every 90s (data itself updates every ~5 min)</p>
+<p class="disclaimer">LSE-listed stocks only. Informational only — not investment advice, not a guarantee of any outcome.</p>
+
+<h2>Heat Map (top movers, by size of move)</h2>
+<div class="heatmap-grid"><span class="meta">No data yet</span></div>
+
+<h2>LSE Screener</h2>
+<div class="screener-grid">
+  <div><h3>Top Volume</h3><table><tr><th>#</th><th>Symbol</th><th>Volume</th></tr><tr><td colspan="3" class="meta">No data yet</td></tr></table></div>
+  <div><h3>Top Gainers</h3><table><tr><th>#</th><th>Symbol</th><th>Chg%</th></tr><tr><td colspan="3" class="meta">No data yet</td></tr></table></div>
+  <div><h3>Top Losers</h3><table><tr><th>#</th><th>Symbol</th><th>Chg%</th></tr><tr><td colspan="3" class="meta">No data yet</td></tr></table></div>
+</div>
+
+<h2>Already Moving Today (watchlist, ±5%+)</h2>
+<p class="meta">A fact about what already happened today — not a forecast of what happens next.</p>
+<div class="quotes"><span class="meta">Nothing past the threshold right now</span></div>
+
+<h2>Your Watchlist</h2>
+<div class="quotes"><span class="meta">No quotes yet</span></div>
+
+<h2>Market-wide Broker Alerts (all LSE, not just watchlist)</h2>
+<p class="meta">Upgrades/downgrades from anywhere on the LSE, not limited to your watchlist below.</p>
+<p class="meta">No market-wide alerts yet.</p>
+
+<h2>News &amp; Broker Feed</h2>
+<p class="meta">No items yet — first run may still be in progress.</p>
+<p class="lastpoll">Last checked: Thu 27 Aug 2026, 17:20 BST (16:20 UTC)</p>
+</body></html>

@@ -1,0 +1,52 @@
+name: UK Stock Watch Poller — FTSE 350 (hourly)
+
+on:
+  schedule:
+    # Hourly — a larger watchlist does several requests per stock, so this can't run
+    # on the same 5-minute cadence as the main job without getting rate-limited.
+    - cron: "0 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run poller (large watchlist)
+        id: poll
+        env:
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+          WEBHOOK_TEMPLATE: ${{ secrets.WEBHOOK_TEMPLATE }}
+          WATCHLIST_FILE: watchlist-ftse350.json
+          STATE_DIR: state-ftse350
+          DOCS_FILENAME: ftse350.html
+          # Skips market-wide search/screener/heatmap — the 5-minute job already covers
+          # those; running them here too would send duplicate WhatsApp alerts.
+          SKIP_MARKET_WIDE: "true"
+        run: python poll.py
+
+      - name: Commit updated state & dashboard
+        if: always()
+        run: |
+          git config user.name "uk-stock-watch-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add state-ftse350 docs/ftse350.html
+          git diff --staged --quiet || git commit -m "Update FTSE 350 feed [skip ci]"
+          git push
+
+      - name: Notify on total failure (backstop)
+        if: failure() && steps.poll.outcome == 'failure'
+        env:
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+        run: |
+          if [ -n "$WEBHOOK_URL" ]; then
+            curl -s -G "$WEBHOOK_URL" --data-urlencode "text=⚠️ UK Stock Watch (FTSE 350 job): failed to run this cycle. Will retry next hour." || true
+          fi
