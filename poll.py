@@ -522,7 +522,34 @@ def format_screener_sections(screener):
     return messages
 
 
+_RATE_LIMIT_WINDOW_SECONDS = 240 * 60  # matches CallMeBot's free-tier window
+_RATE_LIMIT_MAX_SENDS = 14  # stay under CallMeBot's 16/240min cap with a safety margin
+_recent_send_times = []  # populated from seen_state at the start of each run, see main()
+
+
+def _current_template():
+    return (os.environ.get("WEBHOOK_TEMPLATE", "").strip() or "callmebot")
+
+
+def _rate_limit_ok():
+    """Global send budget shared across every message type this run (and recent prior
+    runs) — the per-category throttles above help, but this is the actual backstop that
+    guarantees the WhatsApp free-tier cap is never exceeded regardless of which
+    combination of screener/alert/heartbeat messages happens to fire in a given hour.
+    Only applies to CallMeBot specifically — ntfy and generic webhooks don't share that
+    limit, so they're not artificially held back by a cap that doesn't apply to them."""
+    if _current_template() != "callmebot":
+        return True
+    now = time.time()
+    while _recent_send_times and now - _recent_send_times[0] > _RATE_LIMIT_WINDOW_SECONDS:
+        _recent_send_times.pop(0)
+    return len(_recent_send_times) < _RATE_LIMIT_MAX_SENDS
+
+
 def send_webhook(message):
+    if not _rate_limit_ok():
+        print(f"  ! send skipped: WhatsApp rate-limit budget exhausted ({_RATE_LIMIT_MAX_SENDS}/{_RATE_LIMIT_WINDOW_SECONDS//60}min) — still on dashboard.", file=sys.stderr)
+        return
     webhook_url = os.environ.get("WEBHOOK_URL", "").strip()
     # GitHub passes a missing secret through as an EMPTY STRING env var, not an absent
     # one — so os.environ.get(..., "callmebot") never actually triggers its default in
@@ -532,6 +559,8 @@ def send_webhook(message):
         print("  ! WEBHOOK_URL is empty — check the secret exists and is named exactly WEBHOOK_URL", file=sys.stderr)
         return
     print(f"  > sending webhook via template='{template}'")
+    _recent_send_times.append(time.time())  # count the attempt itself, regardless of outcome —
+                                              # matches CallMeBot's own "message queued" behavior
     try:
         if template == "callmebot":
             sep = "&" if "?" in webhook_url else "?"
@@ -741,6 +770,13 @@ HEARTBEAT_INTERVAL_SECONDS = 6 * 3600  # confirmation ping every 6h, not every 5
 
 
 AI_DIGEST_INTERVAL_SECONDS = 6 * 3600  # throttled like the heartbeat — a paid API call, not free
+
+# CallMeBot's free WhatsApp tier allows ~16 messages per 240 minutes (~4/hour sustained).
+# Sending the screener report every 5-minute cycle would blow through that in half an hour
+# regardless of anything else — throttle the WhatsApp SEND specifically (the dashboard/
+# data itself still refreshes every cycle; only the push notification is rationed).
+SCREENER_MESSAGE_INTERVAL_SECONDS = 60 * 60  # once per hour
+MAX_ALERTS_PER_RUN = 5  # cap a burst of alerts in one run; rest are still on the dashboard
 AI_DIGEST_MODEL = "claude-haiku-4-5-20251001"  # cheap/fast model, appropriate for a short summary
 
 AI_DIGEST_SYSTEM_PROMPT = """You are a strictly factual summarizer for a UK stock market news digest sent to one person's WhatsApp.
@@ -867,6 +903,8 @@ def main():
 
     seen_state = load_json(SEEN_FILE, {"seen": []})
     seen = set(seen_state.get("seen", []))
+    global _recent_send_times
+    _recent_send_times = list(seen_state.get("recentSendTimes", []))
     data = load_json(DATA_FILE, {"items": {}, "quotes": {}, "lastPoll": None})
     items_by_ticker = data.get("items", {})
     quotes = data.get("quotes", {})
@@ -1008,19 +1046,21 @@ def main():
         "lastPoll": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
     }
     save_json(DATA_FILE, data)
-    save_json(SEEN_FILE, {
-        "seen": list(seen)[-MAX_SEEN:],
-        "lastHeartbeat": seen_state.get("lastHeartbeat", 0),
-        "lastAiDigest": seen_state.get("lastAiDigest", 0),
-    })
     render_dashboard(data, watchlist)
 
-    screener_messages = format_screener_sections(screener)
-    for i, msg in enumerate(screener_messages):
-        print(msg)
-        send_webhook(msg)
-        if i < len(screener_messages) - 1:
-            time.sleep(2)  # small gap so WhatsApp/CallMeBot doesn't collapse/drop rapid-fire messages
+    screener_last_sent = seen_state.get("lastScreenerMessage", 0)
+    screener_interval = SCREENER_MESSAGE_INTERVAL_SECONDS if _current_template() == "callmebot" else 0
+    if time.time() - screener_last_sent >= screener_interval:
+        screener_messages = format_screener_sections(screener)
+        for i, msg in enumerate(screener_messages):
+            print(msg)
+            send_webhook(msg)
+            if i < len(screener_messages) - 1:
+                time.sleep(2)  # small gap so rapid-fire messages don't collapse/drop
+        if screener_messages:
+            seen_state["lastScreenerMessage"] = time.time()
+    else:
+        print("Screener WhatsApp send throttled (sent within the last hour) — dashboard/data still updated above.")
 
     if big_movers:
         lines = [f"🔥 ALREADY MOVING TODAY (±{BIG_MOVER_THRESHOLD_PCT:.0f}%+, watchlist)  🕐 {now_stamp()} — facts about today, not a forecast:"]
@@ -1032,7 +1072,10 @@ def main():
         send_webhook(movers_msg)
 
     ALERT_LABELS = {"upgrade": "⬆ UPGRADE", "downgrade": "⬇ DOWNGRADE", "event": "📰 NEWS"}
-    for alert in new_alerts:
+    alert_cap = MAX_ALERTS_PER_RUN if _current_template() == "callmebot" else len(new_alerts)
+    alerts_to_send = new_alerts[:alert_cap]
+    skipped_count = len(new_alerts) - len(alerts_to_send)
+    for alert in alerts_to_send:
         label = ALERT_LABELS.get(alert["category"], "📰 NEWS")
         broker_tag = f' ({alert["broker"]})' if alert["broker"] else ""
         ticker_bit = "LSE (market-wide)" if alert["ticker"] == "MARKET" else alert["ticker"]
@@ -1040,17 +1083,30 @@ def main():
         msg = f'{label}: {ticker_bit}{broker_tag}\n{alert["title"]}\n{alert["link"]}\n📅 {article_date}  🕐 seen {now_stamp()}'
         print(f"Alert: {msg}")
         send_webhook(msg)
+        time.sleep(2)  # CallMeBot can silently drop messages sent in rapid succession
+                        # even while still returning 200 — space every send out.
+    if skipped_count > 0:
+        skip_msg = f"ℹ️ {skipped_count} more alert(s) this run — see the full list on the dashboard (capped to avoid WhatsApp rate limits)."
+        print(skip_msg)
+        send_webhook(skip_msg)
 
-    print(f"Done. {len(new_alerts)} new alert(s) sent.")
+    print(f"Done. {len(new_alerts)} new alert(s) found, {len(alerts_to_send)} sent to WhatsApp.")
+
+    if new_alerts:
+        time.sleep(2)  # gap before heartbeat/digest, same reasoning as between alerts
 
     heartbeat_sent = maybe_send_heartbeat(seen_state, watchlist, len(new_alerts), len(big_movers))
     digest_sent = maybe_send_ai_digest(seen_state, screener, market_wide_enriched, big_movers, new_alerts)
-    if heartbeat_sent or digest_sent:
-        save_json(SEEN_FILE, {
-            "seen": list(seen)[-MAX_SEEN:],
-            "lastHeartbeat": seen_state.get("lastHeartbeat", 0),
-            "lastAiDigest": seen_state.get("lastAiDigest", 0),
-        })
+
+    # Always persist here (not just when heartbeat/digest fired) — this is the only place
+    # lastScreenerMessage's updated value actually gets written to disk.
+    save_json(SEEN_FILE, {
+        "seen": list(seen)[-MAX_SEEN:],
+        "lastHeartbeat": seen_state.get("lastHeartbeat", 0),
+        "lastAiDigest": seen_state.get("lastAiDigest", 0),
+        "lastScreenerMessage": seen_state.get("lastScreenerMessage", 0),
+        "recentSendTimes": _recent_send_times,  # carries the rate-limit budget forward to the next run
+    })
 
 
 if __name__ == "__main__":
