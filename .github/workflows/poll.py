@@ -946,6 +946,7 @@ def render_dashboard(data, watchlist):
     uptrend_stocks = data.get("uptrendStocks", [])
     big_movers = data.get("bigMovers", [])
     market_wide = data.get("marketWide", [])
+    market_research = data.get("marketResearch", {})
     last_poll_raw = data.get("lastPoll")
     if last_poll_raw:
         try:
@@ -1165,6 +1166,25 @@ def render_dashboard(data, watchlist):
     heatmap_pool.sort(key=lambda q: abs(q.get("changePct") or 0), reverse=True)
     heatmap_cells = "".join(heatmap_cell(q) for q in heatmap_pool[:20])
 
+    def research_card(stock):
+        ticker, name = stock["ticker"], stock["name"]
+        entry = market_research.get(ticker)
+        if entry and entry.get("text"):
+            body = f'<p style="margin:6px 0 0;font-size:13px;line-height:1.6;">{esc(entry["text"])}</p>'
+            stamp = f'<span class="meta">Generated {esc(entry.get("generatedAt","?"))} UTC — synthesised from this tool\'s own gathered news/broker data, not fresh web research.</span>'
+        elif not os.environ.get("ANTHROPIC_API_KEY", "").strip():
+            body = '<p class="meta" style="margin:6px 0 0;">Not enabled — requires an ANTHROPIC_API_KEY secret to be configured.</p>'
+            stamp = ""
+        else:
+            body = '<p class="meta" style="margin:6px 0 0;">Not generated yet — refreshes automatically, a few stocks per run.</p>'
+            stamp = ""
+        return (
+            f'<div class="item"><b>{esc(ticker)}</b> <span class="meta">({esc(name)})</span>'
+            f'{body}{"<br/>" + stamp if stamp else ""}</div>'
+        )
+
+    research_rows = "".join(research_card(s) for s in watchlist)
+
     mover_rows = "".join(
         f'<div class="q"><b>{esc(m["ticker"])}</b> '
         f'<span class="{"up" if (m.get("changePct") or 0) >= 0 else "down"}">'
@@ -1224,6 +1244,7 @@ table td, table th{{padding:7px 8px;border-bottom:1px solid #2a2e37;text-align:l
 <a href="#targets" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🎯 Target Prices</a>
 <a href="#movers-today" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🔥 Moving Today</a>
 <a href="#watchlist" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">👀 Watchlist</a>
+<a href="#market-research" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🔎 Market Research</a>
 <a href="#broker-alerts" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">⬆⬇🎯 Broker Alerts</a>
 <a href="#news-feed" style="color:#7fb3ff;text-decoration:none;">📰 News Feed</a>
 </nav>
@@ -1256,6 +1277,10 @@ table td, table th{{padding:7px 8px;border-bottom:1px solid #2a2e37;text-align:l
 
 <h2 id="watchlist">👀 Your Watchlist</h2>
 <div class="quotes">{quote_rows or '<span class="meta">No quotes yet</span>'}</div>
+
+<h2 id="market-research">🔎 Market Research</h2>
+<p class="meta">AI-synthesised from this tool's own gathered news, broker ratings, and prices — NOT fresh web research, and NOT a recommendation. A capped number of entries refresh each run, so the whole watchlist stays current within roughly a day rather than all at once. Always cross-check anything here against primary sources before acting on it.</p>
+{research_rows or '<p class="meta">No watchlist stocks to show yet.</p>'}
 
 <h2 id="broker-alerts">⬆⬇🎯 Market-wide Broker Alerts (all LSE, not just watchlist)</h2>
 <p class="meta">Upgrades/downgrades from anywhere on the LSE, not limited to your watchlist below.</p>
@@ -1449,6 +1474,127 @@ def maybe_send_heartbeat(seen_state, watchlist, alert_count, mover_count):
     return True
 
 
+# =========================================================================
+# MARKET RESEARCH — per-stock factual synthesis of ALREADY-GATHERED data
+# =========================================================================
+# IMPORTANT — what this is and isn't:
+# This does NOT do fresh web research (no search capability exists in this
+# script). It synthesizes facts poll.py has ALREADY collected this run —
+# recent news/broker items, price, target price, consensus label — into a
+# short factual write-up per stock. Same safety pattern as the existing AI
+# digest: strict factual-only system prompt, output scanned against
+# FORBIDDEN_DIGEST_PATTERNS before use, opt-in (requires ANTHROPIC_API_KEY).
+#
+# "Live" here means: refreshed automatically on a rolling basis, always
+# current within ~1 day, WITHOUT refreshing all watchlist stocks every run —
+# doing that would mean one paid API call per stock every 5 minutes, which
+# doesn't scale to a 40+ stock watchlist. A capped number of the STALEST
+# entries get refreshed each run, cycling through the whole list over time.
+
+MARKET_RESEARCH_REFRESH_SECONDS = 24 * 3600  # each stock's write-up refreshes at most once/day
+MARKET_RESEARCH_MAX_PER_RUN = 3  # cost/runtime cap — NOT a technical limit, a deliberate budget
+
+MARKET_RESEARCH_SYSTEM_PROMPT = """You are writing a short "Market Research" note for one UK-listed stock, shown on a personal dashboard.
+
+CRITICAL RULES — violating any of these makes your output unusable:
+- Base EVERY sentence ONLY on the facts provided below. Do not draw on any outside knowledge of this company beyond what's given — if you know more about it from training, ignore that; use only the supplied facts.
+- NEVER recommend buying, selling, or holding, in any form or phrasing.
+- NEVER predict future price movements or say what "might" or "could" happen next.
+- NEVER use directive/advisory language: "should", "consider", "opportunity", "worth watching", "good time to", etc.
+- If broker ratings or targets are in the data, state them as attributed facts ("Broker X rates it Y with a target of Z") — never as your own conclusion or endorsement.
+- If the provided facts are thin or contradictory, say so plainly rather than filling gaps with speculation.
+- Do not explain what the "strong_buy"/"buy"/"hold" label conceptually means — that reasoning isn't in the data you're given, so don't invent it.
+- Keep it under 100 words, plain prose, no markdown headers.
+
+If you cannot write something factual from the given data, write "Not enough recent data gathered for a research note yet" instead of inventing content."""
+
+
+def build_stock_research_context(ticker, name, quote, items):
+    lines = [f"Stock: {name} ({ticker})"]
+    if quote:
+        price = quote.get("price")
+        chg = quote.get("changePct")
+        if price is not None:
+            lines.append(f"Current price: {price} ({chg:+.2f}% today)" if chg is not None else f"Current price: {price}")
+        target = quote.get("targetMeanPrice")
+        rec = quote.get("recommendationKey")
+        if target:
+            lines.append(f"Broker consensus target price: {target}" + (f", consensus rating: {rec}" if rec else ""))
+    if items:
+        lines.append("Recent news/broker items (most recent first):")
+        for it in items[:8]:
+            broker_bit = f" [{it['broker']}]" if it.get("broker") else ""
+            lines.append(f"- ({it.get('category','news')}){broker_bit} {it.get('title','')} — {it.get('source','')}, {it.get('pubDate','')}")
+    return "\n".join(lines)
+
+
+def generate_stock_research(ticker, name, quote, items):
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if not api_key:
+        return None
+    context = build_stock_research_context(ticker, name, quote, items)
+    body = json.dumps({
+        "model": AI_DIGEST_MODEL,
+        "max_tokens": 250,
+        "system": MARKET_RESEARCH_SYSTEM_PROMPT,
+        "messages": [{"role": "user", "content": f"Facts gathered for this stock:\n{context}\n\nWrite the research note."}],
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=body,
+        headers={"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+        method="POST",
+    )
+    try:
+        resp_data = json.loads(urllib.request.urlopen(req, timeout=30).read())
+        text = "".join(b.get("text", "") for b in resp_data.get("content", []) if b.get("type") == "text").strip()
+        if not text:
+            return None
+        if any(re.search(pat, text, re.IGNORECASE) for pat in FORBIDDEN_DIGEST_PATTERNS):
+            print(f"  ! market research blocked for {ticker}: output matched an advice-shaped pattern", file=sys.stderr)
+            return None
+        return text
+    except Exception as e:
+        print(f"  ! market research generation failed for {ticker}: {e}", file=sys.stderr)
+        return None
+
+
+def update_market_research(watchlist, quotes, items_by_ticker, existing_research):
+    """
+    Refreshes MARKET_RESEARCH_MAX_PER_RUN of the stalest watchlist entries per run.
+    Returns the updated research dict (unchanged if no API key configured — the
+    dashboard section still renders, just shows nothing generated yet).
+    """
+    if not os.environ.get("ANTHROPIC_API_KEY", "").strip():
+        return existing_research  # feature off — no key, no cost, section shows "not enabled"
+
+    now = time.time()
+
+    def staleness(ticker):
+        entry = existing_research.get(ticker)
+        if not entry or not entry.get("generatedAtEpoch"):
+            return float("inf")  # never generated — highest priority
+        return now - entry["generatedAtEpoch"]
+
+    candidates = sorted(watchlist, key=lambda s: -staleness(s["ticker"]))
+    due = [s for s in candidates if staleness(s["ticker"]) >= MARKET_RESEARCH_REFRESH_SECONDS]
+    refresh_list = due[:MARKET_RESEARCH_MAX_PER_RUN]
+
+    for stock in refresh_list:
+        ticker, name = stock["ticker"], stock["name"]
+        text = generate_stock_research(ticker, name, quotes.get(ticker), items_by_ticker.get(ticker, []))
+        if text:
+            existing_research[ticker] = {
+                "text": text,
+                "generatedAtEpoch": now,
+                "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+            }
+            print(f"  market research refreshed: {ticker}")
+        time.sleep(1)  # be polite between successive API calls in the same run
+
+    return existing_research
+
+
 def main():
     watchlist = load_json(WATCHLIST_FILE, [])
     if not watchlist:
@@ -1462,6 +1608,7 @@ def main():
     data = load_json(DATA_FILE, {"items": {}, "quotes": {}, "lastPoll": None})
     items_by_ticker = data.get("items", {})
     quotes = data.get("quotes", {})
+    market_research = data.get("marketResearch", {})
 
     yahoo_crumb = get_yahoo_crumb()
     print(f"Yahoo auth crumb: {'obtained' if yahoo_crumb else 'FAILED — screener/analyst-history will likely 401'}")
@@ -1707,6 +1854,11 @@ def main():
     deduped_market_wide.sort(key=item_sort_key, reverse=True)
     deduped_market_wide = deduped_market_wide[:MAX_ITEMS_PER_TICKER]
 
+    # Refresh a capped batch of the stalest Market Research write-ups (see function
+    # docstring for why this doesn't refresh everyone every run) using this run's
+    # freshly-gathered items_by_ticker/quotes as the factual source.
+    market_research = update_market_research(watchlist, quotes, items_by_ticker, market_research)
+
     data = {
         "items": items_by_ticker,
         "quotes": quotes,
@@ -1716,6 +1868,7 @@ def main():
         "uptrendStocks": uptrend_stocks,
         "bigMovers": big_movers,
         "marketWide": deduped_market_wide,
+        "marketResearch": market_research,
         "lastPoll": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
     }
     save_json(DATA_FILE, data)
