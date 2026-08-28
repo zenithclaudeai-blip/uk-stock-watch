@@ -173,12 +173,15 @@ def fetch_yahoo_analyst(ticker):
     real firm name, exact action (up/down/init/main/reit), and date, straight from
     Yahoo's own aggregation of broker calls. Requires the crumb-authenticated opener;
     falls back to trying without a crumb if one couldn't be obtained.
+    Also pulls calendarEvents (next earnings date, next ex-dividend date) in the SAME
+    request — quoteSummary accepts multiple modules at once, so this adds real data
+    without adding a new network call.
     """
     symbol = yahoo_symbol(ticker)
     crumb = get_yahoo_crumb()
     url = (
         f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{urllib.parse.quote(symbol)}"
-        "?modules=upgradeDowngradeHistory,recommendationTrend,financialData"
+        "?modules=upgradeDowngradeHistory,recommendationTrend,financialData,calendarEvents"
     )
     if crumb:
         url += f"&crumb={urllib.parse.quote(crumb)}"
@@ -189,10 +192,16 @@ def fetch_yahoo_analyst(ticker):
             return None
         history = ((result.get("upgradeDowngradeHistory") or {}).get("history")) or []
         fin = result.get("financialData") or {}
+        cal = result.get("calendarEvents") or {}
+        earnings_dates = ((cal.get("earnings") or {}).get("earningsDate")) or []
+        next_earnings = earnings_dates[0].get("raw") if earnings_dates else None
+        ex_div = (cal.get("exDividendDate") or {}).get("raw")
         return {
             "history": history,
             "targetMeanPrice": (fin.get("targetMeanPrice") or {}).get("raw"),
             "recommendationKey": fin.get("recommendationKey"),
+            "nextEarningsDate": next_earnings,  # unix epoch seconds, or None
+            "exDividendDate": ex_div,  # unix epoch seconds, or None
         }
     except Exception as e:
         print(f"  ! yahoo analyst history failed: {ticker} ({e})", file=sys.stderr)
@@ -414,11 +423,32 @@ def fetch_yahoo_quote(ticker):
         return None
 
 
-def fetch_5day_change(ticker):
-    """Real, already-happened price history — % change from 5 trading days ago's close
-    to the latest close. A fact about the past, not a prediction of what happens next."""
+def compute_rsi(closes, period=14):
+    """Standard RSI (relative strength index) — a raw computed statistic from real
+    closing prices, shown as a number, not labeled 'overbought'/'oversold' or turned
+    into a recommendation. That labeling is exactly the kind of implied-advice framing
+    this tool avoids; the number itself is just arithmetic on public price history."""
+    if len(closes) < period + 1:
+        return None
+    deltas = [closes[i] - closes[i - 1] for i in range(1, len(closes))]
+    recent = deltas[-period:]
+    gains = [d for d in recent if d > 0]
+    losses = [-d for d in recent if d < 0]
+    avg_gain = sum(gains) / period
+    avg_loss = sum(losses) / period
+    if avg_loss == 0:
+        return 100.0
+    rs = avg_gain / avg_loss
+    return 100 - (100 / (1 + rs))
+
+
+def fetch_price_technicals(ticker):
+    """Real, already-happened price history — 5-day % change, RSI(14), and 20-day
+    moving average, all computed from the same single chart fetch (a longer range than
+    strictly needed for the 5-day figure, so RSI/MA come along for free rather than
+    requiring a second network call). Facts about the past, not predictions."""
     symbol = yahoo_symbol(ticker)
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(symbol)}?interval=1d&range=10d"
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(symbol)}?interval=1d&range=3mo"
     try:
         data = json.loads(http_get(url))
         result = (data.get("chart") or {}).get("result") or [None]
@@ -427,15 +457,21 @@ def fetch_5day_change(ticker):
         closes = (result[0].get("indicators", {}).get("quote", [{}])[0] or {}).get("close") or []
         closes = [c for c in closes if c is not None]  # some days can come back null (holidays etc.)
         if len(closes) < 6:
-            return None  # not enough real trading days to compute a genuine 5-day change
+            return None  # not enough real trading days to compute even the 5-day change
         latest = closes[-1]
         five_days_ago = closes[-6]
-        if not five_days_ago:
-            return None
-        change_pct = (latest - five_days_ago) / five_days_ago * 100
-        return {"changePct5d": change_pct, "price": latest}
+        change_pct = (latest - five_days_ago) / five_days_ago * 100 if five_days_ago else None
+        rsi14 = compute_rsi(closes, 14)
+        ma20 = sum(closes[-20:]) / len(closes[-20:]) if len(closes) >= 20 else None
+        return {
+            "changePct5d": change_pct,
+            "price": latest,
+            "rsi14": rsi14,
+            "ma20": ma20,
+            "aboveMA20": (latest > ma20) if ma20 else None,
+        }
     except Exception as e:
-        print(f"  ! 5-day history fetch failed: {ticker} ({e})", file=sys.stderr)
+        print(f"  ! price technicals fetch failed: {ticker} ({e})", file=sys.stderr)
         return None
 
 
@@ -655,6 +691,19 @@ def save_json(path, data):
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
+def format_epoch_date(epoch_seconds):
+    """Formats a Yahoo epoch timestamp (earnings/ex-dividend dates) as a plain London
+    date — 'today' logic doesn't apply here since these are future calendar facts, not
+    news items, so no recency filtering, just a readable date."""
+    if not epoch_seconds:
+        return None
+    try:
+        dt = datetime.fromtimestamp(epoch_seconds, tz=timezone.utc).astimezone(LONDON_TZ)
+        return dt.strftime("%d %b %Y")
+    except Exception:
+        return None
+
+
 def render_dashboard(data, watchlist):
     items_by_ticker = data.get("items", {})
     quotes = data.get("quotes", {})
@@ -744,9 +793,23 @@ def render_dashboard(data, watchlist):
                 f'<br/><span class="meta">🎯 target {target:.2f}{f" · {esc(rec)}" if rec else ""}</span>'
                 if target else ""
             )
+            earnings_date = format_epoch_date(q.get("nextEarningsDate"))
+            ex_div_date = format_epoch_date(q.get("exDividendDate"))
+            calendar_html = ""
+            if earnings_date:
+                calendar_html += f'<br/><span class="meta">📅 next earnings: {earnings_date}</span>'
+            if ex_div_date:
+                calendar_html += f'<br/><span class="meta">💰 ex-dividend: {ex_div_date}</span>'
+            rsi14 = q.get("rsi14")
+            above_ma = q.get("aboveMA20")
+            technicals_html = ""
+            if rsi14 is not None:
+                technicals_html += f'<br/><span class="meta">RSI(14): {rsi14:.1f}</span>'
+            if above_ma is not None:
+                technicals_html += f'<br/><span class="meta">Price is {"above" if above_ma else "below"} its 20-day average</span>'
             return (
                 f'<tr><td>{i+1}</td><td><b>{esc(symbol)}</b><br/>'
-                f'<span class="meta">{name}</span>{news_html}{target_html}</td><td{last_cls}>{last_col}</td></tr>'
+                f'<span class="meta">{name}</span>{news_html}{target_html}{calendar_html}{technicals_html}</td><td{last_cls}>{last_col}</td></tr>'
             )
         return "".join(row(i, q) for i, q in enumerate(rows)) or '<tr><td colspan="3" class="meta">No data yet</td></tr>'
 
@@ -1158,23 +1221,33 @@ def main():
         uptrend_targets = dict(ranked_stocks)
         for stock in watchlist:
             uptrend_targets.setdefault(stock["ticker"], stock["name"])
-        print(f"Checking 5-day price history and analyst targets for {len(uptrend_targets)} stocks...")
-        screener_targets = {}  # symbol -> {"targetMeanPrice":..., "recommendationKey":...} for every screener-ranked stock
+        print(f"Checking price technicals, targets, earnings/dividend dates for {len(uptrend_targets)} stocks...")
+        screener_targets = {}  # symbol -> {targetMeanPrice, recommendationKey, nextEarningsDate, exDividendDate, rsi14, ma20, aboveMA20}
         for symbol, name in uptrend_targets.items():
-            hist = fetch_5day_change(symbol)
-            if hist and hist["changePct5d"] >= UPTREND_5DAY_THRESHOLD_PCT:
+            hist = fetch_price_technicals(symbol)
+            if hist and hist.get("changePct5d") is not None and hist["changePct5d"] >= UPTREND_5DAY_THRESHOLD_PCT:
                 uptrend_stocks.append({"symbol": symbol, "name": name, **hist})
             time.sleep(0.3)  # lighter stagger — this hits Yahoo, not Google, different rate-limit budget
 
-            # Real broker price targets (from Yahoo's own aggregation of published analyst
-            # calls, same source already used for the watchlist) — not a prediction we're
-            # generating, just surfacing what brokers have already published.
+            # Real broker price targets + earnings/dividend calendar dates — all from
+            # Yahoo's own published data, in the SAME request as before (calendarEvents
+            # was added to the existing modules list, not a new call).
             analyst = fetch_yahoo_analyst(symbol)
-            if analyst and analyst.get("targetMeanPrice"):
-                screener_targets[symbol] = {
-                    "targetMeanPrice": analyst["targetMeanPrice"],
-                    "recommendationKey": analyst.get("recommendationKey"),
-                }
+            if analyst:
+                entry = {}
+                if analyst.get("targetMeanPrice"):
+                    entry["targetMeanPrice"] = analyst["targetMeanPrice"]
+                    entry["recommendationKey"] = analyst.get("recommendationKey")
+                if analyst.get("nextEarningsDate"):
+                    entry["nextEarningsDate"] = analyst["nextEarningsDate"]
+                if analyst.get("exDividendDate"):
+                    entry["exDividendDate"] = analyst["exDividendDate"]
+                if hist:
+                    entry["rsi14"] = hist.get("rsi14")
+                    entry["ma20"] = hist.get("ma20")
+                    entry["aboveMA20"] = hist.get("aboveMA20")
+                if entry:
+                    screener_targets[symbol] = entry
             time.sleep(0.3)
 
         # Attach the target-price data directly onto each screener row so it displays
@@ -1183,8 +1256,7 @@ def main():
             for row in screener.get(section, []):
                 extra = screener_targets.get(row["symbol"])
                 if extra:
-                    row["targetMeanPrice"] = extra["targetMeanPrice"]
-                    row["recommendationKey"] = extra.get("recommendationKey")
+                    row.update(extra)  # attach whichever fields were found: target, recommendation, earnings/ex-div dates, RSI/MA
 
         # Market-wide broker alerts: covers ALL LSE companies for upgrade/downgrade news,
         # not just the watchlist — this is what "all LSE companies" actually needs, without
