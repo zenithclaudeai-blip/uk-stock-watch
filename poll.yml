@@ -1,0 +1,61 @@
+name: UK Stock Watch Poller
+on:
+  schedule:
+    # GitHub's minimum interval is 5 minutes, and during high load it can run late —
+    # treat this as "roughly every 5 minutes," not a real-time guarantee.
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}   # lets you trigger a run manually from the Actions tab
+permissions:
+  contents: write
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run poller
+        id: poll
+        env:
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+          WEBHOOK_TEMPLATE: ${{ secrets.WEBHOOK_TEMPLATE }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python poll.py
+      - name: Commit updated state & dashboard
+        # Always commit whatever state/dashboard changes exist, even if the poller step
+        # above failed partway through — partial progress (e.g. a dashboard render that
+        # completed before a later error) shouldn't be lost, and this commit is also what
+        # keeps the repo "active" so GitHub doesn't auto-disable the schedule after 60 days.
+        if: always()
+        run: |
+          git config user.name "uk-stock-watch-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add state docs
+          git diff --staged --quiet || git commit -m "Update feed [skip ci]"
+          # Pull-rebase before pushing — another run (the hourly FTSE350 job, or you
+          # pushing manually) can land a commit on main between this job starting and
+          # finishing. Without this, that race causes a rejected push every time it
+          # happens (seen repeatedly). Rebasing this run's single commit on top of
+          # whatever's new on main, then pushing, resolves it automatically instead
+          # of requiring a manual re-run.
+          # -X ours: state/docs are FULLY REGENERATED every run, never hand-edited —
+          # so when two runs' commits both rewrite the same file, there's nothing
+          # to line-merge; "keep the newer full regeneration" is always correct.
+          # Safe specifically because ONLY this bot commits to these paths.
+          git pull --rebase -X ours origin main
+          git push
+      - name: Notify on total failure (backstop)
+        # Fires only if the poller step failed AND its own internal webhook attempt
+        # (inside poll.py's try/except) also didn't get a chance to run — e.g. Python
+        # itself failed to start. A direct curl here means a failure is never fully
+        # silent, even in that worst case.
+        if: failure() && steps.poll.outcome == 'failure'
+        env:
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+        run: |
+          if [ -n "$WEBHOOK_URL" ]; then
+            curl -s -G "$WEBHOOK_URL" --data-urlencode "text=⚠️ UK Stock Watch: the poller failed to run at all this cycle (see GitHub Actions log). Will retry next scheduled run." || true
+          fi

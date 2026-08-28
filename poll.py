@@ -1169,18 +1169,43 @@ def render_dashboard(data, watchlist):
     def research_card(stock):
         ticker, name = stock["ticker"], stock["name"]
         entry = market_research.get(ticker)
+
+        # Free, always-on facts layer — same data already gathered for News Feed/
+        # Watchlist, just pulled together per-stock. No API key needed for this part.
+        quote = quotes.get(ticker, {})
+        facts_parts = []
+        target = quote.get("targetMeanPrice")
+        rec = quote.get("recommendationKey")
+        if target:
+            facts_parts.append(f'🎯 Broker consensus target: <span class="val">{target}</span>' + (f' · {esc(rec)}' if rec else ''))
+        recent_items = (items_by_ticker.get(ticker) or [])[:5]
+        headlines_html = ""
+        if recent_items:
+            headlines_html = '<ul style="margin:6px 0 0;padding-left:18px;font-size:12px;line-height:1.7;">' + "".join(
+                f'<li><span class="meta">{esc(it.get("pubDate",""))} — {esc(it.get("source",""))}</span><br/>'
+                f'<a href="{esc(it.get("link","#"))}" target="_blank" style="color:#e8eaed;">{esc(it.get("title",""))}</a></li>'
+                for it in recent_items
+            ) + '</ul>'
+        facts_html = ""
+        if facts_parts:
+            facts_html += f'<p class="meta" style="margin:6px 0 0;">{" · ".join(facts_parts)}</p>'
+        facts_html += headlines_html
+        if not facts_html:
+            facts_html = '<p class="meta" style="margin:6px 0 0;">No recent news/broker data gathered for this stock yet.</p>'
+
+        # Optional AI-written paragraph on top, only if a key is configured and this
+        # stock's write-up has actually been generated.
+        ai_html = ""
         if entry and entry.get("text"):
-            body = f'<p style="margin:6px 0 0;font-size:13px;line-height:1.6;">{esc(entry["text"])}</p>'
-            stamp = f'<span class="meta">Generated {esc(entry.get("generatedAt","?"))} UTC — synthesised from this tool\'s own gathered news/broker data, not fresh web research.</span>'
-        elif not os.environ.get("ANTHROPIC_API_KEY", "").strip():
-            body = '<p class="meta" style="margin:6px 0 0;">Not enabled — requires an ANTHROPIC_API_KEY secret to be configured.</p>'
-            stamp = ""
-        else:
-            body = '<p class="meta" style="margin:6px 0 0;">Not generated yet — refreshes automatically, a few stocks per run.</p>'
-            stamp = ""
+            ai_html = (
+                f'<p style="margin:10px 0 0;font-size:13px;line-height:1.6;border-top:1px solid #2a2e37;padding-top:8px;">'
+                f'🤖 {esc(entry["text"])}</p>'
+                f'<span class="meta">AI summary generated {esc(entry.get("generatedAt","?"))} UTC from the facts above — not fresh web research, not a recommendation.</span>'
+            )
+
         return (
             f'<div class="item"><b>{esc(ticker)}</b> <span class="meta">({esc(name)})</span>'
-            f'{body}{"<br/>" + stamp if stamp else ""}</div>'
+            f'{facts_html}{ai_html}</div>'
         )
 
     research_rows = "".join(research_card(s) for s in watchlist)
@@ -1279,7 +1304,7 @@ table td, table th{{padding:7px 8px;border-bottom:1px solid #2a2e37;text-align:l
 <div class="quotes">{quote_rows or '<span class="meta">No quotes yet</span>'}</div>
 
 <h2 id="market-research">🔎 Market Research</h2>
-<p class="meta">AI-synthesised from this tool's own gathered news, broker ratings, and prices — NOT fresh web research, and NOT a recommendation. A capped number of entries refresh each run, so the whole watchlist stays current within roughly a day rather than all at once. Always cross-check anything here against primary sources before acting on it.</p>
+<p class="meta">Real broker targets, recent news, and consensus ratings, already gathered by this tool — free, always live, no AI or API cost involved. If an ANTHROPIC_API_KEY is configured, a short AI-written summary appears too (🤖), synthesised only from these same facts — never fresh web research, never a recommendation. Always cross-check anything here against primary sources before acting on it.</p>
 {research_rows or '<p class="meta">No watchlist stocks to show yet.</p>'}
 
 <h2 id="broker-alerts">⬆⬇🎯 Market-wide Broker Alerts (all LSE, not just watchlist)</h2>

@@ -1,0 +1,56 @@
+name: UK Stock Watch Poller — FTSE 350 (hourly)
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run poller (large watchlist)
+        id: poll
+        env:
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+          WEBHOOK_TEMPLATE: ${{ secrets.WEBHOOK_TEMPLATE }}
+          WATCHLIST_FILE: watchlist-ftse350.json
+          STATE_DIR: state-ftse350
+          DOCS_FILENAME: ftse350.html
+          SKIP_MARKET_WIDE: "true"
+        run: python poll.py
+
+      - name: Commit updated state & dashboard
+        if: always()
+        run: |
+          git config user.name "uk-stock-watch-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add state-ftse350 docs/ftse350.html
+          git diff --staged --quiet || git commit -m "Update FTSE 350 feed [skip ci]"
+          # -X ours: state/docs are FULLY REGENERATED every run, never hand-edited —
+          # so when two runs' commits both rewrite the same file, there's nothing
+          # to line-merge; "keep the newer full regeneration" is always correct.
+          # Safe specifically because ONLY this bot commits to these paths.
+          git pull --rebase -X ours origin main
+          git push
+
+      - name: Notify on total failure (backstop)
+        if: failure() && steps.poll.outcome == 'failure'
+        env:
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+        run: |
+          if [ -n "$WEBHOOK_URL" ]; then
+            curl -s -G "$WEBHOOK_URL" --data-urlencode "text=⚠️ UK Stock Watch (FTSE 350 job): failed to run this cycle. Will retry next hour." || true
+          fi
