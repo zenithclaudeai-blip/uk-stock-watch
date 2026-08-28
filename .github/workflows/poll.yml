@@ -1,25 +1,22 @@
 name: UK Stock Watch Poller
-
 on:
   schedule:
     # GitHub's minimum interval is 5 minutes, and during high load it can run late —
     # treat this as "roughly every 5 minutes," not a real-time guarantee.
     - cron: "*/5 * * * *"
   workflow_dispatch: {}   # lets you trigger a run manually from the Actions tab
-
 permissions:
   contents: write
-
 jobs:
   poll:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
+      - name: Install dependencies
+        run: pip install -r requirements.txt
       - name: Run poller
         id: poll
         env:
@@ -27,7 +24,6 @@ jobs:
           WEBHOOK_TEMPLATE: ${{ secrets.WEBHOOK_TEMPLATE }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python poll.py
-
       - name: Commit updated state & dashboard
         # Always commit whatever state/dashboard changes exist, even if the poller step
         # above failed partway through — partial progress (e.g. a dashboard render that
@@ -40,7 +36,6 @@ jobs:
           git add state docs
           git diff --staged --quiet || git commit -m "Update feed [skip ci]"
           git push
-
       - name: Notify on total failure (backstop)
         # Fires only if the poller step failed AND its own internal webhook attempt
         # (inside poll.py's try/except) also didn't get a chance to run — e.g. Python
