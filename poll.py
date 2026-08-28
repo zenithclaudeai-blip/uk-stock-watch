@@ -181,7 +181,7 @@ def fetch_yahoo_analyst(ticker):
     crumb = get_yahoo_crumb()
     url = (
         f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{urllib.parse.quote(symbol)}"
-        "?modules=upgradeDowngradeHistory,recommendationTrend,financialData,calendarEvents"
+        "?modules=upgradeDowngradeHistory,recommendationTrend,financialData,calendarEvents,summaryDetail"
     )
     if crumb:
         url += f"&crumb={urllib.parse.quote(crumb)}"
@@ -196,12 +196,18 @@ def fetch_yahoo_analyst(ticker):
         earnings_dates = ((cal.get("earnings") or {}).get("earningsDate")) or []
         next_earnings = earnings_dates[0].get("raw") if earnings_dates else None
         ex_div = (cal.get("exDividendDate") or {}).get("raw")
+        summary = result.get("summaryDetail") or {}
+        div_rate = (summary.get("dividendRate") or {}).get("raw")  # currency amount per share per year
+        div_yield_raw = (summary.get("dividendYield") or {}).get("raw")  # Yahoo returns this as a fraction, e.g. 0.045 = 4.5%
+        div_yield_pct = div_yield_raw * 100 if div_yield_raw is not None else None
         return {
             "history": history,
             "targetMeanPrice": (fin.get("targetMeanPrice") or {}).get("raw"),
             "recommendationKey": fin.get("recommendationKey"),
             "nextEarningsDate": next_earnings,  # unix epoch seconds, or None
             "exDividendDate": ex_div,  # unix epoch seconds, or None
+            "dividendRate": div_rate,  # per-share currency amount, or None
+            "dividendYieldPct": div_yield_pct,  # already converted to a percentage, or None
         }
     except Exception as e:
         print(f"  ! yahoo analyst history failed: {ticker} ({e})", file=sys.stderr)
@@ -795,11 +801,18 @@ def render_dashboard(data, watchlist):
             )
             earnings_date = format_epoch_date(q.get("nextEarningsDate"))
             ex_div_date = format_epoch_date(q.get("exDividendDate"))
+            div_rate = q.get("dividendRate")
+            div_yield = q.get("dividendYieldPct")
             calendar_html = ""
             if earnings_date:
                 calendar_html += f'<br/><span class="meta">📅 next earnings: {earnings_date}</span>'
             if ex_div_date:
                 calendar_html += f'<br/><span class="meta">💰 ex-dividend: {ex_div_date}</span>'
+            if div_rate is not None or div_yield is not None:
+                rate_str = f'{div_rate:.2f}/share' if div_rate is not None else ''
+                yield_str = f'{div_yield:.2f}% yield' if div_yield is not None else ''
+                joined = " · ".join(s for s in (rate_str, yield_str) if s)
+                calendar_html += f'<br/><span class="meta">💷 dividend: {joined}</span>'
             rsi14 = q.get("rsi14")
             above_ma = q.get("aboveMA20")
             technicals_html = ""
@@ -1242,6 +1255,10 @@ def main():
                     entry["nextEarningsDate"] = analyst["nextEarningsDate"]
                 if analyst.get("exDividendDate"):
                     entry["exDividendDate"] = analyst["exDividendDate"]
+                if analyst.get("dividendRate") is not None:
+                    entry["dividendRate"] = analyst["dividendRate"]
+                if analyst.get("dividendYieldPct") is not None:
+                    entry["dividendYieldPct"] = analyst["dividendYieldPct"]
                 if hist:
                     entry["rsi14"] = hist.get("rsi14")
                     entry["ma20"] = hist.get("ma20")
