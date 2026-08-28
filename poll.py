@@ -799,36 +799,48 @@ table td, table th{{padding:5px 6px;border-bottom:1px solid #2a2e37;text-align:l
 <p class="lastpoll" style="text-align:left;font-size:13px;color:#50dc96;margin:0 0 10px;">🕐 Live as of {esc(str(last_poll))} — this page auto-refreshes every 90s (data itself updates every ~5 min)</p>
 <p class="disclaimer">LSE-listed stocks only. Informational only — not investment advice, not a guarantee of any outcome.</p>
 
-<h2>Heat Map (top movers, by size of move)</h2>
+<nav style="margin:14px 0;padding:10px;background:#161920;border-radius:6px;font-size:13px;line-height:2.2;">
+<b style="color:#9aa0a6;margin-right:8px;">Jump to:</b>
+<a href="#heatmap" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🗺️ Heat Map</a>
+<a href="#screener" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📊 Screener</a>
+<a href="#mover-news" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📰 Mover News</a>
+<a href="#uptrend" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📈 5-Day Uptrend</a>
+<a href="#movers-today" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🔥 Moving Today</a>
+<a href="#watchlist" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">👀 Watchlist</a>
+<a href="#broker-alerts" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">⬆⬇🎯 Broker Alerts</a>
+<a href="#news-feed" style="color:#7fb3ff;text-decoration:none;">📰 News Feed</a>
+</nav>
+
+<h2 id="heatmap">🗺️ Heat Map (top movers, by size of move)</h2>
 <div class="heatmap-grid">{heatmap_cells or '<span class="meta">No data yet</span>'}</div>
 
-<h2>LSE Screener</h2>
+<h2 id="screener">📊 LSE Screener (Volume / Gainers / Losers)</h2>
 <div class="screener-grid">
   <div><h3>Top Volume</h3><table><tr><th>#</th><th>Symbol</th><th>Volume</th></tr>{vol_rows}</table></div>
   <div><h3>Top Gainers</h3><table><tr><th>#</th><th>Symbol</th><th>Chg%</th></tr>{gain_rows}</table></div>
   <div><h3>Top Losers</h3><table><tr><th>#</th><th>Symbol</th><th>Chg%</th></tr>{lose_rows}</table></div>
 </div>
 
-<h2>News on Today's Top Movers</h2>
+<h2 id="mover-news">📰 News on Today's Top Movers</h2>
 <p class="meta">Real, dated-today news for any stock currently in Volume/Gainers/Losers above — not limited to your watchlist.</p>
 <div>{screener_news_rows or '<span class="meta">No same-day news found for today&#39;s ranked stocks yet.</span>'}</div>
 
-<h2>5-Day Uptrend ({UPTREND_5DAY_THRESHOLD_PCT:.0f}%+, screener + watchlist)</h2>
+<h2 id="uptrend">📈 5-Day Uptrend ({UPTREND_5DAY_THRESHOLD_PCT:.0f}%+, screener + watchlist)</h2>
 <p class="meta">Real closing-price history over the last 5 trading days — a fact about the past, not a forecast of what happens next.</p>
 <div class="quotes">{uptrend_rows or '<span class="meta">Nothing has met the 5-day threshold right now</span>'}</div>
 
-<h2>Already Moving Today (watchlist, ±{BIG_MOVER_THRESHOLD_PCT:.0f}%+)</h2>
+<h2 id="movers-today">🔥 Already Moving Today (watchlist, ±{BIG_MOVER_THRESHOLD_PCT:.0f}%+)</h2>
 <p class="meta">A fact about what already happened today — not a forecast of what happens next.</p>
 <div class="quotes">{mover_rows or '<span class="meta">Nothing past the threshold right now</span>'}</div>
 
-<h2>Your Watchlist</h2>
+<h2 id="watchlist">👀 Your Watchlist</h2>
 <div class="quotes">{quote_rows or '<span class="meta">No quotes yet</span>'}</div>
 
-<h2>Market-wide Broker Alerts (all LSE, not just watchlist)</h2>
+<h2 id="broker-alerts">⬆⬇🎯 Market-wide Broker Alerts (all LSE, not just watchlist)</h2>
 <p class="meta">Upgrades/downgrades from anywhere on the LSE, not limited to your watchlist below.</p>
 {market_wide_rows or '<p class="meta">No market-wide alerts yet.</p>'}
 
-<h2>News &amp; Broker Feed</h2>
+<h2 id="news-feed">📰 News &amp; Broker Feed (watchlist)</h2>
 {item_rows or '<p class="meta">No items yet — first run may still be in progress.</p>'}
 <p class="lastpoll">Last checked: {esc(str(last_poll))}</p>
 </body></html>"""
