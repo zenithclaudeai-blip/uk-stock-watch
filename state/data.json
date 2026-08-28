@@ -74,65 +74,79 @@
       "dayHigh": 110.25,
       "dayLow": 109.6,
       "rangePct": 0.5946935041171141,
-      "asOf": 1787901017000,
+      "asOf": 1787901331000,
       "targetMeanPrice": 120.368004,
       "recommendationKey": "none"
     },
     "BARC": {
-      "price": 494.65,
+      "price": 494.55,
       "currency": "GBp",
-      "change": 2.0499999999999545,
-      "changePct": 0.4161591555014118,
+      "change": 1.9499999999999886,
+      "changePct": 0.3958587088915933,
       "dayHigh": 498.7,
       "dayLow": 494.15,
       "rangePct": 0.9236703207470587,
-      "asOf": 1787901018000,
+      "asOf": 1787901331000,
       "targetMeanPrice": 576.235,
       "recommendationKey": "buy"
     },
     "BP.": {
-      "price": 519.0,
+      "price": 517.3,
       "currency": "GBp",
-      "change": 3.6000000000000227,
-      "changePct": 0.6984866123399346,
+      "change": 1.8999999999999773,
+      "changePct": 0.3686457120682921,
       "dayHigh": 521.8,
       "dayLow": 515.9,
       "rangePct": 1.144741948001548,
-      "asOf": 1787901019000,
-      "targetMeanPrice": 594.3785,
+      "asOf": 1787901332000,
+      "targetMeanPrice": 594.48346,
       "recommendationKey": "buy"
     },
     "SHEL": {
-      "price": 3330.0,
+      "price": 3323.5,
       "currency": "GBp",
-      "change": 19.0,
-      "changePct": 0.5738447598912715,
+      "change": 12.5,
+      "changePct": 0.3775294472968892,
       "dayHigh": 3338.0,
-      "dayLow": 3327.0,
-      "rangePct": 0.33222591362126247,
-      "asOf": 1787901023000,
-      "targetMeanPrice": 3695.3254,
+      "dayLow": 3323.0,
+      "rangePct": 0.45303533675626695,
+      "asOf": 1787901331000,
+      "targetMeanPrice": 3695.978,
       "recommendationKey": "buy"
     },
     "VOD": {
-      "price": 117.55,
+      "price": 117.6,
       "currency": "GBp",
-      "change": 0.45000000000000284,
-      "changePct": 0.38428693424423815,
+      "change": 0.5,
+      "changePct": 0.4269854824935952,
       "dayHigh": 118.2,
-      "dayLow": 117.5,
-      "rangePct": 0.5977796754910358,
-      "asOf": 1787901023000,
-      "targetMeanPrice": 114.55125,
+      "dayLow": 117.4,
+      "rangePct": 0.6831767719897499,
+      "asOf": 1787901337000,
+      "targetMeanPrice": 114.556595,
       "recommendationKey": "none"
     }
   },
   "screener": {
     "volume": [
       {
+        "symbol": "PREM.L",
+        "name": "PREMIER AFRICAN MINERALS LIMITE",
+        "volume": 90613110,
+        "price": 0.01324,
+        "changePct": 3.843141
+      },
+      {
+        "symbol": "FORG.L",
+        "name": "FORGENT PLC ORD EUR0.0001 (CDI)",
+        "volume": 44413346,
+        "price": 0.008,
+        "changePct": -15.789467
+      },
+      {
         "symbol": "VALL.L",
         "name": "VANGUARD FUNDS PLC VANGUARD FTS",
-        "volume": 2233052,
+        "volume": 2495259,
         "price": 3.67,
         "changePct": 0.4378763
       },
@@ -167,9 +181,9 @@
       {
         "symbol": "BZT.L",
         "name": "BEZANT RESOURCES PLC ORD 0.002P",
-        "volume": 698421,
-        "price": 0.14318,
-        "changePct": 2.2714267
+        "volume": 2931763,
+        "price": 0.141,
+        "changePct": 0.71428716
       },
       {
         "symbol": "XTR.L",
@@ -184,23 +198,17 @@
         "volume": 15204964,
         "price": 0.11,
         "changePct": 4.761907
-      },
-      {
-        "symbol": "CPX.L",
-        "name": "CAP-XX LIMITED ORD NPV",
-        "volume": 16004105,
-        "price": 0.1416,
-        "changePct": -2.3448262
-      },
-      {
-        "symbol": "AG79.L",
-        "name": "AG79.L",
-        "volume": 12000000,
-        "price": 102.054,
-        "changePct": 0.5458136
       }
     ],
-    "gainers": [],
+    "gainers": [
+      {
+        "symbol": "RKH.L",
+        "name": "ROCKHOPPER EXPLORATION PLC ORD ",
+        "volume": 843591,
+        "price": 80.0,
+        "changePct": 8.657269
+      }
+    ],
     "losers": []
   },
   "bigMovers": [],
@@ -217,5 +225,5 @@
       "detectedAt": "2026-08-27T20:55:18.040341+00:00"
     }
   ],
-  "lastPoll": "2026-08-28 07:25:25"
+  "lastPoll": "2026-08-28 07:30:41"
 }
