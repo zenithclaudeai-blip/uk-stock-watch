@@ -191,7 +191,7 @@ def fetch_yahoo_analyst(ticker):
     crumb = get_yahoo_crumb()
     url = (
         f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{urllib.parse.quote(symbol)}"
-        "?modules=upgradeDowngradeHistory,recommendationTrend,financialData,calendarEvents,summaryDetail,defaultKeyStatistics,price"
+        "?modules=upgradeDowngradeHistory,recommendationTrend,financialData,calendarEvents,summaryDetail,defaultKeyStatistics,price,assetProfile"
     )
     if crumb:
         url += f"&crumb={urllib.parse.quote(crumb)}"
@@ -215,6 +215,16 @@ def fetch_yahoo_analyst(ticker):
         trailing_pe = (summary.get("trailingPE") or {}).get("raw")
         eps = (stats.get("trailingEps") or {}).get("raw")
         market_cap = (price_mod.get("marketCap") or {}).get("raw")
+        fifty_two_low = (summary.get("fiftyTwoWeekLow") or {}).get("raw")
+        fifty_two_high = (summary.get("fiftyTwoWeekHigh") or {}).get("raw")
+        held_insiders_raw = (stats.get("heldPercentInsiders") or {}).get("raw")  # fraction, e.g. 0.12 = 12%
+        held_insiders_pct = held_insiders_raw * 100 if held_insiders_raw is not None else None
+        profile = result.get("assetProfile") or {}
+        sector = profile.get("sector")
+        industry = profile.get("industry")
+        business_summary = profile.get("longBusinessSummary")
+        if business_summary and len(business_summary) > 220:
+            business_summary = business_summary[:217].rsplit(" ", 1)[0] + "..."  # trim at a word boundary
         return {
             "history": history,
             "targetMeanPrice": (fin.get("targetMeanPrice") or {}).get("raw"),
@@ -226,10 +236,89 @@ def fetch_yahoo_analyst(ticker):
             "trailingPE": trailing_pe,
             "trailingEps": eps,
             "marketCap": market_cap,
+            "fiftyTwoWeekLow": fifty_two_low,
+            "fiftyTwoWeekHigh": fifty_two_high,
+            "heldPercentInsidersPct": held_insiders_pct,
+            "sector": sector,
+            "industry": industry,
+            "businessSummary": business_summary,
         }
     except Exception as e:
         print(f"  ! yahoo analyst history failed: {ticker} ({e})", file=sys.stderr)
         return None
+
+
+FCA_SHORT_INTEREST_URL = "https://www.fca.org.uk/publication/data/short-positions-daily-update.xlsx"
+
+
+def fetch_short_interest():
+    """
+    FCA's daily Aggregate Net Short Position file — free, official, no auth.
+    T+2 lag (today's figures reflect positions from two working days ago).
+    Returns dict: COMPANY NAME (upper, stripped) -> {"pct": float, "position_date": str}
+    Fails soft (returns {}) — same pattern as every other fetch_* here.
+    """
+    try:
+        import openpyxl
+    except ImportError:
+        print("  ! short interest skipped: openpyxl not installed (add to requirements.txt)", file=sys.stderr)
+        return {}
+    try:
+        import io
+        raw = http_get(FCA_SHORT_INTEREST_URL, timeout=20)
+        wb = openpyxl.load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
+        ws = wb.active
+
+        header_row_idx, headers = None, {}
+        for i, row in enumerate(ws.iter_rows(min_row=1, max_row=10, values_only=True)):
+            for cell in row:
+                if cell and "issuer" in str(cell).lower():
+                    header_row_idx = i + 1
+                    headers = {str(h).strip().lower(): k for k, h in enumerate(row) if h}
+                    break
+            if header_row_idx:
+                break
+        if header_row_idx is None:
+            print("  ! short interest: header row not found — FCA file format may have changed", file=sys.stderr)
+            return {}
+
+        name_col = next((v for k, v in headers.items() if "issuer" in k), None)
+        pct_col = next((v for k, v in headers.items() if "%" in k or "percent" in k), None)
+        date_col = next((v for k, v in headers.items() if "date" in k), None)
+        if name_col is None or pct_col is None:
+            print(f"  ! short interest: required columns not found (saw: {list(headers.keys())})", file=sys.stderr)
+            return {}
+
+        result = {}
+        for row in ws.iter_rows(min_row=header_row_idx + 1, values_only=True):
+            if not row or row[name_col] is None:
+                continue
+            name = str(row[name_col]).strip().upper()
+            try:
+                pct = float(row[pct_col])
+            except (TypeError, ValueError):
+                continue
+            result[name] = {
+                "pct": pct,
+                "position_date": str(row[date_col]) if date_col is not None else None,
+            }
+        print(f"  short interest: loaded {len(result)} companies from FCA")
+        return result
+    except Exception as e:
+        print(f"  ! short interest fetch failed: {e}", file=sys.stderr)
+        return {}
+
+
+def match_short_interest(company_name, short_interest_map):
+    """Loose name match — FCA issuer names rarely match Yahoo's/watchlist's naming exactly."""
+    if not company_name or not short_interest_map:
+        return None
+    clean = company_name.upper().replace(" PLC", "").replace(" ORD", "").strip()
+    for fca_name, data in short_interest_map.items():
+        clean_fca = fca_name.replace(" PLC", "").replace(" ORD", "").strip()
+        if clean in clean_fca or clean_fca in clean:
+            return data
+    return None
 
 
 ACTION_CATEGORY = {"up": "upgrade", "down": "downgrade", "init": "event", "main": "news", "reit": "news"}
@@ -412,6 +501,28 @@ def yahoo_news_url(ticker):
     return "https://feeds.finance.yahoo.com/rss/2.0/headline?" + urllib.parse.urlencode(
         {"s": yahoo_symbol(ticker), "region": "UK", "lang": "en-GB"}
     )
+
+
+def fetch_ftse100():
+    """The overall market headline every major finance site leads with — a single call
+    once per cycle (not per-stock), for the ^FTSE index itself."""
+    url = "https://query1.finance.yahoo.com/v8/finance/chart/%5EFTSE?interval=1d&range=5d"
+    try:
+        data = json.loads(http_get(url))
+        result = (data.get("chart") or {}).get("result") or [None]
+        if not result[0]:
+            return None
+        meta = result[0].get("meta", {})
+        price = meta.get("regularMarketPrice")
+        prev_close = meta.get("chartPreviousClose") or meta.get("previousClose")
+        if price is None or not prev_close:
+            return None
+        change = price - prev_close
+        change_pct = change / prev_close * 100
+        return {"price": price, "change": change, "changePct": change_pct}
+    except Exception as e:
+        print(f"  ! FTSE 100 fetch failed: {e}", file=sys.stderr)
+        return None
 
 
 def fetch_yahoo_quote(ticker):
@@ -758,6 +869,7 @@ def render_dashboard(data, watchlist):
     items_by_ticker = data.get("items", {})
     quotes = data.get("quotes", {})
     screener = data.get("screener", {})
+    ftse100 = data.get("ftse100")
     screener_news = data.get("screenerNews", {})
     uptrend_stocks = data.get("uptrendStocks", [])
     big_movers = data.get("bigMovers", [])
@@ -777,6 +889,16 @@ def render_dashboard(data, watchlist):
 
     def esc(s):
         return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    ftse_html = ""
+    if ftse100:
+        chg = ftse100.get("changePct") or 0
+        cls = "up" if chg >= 0 else "down"
+        arrow = "▲" if chg >= 0 else "▼"
+        ftse_html = (
+            f'<p style="font-size:14px;margin:0 0 10px;">FTSE 100: '
+            f'<span class="{cls}">{ftse100.get("price",""):,.2f} {arrow}{abs(chg):.2f}%</span></p>'
+        )
 
     def quote_div(t, q):
         chg_cls = "up" if (q.get("change") or 0) >= 0 else "down"
@@ -869,6 +991,24 @@ def render_dashboard(data, watchlist):
                 fundamentals_parts.append(f'mkt cap <span class="val">{mcap}</span>')
             if fundamentals_parts:
                 calendar_html += f'<br/><span class="meta">📊 {" · ".join(fundamentals_parts)}</span>'
+            wk_low = q.get("fiftyTwoWeekLow")
+            wk_high = q.get("fiftyTwoWeekHigh")
+            if wk_low is not None and wk_high is not None:
+                calendar_html += f'<br/><span class="meta">📏 52-wk range: <span class="val">{wk_low:.2f}</span> – <span class="val">{wk_high:.2f}</span></span>'
+            insiders = q.get("heldPercentInsidersPct")
+            if insiders is not None:
+                calendar_html += f'<br/><span class="meta">🧑‍💼 insider ownership: <span class="val">{insiders:.1f}%</span></span>'
+            short_pct = q.get("shortInterestPct")
+            if short_pct is not None:
+                calendar_html += f'<br/><span class="meta">📉 short interest: <span class="val">{short_pct:.2f}%</span> (FCA)</span>'
+            sector = q.get("sector")
+            industry = q.get("industry")
+            if sector or industry:
+                sector_bit = " · ".join(s for s in (sector, industry) if s)
+                calendar_html += f'<br/><span class="meta">🏷️ <span class="val">{esc(sector_bit)}</span></span>'
+            biz_summary = q.get("businessSummary")
+            if biz_summary:
+                calendar_html += f'<br/><span class="meta" style="display:block;max-width:520px;">ℹ️ {esc(biz_summary)}</span>'
             rsi14 = q.get("rsi14")
             above_ma = q.get("aboveMA20")
             technicals_html = ""
@@ -996,6 +1136,7 @@ table td, table th{{padding:7px 8px;border-bottom:1px solid #2a2e37;text-align:l
 <body>
 <h1>UK Stock Watch — Live Feed</h1>
 <p class="lastpoll" style="text-align:left;font-size:13px;color:#50dc96;margin:0 0 10px;">🕐 Live as of {esc(str(last_poll))} — this page auto-refreshes every 90s (data itself updates every ~5 min)</p>
+{ftse_html}
 <p class="disclaimer">LSE-listed stocks only. Informational only — not investment advice, not a guarantee of any outcome.</p>
 
 <nav style="margin:14px 0;padding:10px;background:#161920;border-radius:6px;font-size:13px;line-height:2.2;">
@@ -1258,6 +1399,7 @@ def main():
     screener_news = {}
     uptrend_stocks = []
     screener_targets = {}
+    ftse100 = fetch_ftse100()
 
     if not SKIP_MARKET_WIDE:
         ratings_items, _ = fetch_feed(ANALYST_RATINGS_FEED_URL)
@@ -1293,6 +1435,7 @@ def main():
         for stock in watchlist:
             uptrend_targets.setdefault(stock["ticker"], stock["name"])
         print(f"Checking price technicals, targets, earnings/dividend dates for {len(uptrend_targets)} stocks...")
+        short_interest_map = fetch_short_interest()  # one fetch per run, not per ticker
         screener_targets = {}  # symbol -> {targetMeanPrice, recommendationKey, nextEarningsDate, exDividendDate, rsi14, ma20, aboveMA20}
         for symbol, name in uptrend_targets.items():
             hist = fetch_price_technicals(symbol)
@@ -1323,10 +1466,26 @@ def main():
                     entry["trailingEps"] = analyst["trailingEps"]
                 if analyst.get("marketCap") is not None:
                     entry["marketCap"] = analyst["marketCap"]
+                if analyst.get("fiftyTwoWeekLow") is not None:
+                    entry["fiftyTwoWeekLow"] = analyst["fiftyTwoWeekLow"]
+                if analyst.get("fiftyTwoWeekHigh") is not None:
+                    entry["fiftyTwoWeekHigh"] = analyst["fiftyTwoWeekHigh"]
+                if analyst.get("heldPercentInsidersPct") is not None:
+                    entry["heldPercentInsidersPct"] = analyst["heldPercentInsidersPct"]
+                if analyst.get("sector"):
+                    entry["sector"] = analyst["sector"]
+                if analyst.get("industry"):
+                    entry["industry"] = analyst["industry"]
+                if analyst.get("businessSummary"):
+                    entry["businessSummary"] = analyst["businessSummary"]
                 if hist:
                     entry["rsi14"] = hist.get("rsi14")
                     entry["ma20"] = hist.get("ma20")
                     entry["aboveMA20"] = hist.get("aboveMA20")
+                si = match_short_interest(name, short_interest_map)
+                if si:
+                    entry["shortInterestPct"] = si["pct"]
+                    entry["shortInterestDate"] = si["position_date"]
                 if entry:
                     screener_targets[symbol] = entry
             time.sleep(0.3)
@@ -1476,6 +1635,7 @@ def main():
         "items": items_by_ticker,
         "quotes": quotes,
         "screener": screener,
+        "ftse100": ftse100,
         "screenerNews": screener_news,
         "uptrendStocks": uptrend_stocks,
         "bigMovers": big_movers,
