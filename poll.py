@@ -877,15 +877,15 @@ def scale_bar_html(label, value_display, position_pct, lo_label, hi_label, color
     """
     pos = max(0, min(100, position_pct))
     return (
-        f'<div style="margin:5px 0 2px;max-width:260px;">'
-        f'<div style="display:flex;justify-content:space-between;font-size:11px;color:#9aa0a6;margin-bottom:2px;">'
+        f'<div style="margin:6px 0 3px;max-width:320px;">'
+        f'<div style="display:flex;justify-content:space-between;font-size:14px;color:#9aa0a6;margin-bottom:3px;">'
         f'<span>{esc_safe(label)}</span><span style="color:#e8eaed;font-weight:700;">{esc_safe(value_display)}</span></div>'
-        f'<div style="position:relative;height:5px;border-radius:3px;'
+        f'<div style="position:relative;height:7px;border-radius:4px;'
         f'background:linear-gradient(to right, {color_lo} 0%, {color_lo} {zone_lo}%, '
         f'#2a2e37 {zone_lo}%, #2a2e37 {zone_hi}%, {color_hi} {zone_hi}%, {color_hi} 100%);">'
-        f'<div style="position:absolute;left:{pos:.0f}%;top:-2px;width:2px;height:9px;'
+        f'<div style="position:absolute;left:{pos:.0f}%;top:-3px;width:3px;height:13px;'
         f'background:#e8eaed;border-radius:1px;"></div></div>'
-        f'<div style="display:flex;justify-content:space-between;font-size:9px;color:#6b7078;margin-top:1px;">'
+        f'<div style="display:flex;justify-content:space-between;font-size:12px;color:#6b7078;margin-top:2px;">'
         f'<span>{esc_safe(lo_label)}</span><span>{esc_safe(hi_label)}</span></div></div>'
     )
 
@@ -1241,36 +1241,36 @@ def render_dashboard(data, watchlist):
 <meta http-equiv="refresh" content="90">
 <title>UK Stock Watch</title>
 <style>
-body{{background:#0f1115;color:#e8eaed;font-family:-apple-system,sans-serif;margin:0;padding:12px;font-size:14px}}
-h1{{font-size:20px;margin:4px 0;font-weight:800}}
-h2{{font-size:17px;margin:22px 0 8px;font-weight:800;border-left:4px solid #7fb3ff;padding-left:10px}}
-h3{{font-size:13px;margin:0 0 6px;color:#c2c7d0;font-weight:700}}
+body{{background:#0f1115;color:#e8eaed;font-family:-apple-system,sans-serif;margin:0;padding:12px;font-size:17px;line-height:1.6}}
+h1{{font-size:26px;margin:4px 0;font-weight:800}}
+h2{{font-size:21px;margin:26px 0 10px;font-weight:800;border-left:4px solid #7fb3ff;padding-left:10px}}
+h3{{font-size:16px;margin:0 0 8px;color:#c2c7d0;font-weight:700}}
 .screener-grid{{display:grid;grid-template-columns:1fr;gap:10px}}
 @media(min-width:600px){{.screener-grid{{grid-template-columns:1fr 1fr 1fr}}}}
 .heatmap-grid{{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:16px}}
 @media(min-width:600px){{.heatmap-grid{{grid-template-columns:repeat(8,1fr)}}}}
 .heat-cell{{border-radius:4px;padding:8px 4px;text-align:center;color:#fff}}
-.heat-symbol{{font-size:11px;font-weight:700}}
-.heat-pct{{font-size:10px;opacity:0.9}}
-.disclaimer{{background:#1c2b25;border:1px solid #274235;color:#9aa0a6;border-radius:6px;padding:8px;font-size:11px;margin-bottom:10px}}
+.heat-symbol{{font-size:14px;font-weight:700}}
+.heat-pct{{font-size:13px;opacity:0.9}}
+.disclaimer{{background:#1c2b25;border:1px solid #274235;color:#9aa0a6;border-radius:6px;padding:10px;font-size:14px;margin-bottom:10px}}
 .quotes{{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}}
-.q{{background:#171a21;border:1px solid #2a2e37;border-radius:6px;padding:6px 10px;font-size:12px}}
-.up{{color:#50dc96;font-weight:800;font-size:14px}} .down{{color:#ff6b6b;font-weight:800;font-size:14px}}
-table{{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px}}
-table td, table th{{padding:7px 8px;border-bottom:1px solid #2a2e37;text-align:left}}
-.item{{background:#171a21;border:1px solid #2a2e37;border-radius:8px;padding:10px;margin-bottom:8px}}
-.item a{{color:#e8eaed;text-decoration:none;font-size:14px;font-weight:600}}
+.q{{background:#171a21;border:1px solid #2a2e37;border-radius:6px;padding:8px 12px;font-size:15px}}
+.up{{color:#50dc96;font-weight:800;font-size:17px}} .down{{color:#ff6b6b;font-weight:800;font-size:17px}}
+table{{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:16px}}
+table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:left}}
+.item{{background:#171a21;border:1px solid #2a2e37;border-radius:8px;padding:12px;margin-bottom:8px}}
+.item a{{color:#e8eaed;text-decoration:none;font-size:17px;font-weight:600}}
 .item a:hover{{text-decoration:underline}}
-.meta{{color:#9aa0a6;font-size:12px;line-height:1.9}}
+.meta{{color:#9aa0a6;font-size:15px;line-height:2.0}}
 .val{{color:#e8eaed;font-weight:700}}
-.badge{{border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-right:4px}}
+.badge{{border-radius:4px;padding:2px 8px;font-size:12px;font-weight:700;margin-right:4px}}
 .badge.upgrade{{background:#163a2a;color:#50dc96}}
 .badge.downgrade{{background:#3a1919;color:#ff6b6b}}
 .badge.target{{background:#2a2a17;color:#e0d267}}
 .badge.director_dealing{{background:#1a2a3a;color:#7fb3ff}}
 .badge.event{{background:#1c2a3a;color:#6ab6ff}}
 .badge.news{{background:#22262f;color:#9aa0a6}}
-.broker{{background:#2a1c3a;color:#c69bf0;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-right:4px}}
+.broker{{background:#2a1c3a;color:#c69bf0;border-radius:4px;padding:2px 8px;font-size:12px;font-weight:700;margin-right:4px}}
 .lastpoll{{color:#9aa0a6;font-size:11px;text-align:right}}
 </style></head>
 <body>
@@ -1279,7 +1279,7 @@ table td, table th{{padding:7px 8px;border-bottom:1px solid #2a2e37;text-align:l
 {ftse_html}
 <p class="disclaimer">LSE-listed stocks only. Informational only — not investment advice, not a guarantee of any outcome.</p>
 
-<nav style="margin:14px 0;padding:10px;background:#161920;border-radius:6px;font-size:13px;line-height:2.2;">
+<nav style="margin:14px 0;padding:12px;background:#161920;border-radius:6px;font-size:16px;line-height:2.4;">
 <b style="color:#9aa0a6;margin-right:8px;">Jump to:</b>
 <a href="#heatmap" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🗺️ Heat Map</a>
 <a href="#screener" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📊 Screener</a>
