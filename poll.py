@@ -738,9 +738,15 @@ def render_dashboard(data, watchlist):
                 )
             else:
                 news_html = ""
+            target = q.get("targetMeanPrice")
+            rec = q.get("recommendationKey")
+            target_html = (
+                f'<br/><span class="meta">🎯 target {target:.2f}{f" · {esc(rec)}" if rec else ""}</span>'
+                if target else ""
+            )
             return (
                 f'<tr><td>{i+1}</td><td><b>{esc(symbol)}</b><br/>'
-                f'<span class="meta">{name}</span>{news_html}</td><td{last_cls}>{last_col}</td></tr>'
+                f'<span class="meta">{name}</span>{news_html}{target_html}</td><td{last_cls}>{last_col}</td></tr>'
             )
         return "".join(row(i, q) for i, q in enumerate(rows)) or '<tr><td colspan="3" class="meta">No data yet</td></tr>'
 
@@ -1090,6 +1096,7 @@ def main():
     ratings_items = []
     screener_news = {}
     uptrend_stocks = []
+    screener_targets = {}
 
     if not SKIP_MARKET_WIDE:
         ratings_items, _ = fetch_feed(ANALYST_RATINGS_FEED_URL)
@@ -1125,12 +1132,33 @@ def main():
         uptrend_targets = dict(ranked_stocks)
         for stock in watchlist:
             uptrend_targets.setdefault(stock["ticker"], stock["name"])
-        print(f"Checking 5-day price history for {len(uptrend_targets)} stocks...")
+        print(f"Checking 5-day price history and analyst targets for {len(uptrend_targets)} stocks...")
+        screener_targets = {}  # symbol -> {"targetMeanPrice":..., "recommendationKey":...} for every screener-ranked stock
         for symbol, name in uptrend_targets.items():
             hist = fetch_5day_change(symbol)
             if hist and hist["changePct5d"] >= UPTREND_5DAY_THRESHOLD_PCT:
                 uptrend_stocks.append({"symbol": symbol, "name": name, **hist})
             time.sleep(0.3)  # lighter stagger — this hits Yahoo, not Google, different rate-limit budget
+
+            # Real broker price targets (from Yahoo's own aggregation of published analyst
+            # calls, same source already used for the watchlist) — not a prediction we're
+            # generating, just surfacing what brokers have already published.
+            analyst = fetch_yahoo_analyst(symbol)
+            if analyst and analyst.get("targetMeanPrice"):
+                screener_targets[symbol] = {
+                    "targetMeanPrice": analyst["targetMeanPrice"],
+                    "recommendationKey": analyst.get("recommendationKey"),
+                }
+            time.sleep(0.3)
+
+        # Attach the target-price data directly onto each screener row so it displays
+        # with the row itself — no separate lookup needed on the dashboard/message side.
+        for section in ("volume", "gainers", "losers"):
+            for row in screener.get(section, []):
+                extra = screener_targets.get(row["symbol"])
+                if extra:
+                    row["targetMeanPrice"] = extra["targetMeanPrice"]
+                    row["recommendationKey"] = extra.get("recommendationKey")
 
         # Market-wide broker alerts: covers ALL LSE companies for upgrade/downgrade news,
         # not just the watchlist — this is what "all LSE companies" actually needs, without
