@@ -39,7 +39,11 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           git add state-ftse350 docs/ftse350.html
           git diff --staged --quiet || git commit -m "Update FTSE 350 feed [skip ci]"
-          git pull --rebase --autostash origin main
+          # -X ours: state/docs are FULLY REGENERATED every run, never hand-edited —
+          # so when two runs' commits both rewrite the same file, there's nothing
+          # to line-merge; "keep the newer full regeneration" is always correct.
+          # Safe specifically because ONLY this bot commits to these paths.
+          git pull --rebase -X ours origin main
           git push
 
       - name: Notify on total failure (backstop)

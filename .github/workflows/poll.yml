@@ -41,7 +41,11 @@ jobs:
           # happens (seen repeatedly). Rebasing this run's single commit on top of
           # whatever's new on main, then pushing, resolves it automatically instead
           # of requiring a manual re-run.
-          git pull --rebase --autostash origin main
+          # -X ours: state/docs are FULLY REGENERATED every run, never hand-edited —
+          # so when two runs' commits both rewrite the same file, there's nothing
+          # to line-merge; "keep the newer full regeneration" is always correct.
+          # Safe specifically because ONLY this bot commits to these paths.
+          git pull --rebase -X ours origin main
           git push
       - name: Notify on total failure (backstop)
         # Fires only if the poller step failed AND its own internal webhook attempt
