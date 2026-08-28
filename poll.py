@@ -316,6 +316,16 @@ def google_news_url(company_name):
     )
 
 
+def general_news_url(company_name):
+    """Broader than google_news_url — not restricted to rating/broker keywords, so it
+    catches general company news (earnings, M&A, trading updates) for stocks that show
+    up in the screener but aren't on the watchlist."""
+    q = f'{company_name} (LSE OR "London Stock Exchange")'
+    return "https://news.google.com/rss/search?" + urllib.parse.urlencode(
+        {"q": q, "hl": "en-GB", "gl": "GB", "ceid": "GB:en"}
+    )
+
+
 def reuters_bloomberg_url(company_name):
     # Reuters dropped public RSS years ago and Bloomberg is subscription-walled, so
     # neither offers a free feed directly. This scopes the same free Google News search
@@ -601,6 +611,7 @@ def render_dashboard(data, watchlist):
     items_by_ticker = data.get("items", {})
     quotes = data.get("quotes", {})
     screener = data.get("screener", {})
+    screener_news = data.get("screenerNews", {})
     big_movers = data.get("bigMovers", [])
     market_wide = data.get("marketWide", [])
     last_poll_raw = data.get("lastPoll")
@@ -636,7 +647,11 @@ def render_dashboard(data, watchlist):
     quote_rows = "".join(quote_div(t, q) for t, q in quotes.items())
 
     def item_div(it):
-        broker_html = f'<span class="broker">{esc(it["broker"])}</span>' if it.get("broker") else ""
+        # Defense in depth: only render a broker badge for genuine rating/target items,
+        # even if something upstream ever slipped through — a "news" item mentioning a
+        # bank's name is not the same as that bank issuing a rating.
+        show_broker = it.get("broker") and it.get("category") in ("upgrade", "downgrade", "target")
+        broker_html = f'<span class="broker">{esc(it["broker"])}</span>' if show_broker else ""
         ticker_label = "LSE" if it.get("ticker") == "MARKET" else esc(it.get("ticker", ""))
         return (
             f'<div class="item"><span class="badge {it.get("category","news")}">{it.get("category","news").upper()}</span> '
@@ -668,6 +683,21 @@ def render_dashboard(data, watchlist):
     vol_rows = screener_table(screener.get("volume", []), show_pct=False)
     gain_rows = screener_table(screener.get("gainers", []))
     lose_rows = screener_table(screener.get("losers", []))
+
+    def screener_news_item(symbol, it):
+        broker_html = f'<span class="broker">{esc(it["broker"])}</span>' if it.get("broker") and it.get("category") in ("upgrade", "downgrade", "target") else ""
+        return (
+            f'<div class="item"><span class="badge {it.get("category","news")}">{it.get("category","news").upper()}</span> '
+            f'<b>{esc(symbol)}</b> {broker_html} '
+            f'<span class="meta">{esc(it.get("source",""))} · {esc(it.get("pubDate",""))}</span><br/>'
+            f'<a href="{esc(it.get("link","#"))}" target="_blank">{esc(it.get("title",""))}</a></div>'
+        )
+
+    screener_news_rows = "".join(
+        screener_news_item(symbol, it)
+        for symbol, items in screener_news.items()
+        for it in items
+    )
 
     def heatmap_cell(q):
         chg = q.get("changePct") or 0
@@ -746,6 +776,10 @@ table td, table th{{padding:5px 6px;border-bottom:1px solid #2a2e37;text-align:l
   <div><h3>Top Losers</h3><table><tr><th>#</th><th>Symbol</th><th>Chg%</th></tr>{lose_rows}</table></div>
 </div>
 
+<h2>News on Today's Top Movers</h2>
+<p class="meta">Real, dated-today news for any stock currently in Volume/Gainers/Losers above — not limited to your watchlist.</p>
+<div>{screener_news_rows or '<span class="meta">No same-day news found for today&#39;s ranked stocks yet.</span>'}</div>
+
 <h2>Already Moving Today (watchlist, ±{BIG_MOVER_THRESHOLD_PCT:.0f}%+)</h2>
 <p class="meta">A fact about what already happened today — not a forecast of what happens next.</p>
 <div class="quotes">{mover_rows or '<span class="meta">Nothing past the threshold right now</span>'}</div>
@@ -777,6 +811,40 @@ AI_DIGEST_INTERVAL_SECONDS = 6 * 3600  # throttled like the heartbeat — a paid
 # data itself still refreshes every cycle; only the push notification is rationed).
 SCREENER_MESSAGE_INTERVAL_SECONDS = 60 * 60  # once per hour
 MAX_ALERTS_PER_RUN = 5  # cap a burst of alerts in one run; rest are still on the dashboard
+# A stock is flagged as "getting attention today" purely on mention COUNT — how many
+# already-published, real items exist about it today. This is not a signal about where
+# the price might go; it's a fact about today's coverage volume, same category as the
+# screener's volume ranking.
+ATTENTION_MENTION_THRESHOLD = 3
+
+
+def format_screener_news_message(screener_news):
+    """Real, dated-today news for stocks currently ranked in Volume/Gainers/Losers —
+    not limited to the watchlist. Capped per message to stay a reasonable length."""
+    lines = []
+    for symbol, items in screener_news.items():
+        for it in items[:2]:  # at most 2 headlines per stock in the message (full list is on the dashboard)
+            lines.append(f'{symbol}: {it["title"]}')
+    if not lines:
+        return None
+    header = f"📰 NEWS ON TODAY'S TOP MOVERS  🕐 {now_stamp()}"
+    return header + "\n" + "\n".join(lines[:15])  # overall cap so one message can't run away
+
+
+def format_attention_message(mention_counts):
+    """Purely descriptive: which watchlist stocks have unusually high real news/broker
+    mention counts today. Never says why that might matter for price — just the count."""
+    flagged = sorted(
+        ((t, d) for t, d in mention_counts.items() if d["count"] >= ATTENTION_MENTION_THRESHOLD),
+        key=lambda x: -x[1]["count"],
+    )
+    if not flagged:
+        return None
+    lines = [f"📢 GETTING ATTENTION TODAY (watchlist, {ATTENTION_MENTION_THRESHOLD}+ mentions)  🕐 {now_stamp()}"]
+    lines.append("A count of today's coverage — not a signal about where price might go.")
+    for ticker, d in flagged:
+        lines.append(f"{ticker} ({d['name']}) — {d['count']} mentions today")
+    return "\n".join(lines)
 AI_DIGEST_MODEL = "claude-haiku-4-5-20251001"  # cheap/fast model, appropriate for a short summary
 
 AI_DIGEST_SYSTEM_PROMPT = """You are a strictly factual summarizer for a UK stock market news digest sent to one person's WhatsApp.
@@ -913,15 +981,39 @@ def main():
     print(f"Yahoo auth crumb: {'obtained' if yahoo_crumb else 'FAILED — screener/analyst-history will likely 401'}")
 
     new_alerts = []
+    mention_counts = {}  # ticker -> {"name": ..., "count": ...} — today's mention volume, purely descriptive
     big_movers = []
     market_wide_enriched = []
     screener = {}
     ratings_items = []
+    screener_news = {}
 
     if not SKIP_MARKET_WIDE:
         ratings_items, _ = fetch_feed(ANALYST_RATINGS_FEED_URL)
         market_wide_items, _ = fetch_feed(market_wide_broker_news_url())
         screener = fetch_lse_screener()
+
+        # News for every stock ranked in Volume/Gainers/Losers, not just the watchlist —
+        # deduped by symbol (a stock can appear in more than one list), one query each,
+        # staggered to avoid the burst-triggered 503s seen earlier in this project.
+        screener_news = {}
+        ranked_stocks = {}
+        for section in ("volume", "gainers", "losers"):
+            for row in screener.get(section, []):
+                ranked_stocks[row["symbol"]] = row.get("name", row["symbol"])
+        print(f"Fetching news for {len(ranked_stocks)} screener-ranked stocks (volume/gainers/losers)...")
+        for symbol, name in ranked_stocks.items():
+            items, _ = fetch_feed(general_news_url(name))
+            items = [it for it in items if passes_news_filters(it.get("pubDate"))]
+            if items:
+                now_iso_sc = datetime.now(timezone.utc).isoformat()
+                enriched_items = []
+                for it in items[:5]:  # cap per-stock to keep dashboard/message size sane
+                    category = classify(it["title"])
+                    broker = detect_broker(it["title"]) if category in ("upgrade", "downgrade", "target") else None
+                    enriched_items.append({**it, "ticker": symbol, "company": name, "category": category, "broker": broker, "detectedAt": now_iso_sc})
+                screener_news[symbol] = enriched_items
+            time.sleep(1)  # stagger — this is the change most likely to trip Google's rate limiting if rushed
 
         # Market-wide broker alerts: covers ALL LSE companies for upgrade/downgrade news,
         # not just the watchlist — this is what "all LSE companies" actually needs, without
@@ -932,7 +1024,10 @@ def main():
         now_iso_mw = datetime.now(timezone.utc).isoformat()
         for it in market_wide_pool:
             category = classify(it["title"])
-            if category not in ("upgrade", "downgrade"):
+            # "target" = a broker raising/cutting their price target — a genuine, already-
+            # published broker action, same category of fact as an upgrade/downgrade, so it
+            # belongs in the same alert stream rather than being silently dropped.
+            if category not in ("upgrade", "downgrade", "target"):
                 continue
             market_wide_enriched.append({
                 **it,
@@ -965,6 +1060,11 @@ def main():
         matched_ratings = [it for it in ratings_items if name.lower() in it["title"].lower()]
         combined = g_items + y_items + rb_items + matched_ratings
         combined = [it for it in combined if passes_news_filters(it.get("pubDate"))]
+        # Purely a count of real, already-published items mentioning this stock today
+        # (deduped by link) — a fact about today's coverage volume, not a prediction of
+        # anything. NEWS_SAME_LONDON_DAY_ONLY already restricts `combined` to today.
+        mention_links = {it["link"] for it in combined}
+        mention_counts[ticker] = {"name": name, "count": len(mention_links)}
 
         quote = fetch_yahoo_quote(ticker)
         if quote:
@@ -983,12 +1083,17 @@ def main():
         now_iso = datetime.now(timezone.utc).isoformat()
         enriched = []
         for it in combined:
+            category = classify(it["title"])
+            # Only tag a broker when the item is actually a rating/target call — otherwise
+            # a story that merely mentions a bank's name (e.g. a personnel/legal story
+            # about "Barclays") gets mislabeled as if that bank issued the rating.
+            broker = detect_broker(it["title"]) if category in ("upgrade", "downgrade", "target") else None
             enriched.append({
                 **it,
                 "ticker": ticker,
                 "company": name,
-                "category": classify(it["title"]),
-                "broker": detect_broker(it["title"]),
+                "category": category,
+                "broker": broker,
                 "detectedAt": now_iso,
             })
         # Analyst history items already carry structured category/broker/pubDate —
@@ -1018,7 +1123,7 @@ def main():
             # watchlist specifically, event-category news (mergers, trading updates,
             # profit warnings, results) is genuinely price-moving and worth pushing —
             # unlike the market-wide stream, this is scoped to stocks you actually track.
-            if it["category"] in ("upgrade", "downgrade", "event") and it.get("_recent", True):
+            if it["category"] in ("upgrade", "downgrade", "target", "event") and it.get("_recent", True):
                 new_alerts.append(it)
 
         time.sleep(0.5)  # be polite to free sources
@@ -1041,6 +1146,7 @@ def main():
         "items": items_by_ticker,
         "quotes": quotes,
         "screener": screener,
+        "screenerNews": screener_news,
         "bigMovers": big_movers,
         "marketWide": deduped_market_wide,
         "lastPoll": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
@@ -1062,6 +1168,16 @@ def main():
     else:
         print("Screener WhatsApp send throttled (sent within the last hour) — dashboard/data still updated above.")
 
+    screener_news_msg = format_screener_news_message(screener_news)
+    if screener_news_msg:
+        print(screener_news_msg)
+        send_webhook(screener_news_msg)
+
+    attention_msg = format_attention_message(mention_counts)
+    if attention_msg:
+        print(attention_msg)
+        send_webhook(attention_msg)
+
     if big_movers:
         lines = [f"🔥 ALREADY MOVING TODAY (±{BIG_MOVER_THRESHOLD_PCT:.0f}%+, watchlist)  🕐 {now_stamp()} — facts about today, not a forecast:"]
         for m in big_movers:
@@ -1071,7 +1187,7 @@ def main():
         print(movers_msg)
         send_webhook(movers_msg)
 
-    ALERT_LABELS = {"upgrade": "⬆ UPGRADE", "downgrade": "⬇ DOWNGRADE", "event": "📰 NEWS"}
+    ALERT_LABELS = {"upgrade": "⬆ UPGRADE", "downgrade": "⬇ DOWNGRADE", "target": "🎯 PRICE TARGET", "event": "📰 NEWS"}
     alert_cap = MAX_ALERTS_PER_RUN if _current_template() == "callmebot" else len(new_alerts)
     alerts_to_send = new_alerts[:alert_cap]
     skipped_count = len(new_alerts) - len(alerts_to_send)
