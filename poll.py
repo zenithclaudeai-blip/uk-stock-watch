@@ -77,6 +77,7 @@ BROKER_NAMES = [
     "Oberon Capital", "Whitman Howard", "Progressive Equity Research", "Hardman & Co",
 ]
 ANALYST_RATINGS_FEED_URL = "https://uk.investing.com/rss/news_1061.rss"
+GENERAL_MARKET_NEWS_FEED_URL = "https://uk.investing.com/rss/news_25.rss"  # confirmed via their own official RSS listing page
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                   "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -299,6 +300,27 @@ def passes_news_filters(pub_date_str):
     if NEWS_SAME_LONDON_DAY_ONLY and not is_today_in_london(pub_date_str):
         return False
     return True
+
+
+def item_sort_key(it):
+    """Sort key for ordering news/alert items latest-first. NEVER sort on the raw
+    pubDate string directly — RFC 822 dates start with the day name ("Thu, 27 Aug...",
+    "Fri, 28 Aug..."), so a plain string sort groups by day-of-week alphabetically
+    ("Fri" < "Thu") rather than by actual chronological time, silently scrambling the
+    real order. Parse to a real datetime first; fall back to detectedAt (stored as
+    Python's .isoformat(), a different format _parse_pub_date doesn't cover — handled
+    separately here), then epoch 0 (sorts last) for anything genuinely unparseable."""
+    dt = _parse_pub_date(it.get("pubDate"))
+    if dt is None and it.get("detectedAt"):
+        try:
+            dt = datetime.fromisoformat(it["detectedAt"])
+        except Exception:
+            dt = None
+    if dt is None:
+        return datetime.fromtimestamp(0, tz=timezone.utc)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
 
 
 def fetch_feed(url):
@@ -652,7 +674,7 @@ def render_dashboard(data, watchlist):
     all_items = []
     for ticker, its in items_by_ticker.items():
         all_items.extend(its)
-    all_items.sort(key=lambda it: it.get("pubDate") or it.get("detectedAt") or "", reverse=True)
+    all_items.sort(key=item_sort_key, reverse=True)
 
     def esc(s):
         return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -700,10 +722,25 @@ def render_dashboard(data, watchlist):
             chg_str = f'{"▲" if chg >= 0 else "▼"}{abs(chg):.2f}%'
             last_col = chg_str if show_pct else vol_str
             last_cls = f' class="{chg_cls}"' if show_pct else ""
-            name = esc(q.get("name") or q.get("symbol", ""))
+            symbol = q.get("symbol", "")
+            name = esc(q.get("name") or symbol)
+            # Inline news link — the same lookup already built for the "News on Today's
+            # Top Movers" section, shown right where you'd actually look for it: next to
+            # the stock itself, not just in a separate section further down the page.
+            news_for_symbol = screener_news.get(symbol) or []
+            if news_for_symbol:
+                top = news_for_symbol[0]
+                extra = f" (+{len(news_for_symbol)-1} more)" if len(news_for_symbol) > 1 else ""
+                news_html = (
+                    f'<br/><a href="{esc(top.get("link","#"))}" target="_blank" '
+                    f'style="color:#7fb3ff;font-size:11px;">📰 {esc(top.get("title",""))}</a>'
+                    f'<span class="meta">{extra}</span>'
+                )
+            else:
+                news_html = ""
             return (
-                f'<tr><td>{i+1}</td><td><b>{esc(q.get("symbol",""))}</b><br/>'
-                f'<span class="meta">{name}</span></td><td{last_cls}>{last_col}</td></tr>'
+                f'<tr><td>{i+1}</td><td><b>{esc(symbol)}</b><br/>'
+                f'<span class="meta">{name}</span>{news_html}</td><td{last_cls}>{last_col}</td></tr>'
             )
         return "".join(row(i, q) for i, q in enumerate(rows)) or '<tr><td colspan="3" class="meta">No data yet</td></tr>'
 
@@ -1056,6 +1093,7 @@ def main():
 
     if not SKIP_MARKET_WIDE:
         ratings_items, _ = fetch_feed(ANALYST_RATINGS_FEED_URL)
+        general_market_items, _ = fetch_feed(GENERAL_MARKET_NEWS_FEED_URL)
         market_wide_items, _ = fetch_feed(market_wide_broker_news_url())
         screener = fetch_lse_screener()
 
@@ -1098,7 +1136,7 @@ def main():
         # not just the watchlist — this is what "all LSE companies" actually needs, without
         # trying to poll ~1,900 individual tickers (which would take hours per cycle and
         # get rate-limited). Combines the unfiltered ratings feed + the market-wide search.
-        market_wide_pool = ratings_items + market_wide_items
+        market_wide_pool = ratings_items + market_wide_items + general_market_items
         market_wide_pool = [it for it in market_wide_pool if passes_news_filters(it.get("pubDate"))]
         now_iso_mw = datetime.now(timezone.utc).isoformat()
         for it in market_wide_pool:
@@ -1189,7 +1227,7 @@ def main():
                 continue
             seen_links.add(it["link"])
             deduped.append(it)
-        deduped.sort(key=lambda it: it.get("pubDate") or it.get("detectedAt") or "", reverse=True)
+        deduped.sort(key=item_sort_key, reverse=True)
         items_by_ticker[ticker] = deduped[:MAX_ITEMS_PER_TICKER]
 
         for it in enriched:
@@ -1218,7 +1256,7 @@ def main():
             continue
         seen_links_mw.add(it["link"])
         deduped_market_wide.append(it)
-    deduped_market_wide.sort(key=lambda it: it.get("pubDate") or it.get("detectedAt") or "", reverse=True)
+    deduped_market_wide.sort(key=item_sort_key, reverse=True)
     deduped_market_wide = deduped_market_wide[:MAX_ITEMS_PER_TICKER]
 
     data = {
