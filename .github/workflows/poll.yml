@@ -35,6 +35,13 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           git add state docs
           git diff --staged --quiet || git commit -m "Update feed [skip ci]"
+          # Pull-rebase before pushing — another run (the hourly FTSE350 job, or you
+          # pushing manually) can land a commit on main between this job starting and
+          # finishing. Without this, that race causes a rejected push every time it
+          # happens (seen repeatedly). Rebasing this run's single commit on top of
+          # whatever's new on main, then pushing, resolves it automatically instead
+          # of requiring a manual re-run.
+          git pull --rebase --autostash origin main
           git push
       - name: Notify on total failure (backstop)
         # Fires only if the poller step failed AND its own internal webhook attempt

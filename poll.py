@@ -1414,6 +1414,13 @@ def generate_ai_digest(context_text):
             print("  ! AI digest blocked: output matched an advice-shaped pattern, not sent.", file=sys.stderr)
             return None
         return text
+    except urllib.error.HTTPError as e:
+        try:
+            error_body = e.read().decode("utf-8", errors="replace")
+        except Exception:
+            error_body = "(couldn't read error body)"
+        print(f"  ! AI digest generation failed: HTTP {e.code} — {error_body[:300]}", file=sys.stderr)
+        return None
     except Exception as e:
         print(f"  ! AI digest generation failed: {e}", file=sys.stderr)
         return None
@@ -1554,6 +1561,13 @@ def generate_stock_research(ticker, name, quote, items):
             print(f"  ! market research blocked for {ticker}: output matched an advice-shaped pattern", file=sys.stderr)
             return None
         return text
+    except urllib.error.HTTPError as e:
+        try:
+            error_body = e.read().decode("utf-8", errors="replace")
+        except Exception:
+            error_body = "(couldn't read error body)"
+        print(f"  ! market research generation failed for {ticker}: HTTP {e.code} — {error_body[:300]}", file=sys.stderr)
+        return None
     except Exception as e:
         print(f"  ! market research generation failed for {ticker}: {e}", file=sys.stderr)
         return None
@@ -1566,6 +1580,7 @@ def update_market_research(watchlist, quotes, items_by_ticker, existing_research
     dashboard section still renders, just shows nothing generated yet).
     """
     if not os.environ.get("ANTHROPIC_API_KEY", "").strip():
+        print("  market research: skipped, no ANTHROPIC_API_KEY configured", file=sys.stderr)
         return existing_research  # feature off — no key, no cost, section shows "not enabled"
 
     now = time.time()
@@ -1579,6 +1594,7 @@ def update_market_research(watchlist, quotes, items_by_ticker, existing_research
     candidates = sorted(watchlist, key=lambda s: -staleness(s["ticker"]))
     due = [s for s in candidates if staleness(s["ticker"]) >= MARKET_RESEARCH_REFRESH_SECONDS]
     refresh_list = due[:MARKET_RESEARCH_MAX_PER_RUN]
+    print(f"  market research: {len(due)} stock(s) due, refreshing {len(refresh_list)} this run")
 
     for stock in refresh_list:
         ticker, name = stock["ticker"], stock["name"]
