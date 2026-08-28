@@ -392,7 +392,33 @@ def fetch_yahoo_quote(ticker):
         return None
 
 
+def fetch_5day_change(ticker):
+    """Real, already-happened price history — % change from 5 trading days ago's close
+    to the latest close. A fact about the past, not a prediction of what happens next."""
+    symbol = yahoo_symbol(ticker)
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(symbol)}?interval=1d&range=10d"
+    try:
+        data = json.loads(http_get(url))
+        result = (data.get("chart") or {}).get("result") or [None]
+        if not result[0]:
+            return None
+        closes = (result[0].get("indicators", {}).get("quote", [{}])[0] or {}).get("close") or []
+        closes = [c for c in closes if c is not None]  # some days can come back null (holidays etc.)
+        if len(closes) < 6:
+            return None  # not enough real trading days to compute a genuine 5-day change
+        latest = closes[-1]
+        five_days_ago = closes[-6]
+        if not five_days_ago:
+            return None
+        change_pct = (latest - five_days_ago) / five_days_ago * 100
+        return {"changePct5d": change_pct, "price": latest}
+    except Exception as e:
+        print(f"  ! 5-day history fetch failed: {ticker} ({e})", file=sys.stderr)
+        return None
+
+
 BIG_MOVER_THRESHOLD_PCT = 5.0  # purely descriptive flag: "this has already moved a lot today"
+UPTREND_5DAY_THRESHOLD_PCT = 5.0  # flagged as "5-day uptrend" once risen at least this much
 # Gainers/losers liquidity filter — without this, illiquid penny stocks with meaningless
 # tiny-absolute-value swings (0.1p -> 1p = "900%") dominate the list.
 MIN_VOLUME_FOR_MOVERS = 500_000
@@ -612,6 +638,7 @@ def render_dashboard(data, watchlist):
     quotes = data.get("quotes", {})
     screener = data.get("screener", {})
     screener_news = data.get("screenerNews", {})
+    uptrend_stocks = data.get("uptrendStocks", [])
     big_movers = data.get("bigMovers", [])
     market_wide = data.get("marketWide", [])
     last_poll_raw = data.get("lastPoll")
@@ -699,6 +726,12 @@ def render_dashboard(data, watchlist):
         for it in items
     )
 
+    uptrend_rows = "".join(
+        f'<div class="quote-row"><b>{esc(s["symbol"])}</b> ({esc(s["name"])}) — '
+        f'<span style="color:#2fbf71">▲{s["changePct5d"]:.1f}%</span> over 5 sessions</div>'
+        for s in sorted(uptrend_stocks, key=lambda x: -x["changePct5d"])
+    )
+
     def heatmap_cell(q):
         chg = q.get("changePct") or 0
         symbol = esc(q.get("symbol", ""))
@@ -780,6 +813,10 @@ table td, table th{{padding:5px 6px;border-bottom:1px solid #2a2e37;text-align:l
 <p class="meta">Real, dated-today news for any stock currently in Volume/Gainers/Losers above — not limited to your watchlist.</p>
 <div>{screener_news_rows or '<span class="meta">No same-day news found for today&#39;s ranked stocks yet.</span>'}</div>
 
+<h2>5-Day Uptrend ({UPTREND_5DAY_THRESHOLD_PCT:.0f}%+, screener + watchlist)</h2>
+<p class="meta">Real closing-price history over the last 5 trading days — a fact about the past, not a forecast of what happens next.</p>
+<div class="quotes">{uptrend_rows or '<span class="meta">Nothing has met the 5-day threshold right now</span>'}</div>
+
 <h2>Already Moving Today (watchlist, ±{BIG_MOVER_THRESHOLD_PCT:.0f}%+)</h2>
 <p class="meta">A fact about what already happened today — not a forecast of what happens next.</p>
 <div class="quotes">{mover_rows or '<span class="meta">Nothing past the threshold right now</span>'}</div>
@@ -816,6 +853,22 @@ MAX_ALERTS_PER_RUN = 5  # cap a burst of alerts in one run; rest are still on th
 # the price might go; it's a fact about today's coverage volume, same category as the
 # screener's volume ranking.
 ATTENTION_MENTION_THRESHOLD = 3
+
+
+def format_uptrend_message(uptrend_stocks):
+    """Purely descriptive: stocks that have genuinely risen UPTREND_5DAY_THRESHOLD_PCT%+
+    over the last 5 real trading days, computed from actual closing prices. This is a
+    fact about the past — explicitly not a prediction the rise continues."""
+    if not uptrend_stocks:
+        return None
+    flagged = sorted(uptrend_stocks, key=lambda x: -x["changePct5d"])
+    lines = [
+        f"📈 5-DAY UPTREND ({UPTREND_5DAY_THRESHOLD_PCT:.0f}%+, screener + watchlist)  🕐 {now_stamp()}",
+        "Real closing-price history over the last 5 trading days — not a forecast of what happens next.",
+    ]
+    for s in flagged[:15]:
+        lines.append(f'{s["symbol"]} ({s["name"]}) — ▲{s["changePct5d"]:.1f}% over 5 sessions')
+    return "\n".join(lines)
 
 
 def format_screener_news_message(screener_news):
@@ -987,6 +1040,7 @@ def main():
     screener = {}
     ratings_items = []
     screener_news = {}
+    uptrend_stocks = []
 
     if not SKIP_MARKET_WIDE:
         ratings_items, _ = fetch_feed(ANALYST_RATINGS_FEED_URL)
@@ -1014,6 +1068,19 @@ def main():
                     enriched_items.append({**it, "ticker": symbol, "company": name, "category": category, "broker": broker, "detectedAt": now_iso_sc})
                 screener_news[symbol] = enriched_items
             time.sleep(1)  # stagger — this is the change most likely to trip Google's rate limiting if rushed
+
+        # 5-day uptrend: real closing-price history for the same deduped stock set (no
+        # extra tickers beyond what's already being fetched news for) plus the watchlist.
+        uptrend_stocks = []
+        uptrend_targets = dict(ranked_stocks)
+        for stock in watchlist:
+            uptrend_targets.setdefault(stock["ticker"], stock["name"])
+        print(f"Checking 5-day price history for {len(uptrend_targets)} stocks...")
+        for symbol, name in uptrend_targets.items():
+            hist = fetch_5day_change(symbol)
+            if hist and hist["changePct5d"] >= UPTREND_5DAY_THRESHOLD_PCT:
+                uptrend_stocks.append({"symbol": symbol, "name": name, **hist})
+            time.sleep(0.3)  # lighter stagger — this hits Yahoo, not Google, different rate-limit budget
 
         # Market-wide broker alerts: covers ALL LSE companies for upgrade/downgrade news,
         # not just the watchlist — this is what "all LSE companies" actually needs, without
@@ -1147,6 +1214,7 @@ def main():
         "quotes": quotes,
         "screener": screener,
         "screenerNews": screener_news,
+        "uptrendStocks": uptrend_stocks,
         "bigMovers": big_movers,
         "marketWide": deduped_market_wide,
         "lastPoll": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
@@ -1172,6 +1240,11 @@ def main():
     if screener_news_msg:
         print(screener_news_msg)
         send_webhook(screener_news_msg)
+
+    uptrend_msg = format_uptrend_message(uptrend_stocks)
+    if uptrend_msg:
+        print(uptrend_msg)
+        send_webhook(uptrend_msg)
 
     attention_msg = format_attention_message(mention_counts)
     if attention_msg:
