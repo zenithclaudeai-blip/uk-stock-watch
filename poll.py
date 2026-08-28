@@ -553,6 +553,14 @@ def fetch_gb_screener(sort_field, sort_type="DESC", count=10):
             symbol = q.get("symbol", "")
             if not symbol.upper().endswith(".L"):
                 continue  # skip GDRs/IOB instruments etc — keep genuine LSE-listed shares only
+            # LSE International Order Book tickers (depositary receipts for FOREIGN
+            # companies, not genuine UK-listed businesses) conventionally start with a
+            # digit — e.g. "0R9U.L" is PayPal Holdings, confirmed by its news being
+            # entirely US-market coverage. Excluding these keeps results to genuine LSE
+            # primary listings, matching what "LSE-listed stocks only" actually promises.
+            ticker_part = symbol.upper().rsplit(".L", 1)[0]
+            if ticker_part[:1].isdigit():
+                continue
             volume = q.get("regularMarketVolume")
             price = q.get("regularMarketPrice")
             if sort_field == "dayvolume" and not volume:
@@ -730,12 +738,17 @@ def format_market_cap(value):
 
 def format_epoch_date(epoch_seconds):
     """Formats a Yahoo epoch timestamp (earnings/ex-dividend dates) as a plain London
-    date — 'today' logic doesn't apply here since these are future calendar facts, not
-    news items, so no recency filtering, just a readable date."""
+    date. IMPORTANT: only returns a value if the date is today or in the future — Yahoo
+    sometimes returns a stale PAST date for "next earnings"/"ex-dividend" when it has no
+    genuine upcoming one (confirmed against real data: a "next earnings" date that had
+    already passed, an "ex-dividend" date from 1996). Showing a past date labeled "next"
+    would be actively misleading, so it's treated the same as missing data — omitted."""
     if not epoch_seconds:
         return None
     try:
         dt = datetime.fromtimestamp(epoch_seconds, tz=timezone.utc).astimezone(LONDON_TZ)
+        if dt.date() < datetime.now(timezone.utc).astimezone(LONDON_TZ).date():
+            return None  # stale/past date — not genuinely "next" anything
         return dt.strftime("%d %b %Y")
     except Exception:
         return None
@@ -1248,7 +1261,6 @@ def main():
 
     if not SKIP_MARKET_WIDE:
         ratings_items, _ = fetch_feed(ANALYST_RATINGS_FEED_URL)
-        general_market_items, _ = fetch_feed(GENERAL_MARKET_NEWS_FEED_URL)
         market_wide_items, _ = fetch_feed(market_wide_broker_news_url())
         screener = fetch_lse_screener()
 
@@ -1331,7 +1343,13 @@ def main():
         # not just the watchlist — this is what "all LSE companies" actually needs, without
         # trying to poll ~1,900 individual tickers (which would take hours per cycle and
         # get rate-limited). Combines the unfiltered ratings feed + the market-wide search.
-        market_wide_pool = ratings_items + market_wide_items + general_market_items
+        # general_market_items (investing.com's general "Stock Market News" feed) was
+        # removed from this pool entirely, and its fetch removed too — despite being on
+        # the uk.investing.com subdomain, real data proved it's not actually UK-scoped
+        # (surfaced US broker actions on Workday, Ulta Beauty, Elastic, Autodesk as if
+        # they were "all LSE" alerts). Not reused elsewhere either, so keeping the fetch
+        # around would just be a wasted request for data that's no longer used anywhere.
+        market_wide_pool = ratings_items + market_wide_items
         market_wide_pool = [it for it in market_wide_pool if passes_news_filters(it.get("pubDate"))]
         now_iso_mw = datetime.now(timezone.utc).isoformat()
         for it in market_wide_pool:
