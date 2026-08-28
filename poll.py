@@ -453,6 +453,25 @@ def fetch_feed(url):
         return [], True
 
 
+def clean_company_name(name):
+    """
+    Yahoo's screener returns full share-listing names, e.g. "MCBRIDE PLC ORD 10P",
+    "GEIGER COUNTER LIMITED ORD NPV", "SMITH & NEPHEW PLC ORD USD0.20" — the "ORD ..."
+    part is share-class jargon (par value, currency) that never appears in actual news
+    articles. Searching Google News for that literal string returns almost nothing,
+    because real headlines just say "McBride" — confirmed against real data: McBride's
+    genuine same-day news (a Vestacy partnership announcement) was being missed
+    entirely because "ORD 10P" polluted the search query. Trimming everything from
+    " ORD " onward gives a name that actually matches how news outlets refer to the
+    company. Names that don't contain " ORD " (e.g. watchlist names you supplied
+    yourself, like "Vodafone Group") pass through unchanged.
+    """
+    if not name:
+        return name
+    cleaned = re.split(r"\bORD\b", name, maxsplit=1, flags=re.IGNORECASE)[0].strip()
+    return cleaned or name  # never return an empty string
+
+
 def google_news_url(company_name):
     q = f'{company_name} (LSE OR "London Stock Exchange") (upgrade OR downgrade OR "price target" OR rating)'
     return "https://news.google.com/rss/search?" + urllib.parse.urlencode(
@@ -1680,7 +1699,10 @@ def main():
                 ranked_stocks[row["symbol"]] = row.get("name", row["symbol"])
         print(f"Fetching news for {len(ranked_stocks)} screener-ranked stocks (volume/gainers/losers)...")
         for symbol, name in ranked_stocks.items():
-            items, _ = fetch_feed(general_news_url(name))
+            # Search using a cleaned name (see clean_company_name docstring) — the
+            # dashboard still displays the full "name" as-is, only the search query
+            # uses the cleaned version, since that's what actually matches real news.
+            items, _ = fetch_feed(general_news_url(clean_company_name(name)))
             items = [it for it in items if passes_news_filters(it.get("pubDate"))]
             if items:
                 now_iso_sc = datetime.now(timezone.utc).isoformat()
