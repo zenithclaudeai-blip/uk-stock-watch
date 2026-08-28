@@ -58,7 +58,7 @@
         "company": "BP",
         "category": "news",
         "broker": null,
-        "detectedAt": "2026-08-28T13:35:44.732824+00:00"
+        "detectedAt": "2026-08-28T13:40:56.283602+00:00"
       }
     ],
     "SHEL": [
@@ -93,7 +93,7 @@
         "company": "Shell",
         "category": "news",
         "broker": null,
-        "detectedAt": "2026-08-28T13:35:46.536677+00:00"
+        "detectedAt": "2026-08-28T13:40:57.830015+00:00"
       },
       {
         "title": "FTSE 100 rises as investors await Warsh speech at Jackson Hole",
@@ -104,33 +104,33 @@
         "company": "Shell",
         "category": "news",
         "broker": null,
-        "detectedAt": "2026-08-28T13:35:46.536677+00:00"
+        "detectedAt": "2026-08-28T13:40:57.830015+00:00"
       }
     ],
     "VOD": []
   },
   "quotes": {
     "LLOY": {
-      "price": 109.425,
+      "price": 109.5,
       "currency": "GBp",
-      "change": 0.125,
-      "changePct": 0.11436413540713633,
+      "change": 0.20000000000000284,
+      "changePct": 0.18298261665142074,
       "dayHigh": 110.25,
       "dayLow": 108.7,
       "rangePct": 1.4181152790484879,
-      "asOf": 1787923219000,
+      "asOf": 1787923551000,
       "targetMeanPrice": 120.368004,
       "recommendationKey": "none"
     },
     "BARC": {
-      "price": 491.899,
+      "price": 491.9,
       "currency": "GBp",
-      "change": -0.7010000000000218,
-      "changePct": -0.14230613073488058,
+      "change": -0.7000000000000455,
+      "changePct": -0.14210312626878713,
       "dayHigh": 498.7,
       "dayLow": 490.25,
       "rangePct": 1.7153877385302452,
-      "asOf": 1787923226000,
+      "asOf": 1787923544000,
       "targetMeanPrice": 576.235,
       "recommendationKey": "buy"
     },
@@ -142,32 +142,32 @@
       "dayHigh": 521.8,
       "dayLow": 514.5,
       "rangePct": 1.416375630578183,
-      "asOf": 1787923237000,
-      "targetMeanPrice": 594.5561,
+      "asOf": 1787923542000,
+      "targetMeanPrice": 594.5238,
       "recommendationKey": "buy"
     },
     "SHEL": {
-      "price": 3330.0,
+      "price": 3329.0,
       "currency": "GBp",
-      "change": 19.0,
-      "changePct": 0.5738447598912715,
+      "change": 18.0,
+      "changePct": 0.5436424041075204,
       "dayHigh": 3344.0,
       "dayLow": 3319.0,
       "rangePct": 0.7550588945937784,
-      "asOf": 1787923244000,
-      "targetMeanPrice": 3696.4297,
+      "asOf": 1787923548000,
+      "targetMeanPrice": 3696.229,
       "recommendationKey": "buy"
     },
     "VOD": {
-      "price": 117.95,
+      "price": 118.05,
       "currency": "GBp",
-      "change": 0.8500000000000085,
-      "changePct": 0.7258753202391192,
+      "change": 0.9500000000000028,
+      "changePct": 0.8112724167378333,
       "dayHigh": 118.2,
       "dayLow": 116.846,
       "rangePct": 1.1562766865926553,
-      "asOf": 1787923247000,
-      "targetMeanPrice": 114.58599,
+      "asOf": 1787923540000,
+      "targetMeanPrice": 114.584656,
       "recommendationKey": "none"
     }
   },
@@ -176,9 +176,9 @@
       {
         "symbol": "FORG.L",
         "name": "FORGENT PLC ORD EUR0.0001 (CDI)",
-        "volume": 1243428824,
-        "price": 0.0089,
-        "changePct": -6.3157887
+        "volume": 1258428824,
+        "price": 0.00848,
+        "changePct": -10.736836
       },
       {
         "symbol": "TRP.L",
@@ -202,11 +202,25 @@
         "changePct": -8.351643
       },
       {
+        "symbol": "CPX.L",
+        "name": "CAP-XX LIMITED ORD NPV",
+        "volume": 86902446,
+        "price": 0.146,
+        "changePct": 0.6896566
+      },
+      {
         "symbol": "ENET.L",
         "name": "ETHERNITY NETWORKS LTD ORD NPV ",
         "volume": 86686070,
         "price": 0.0013,
         "changePct": 8.333328
+      },
+      {
+        "symbol": "RRR.L",
+        "name": "RED ROCK RESOURCES PLC ORD 0.01",
+        "volume": 59554635,
+        "price": 0.021,
+        "changePct": 5.000001
       },
       {
         "symbol": "TOM.L",
@@ -216,20 +230,6 @@
         "changePct": 10.000003
       },
       {
-        "symbol": "80M.L",
-        "name": "80 MILE PLC ORD 0.01P",
-        "volume": 54001460,
-        "price": 0.668,
-        "changePct": 1.2121146
-      },
-      {
-        "symbol": "BZT.L",
-        "name": "BEZANT RESOURCES PLC ORD 0.002P",
-        "volume": 47514002,
-        "price": 0.1426,
-        "changePct": 1.8571423
-      },
-      {
         "symbol": "ROCK.L",
         "name": "ROCKFIRE RESOURCES PLC ORD 0.1P",
         "volume": 54991495,
@@ -237,52 +237,44 @@
         "changePct": 3.8095245
       },
       {
-        "symbol": "RRR.L",
-        "name": "RED ROCK RESOURCES PLC ORD 0.01",
-        "volume": 59554635,
-        "price": 0.021,
-        "changePct": 5.000001
+        "symbol": "80M.L",
+        "name": "80 MILE PLC ORD 0.01P",
+        "volume": 57059901,
+        "price": 0.69,
+        "changePct": 4.54545
       }
     ],
     "gainers": [
       {
         "symbol": "MCB.L",
         "name": "MCBRIDE PLC ORD 10P",
-        "volume": 1969787,
-        "price": 208.0,
-        "changePct": 24.25329
+        "volume": 1973849,
+        "price": 206.7758,
+        "changePct": 23.52199
       },
       {
         "symbol": "3LSI.L",
         "name": "WISDOMTREE MULTI ASSET ISSUER P",
-        "volume": 555867,
-        "price": 840.0,
-        "changePct": 8.773066
+        "volume": 565153,
+        "price": 834.5,
+        "changePct": 8.060862
       },
       {
         "symbol": "RKH.L",
         "name": "ROCKHOPPER EXPLORATION PLC ORD ",
-        "volume": 4999056,
-        "price": 78.1,
-        "changePct": 6.0766563
+        "volume": 5005601,
+        "price": 78.1278,
+        "changePct": 6.114417
       },
       {
         "symbol": "ECO.L",
         "name": "ECO (ATLANTIC) OIL & GAS LTD CO",
-        "volume": 680085,
-        "price": 49.96,
-        "changePct": 5.1789455
+        "volume": 682422,
+        "price": 50.0,
+        "changePct": 5.263158
       }
     ],
-    "losers": [
-      {
-        "symbol": "GGP.L",
-        "name": "GREATLAND RESOURCES LIMITED ORD",
-        "volume": 1801665,
-        "price": 670.94,
-        "changePct": -3.4618702
-      }
-    ]
+    "losers": []
   },
   "screenerNews": {
     "ORCP.L": [
@@ -295,10 +287,42 @@
         "company": "ORACLE POWER PLC ORD 0.001P",
         "category": "news",
         "broker": null,
-        "detectedAt": "2026-08-28T13:35:23.437307+00:00"
+        "detectedAt": "2026-08-28T13:40:29.906127+00:00"
       }
     ]
   },
+  "uptrendStocks": [
+    {
+      "symbol": "ENET.L",
+      "name": "ETHERNITY NETWORKS LTD ORD NPV ",
+      "changePct5d": 29.999994179234186,
+      "price": 0.0013000000035390258
+    },
+    {
+      "symbol": "RRR.L",
+      "name": "RED ROCK RESOURCES PLC ORD 0.01",
+      "changePct5d": 10.526317853346493,
+      "price": 0.020999999716877937
+    },
+    {
+      "symbol": "80M.L",
+      "name": "80 MILE PLC ORD 0.01P",
+      "changePct5d": 32.07547657852226,
+      "price": 0.699999988079071
+    },
+    {
+      "symbol": "MCB.L",
+      "name": "MCBRIDE PLC ORD 10P",
+      "changePct5d": 26.23675137964882,
+      "price": 206.7758026123047
+    },
+    {
+      "symbol": "RKH.L",
+      "name": "ROCKHOPPER EXPLORATION PLC ORD ",
+      "changePct5d": 6.693991434649335,
+      "price": 78.0999984741211
+    }
+  ],
   "bigMovers": [],
   "marketWide": [
     {
@@ -321,8 +345,8 @@
       "company": "",
       "category": "target",
       "broker": "Deutsche Bank",
-      "detectedAt": "2026-08-28T13:35:39.591937+00:00"
+      "detectedAt": "2026-08-28T13:40:51.628149+00:00"
     }
   ],
-  "lastPoll": "2026-08-28 13:35:49"
+  "lastPoll": "2026-08-28 13:40:59"
 }
