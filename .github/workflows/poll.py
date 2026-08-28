@@ -847,6 +847,78 @@ def format_market_cap(value):
     return f"£{value:,.0f}"
 
 
+def scale_bar_html(label, value_display, position_pct, lo_label, hi_label, color_lo, color_hi, zone_lo=33, zone_hi=66):
+    """
+    A compact positional scale bar: shows WHERE a number sits on a labelled range,
+    never whether that's "good" or "bad" — no buy/sell framing, no green-means-go
+    styling. The marker's position is the only signal; colour is purely to distinguish
+    the two ends of the scale (e.g. small-cap vs large-cap), not a verdict.
+    position_pct: 0-100, already clamped by the caller.
+    zone_lo/zone_hi: where the colour bands split (default even thirds, middle band neutral grey).
+    """
+    pos = max(0, min(100, position_pct))
+    return (
+        f'<div style="margin:5px 0 2px;max-width:260px;">'
+        f'<div style="display:flex;justify-content:space-between;font-size:11px;color:#9aa0a6;margin-bottom:2px;">'
+        f'<span>{esc_safe(label)}</span><span style="color:#e8eaed;font-weight:700;">{esc_safe(value_display)}</span></div>'
+        f'<div style="position:relative;height:5px;border-radius:3px;'
+        f'background:linear-gradient(to right, {color_lo} 0%, {color_lo} {zone_lo}%, '
+        f'#2a2e37 {zone_lo}%, #2a2e37 {zone_hi}%, {color_hi} {zone_hi}%, {color_hi} 100%);">'
+        f'<div style="position:absolute;left:{pos:.0f}%;top:-2px;width:2px;height:9px;'
+        f'background:#e8eaed;border-radius:1px;"></div></div>'
+        f'<div style="display:flex;justify-content:space-between;font-size:9px;color:#6b7078;margin-top:1px;">'
+        f'<span>{esc_safe(lo_label)}</span><span>{esc_safe(hi_label)}</span></div></div>'
+    )
+
+
+def esc_safe(s):
+    """Small standalone escaper — scale_bar_html is called from inside render_dashboard's
+    nested functions where the main esc() closure isn't in scope, so this avoids relying
+    on closure capture across function boundaries."""
+    return (str(s) if s is not None else "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def pe_scale(pe):
+    """P/E scale: 0-30 range, no 'good/bad' framing — a P/E can be low because a stock
+    is cheap OR because something's wrong; can be high because of growth optimism OR
+    overpricing. The bar shows POSITION only, never a verdict."""
+    if pe is None or pe < 0:
+        return ""
+    pos = min(pe / 30 * 100, 100)
+    return scale_bar_html("P/E", f"{pe:.1f}", pos, "low", "high", "#7fb3ff", "#e0d267")
+
+
+def rsi_scale(rsi):
+    """RSI is already 0-100 natively — no transform needed. Labels describe the fact
+    (risen/fallen fast) never a recommendation (never 'overbought'/'oversold')."""
+    if rsi is None:
+        return ""
+    return scale_bar_html("RSI (14)", f"{rsi:.1f}", rsi, "0 (fallen fast)", "100 (risen fast)", "#7fb3ff", "#e0d267")
+
+
+def mktcap_scale(mcap_value):
+    """Log-scale position: £1m -> 0%, £10bn -> 100%. Purely a size classification
+    (micro/mid/large-cap), not a quality judgement — small isn't 'bad', it's smaller."""
+    if not mcap_value or mcap_value <= 0:
+        return ""
+    import math
+    log_val = math.log10(max(mcap_value, 1))
+    pos = (log_val - 6) / (10 - 6) * 100  # 10^6 (£1m) to 10^10 (£10bn)
+    pos = max(0, min(100, pos))
+    display = format_market_cap(mcap_value) or ""
+    return scale_bar_html("Mkt cap", display, pos, "micro-cap", "large-cap", "#f0997b", "#5dcaa5")
+
+
+def eps_scale(eps):
+    """EPS scale: -£0.50 to £2.00 — a company can be a legitimate early-stage business
+    with negative EPS, so 'loss-making' is a factual label, not a red flag icon."""
+    if eps is None:
+        return ""
+    pos = (eps - (-0.5)) / (2.0 - (-0.5)) * 100
+    pos = max(0, min(100, pos))
+    return scale_bar_html("EPS", f"£{eps:.2f}", pos, "loss-making", "strong profit/share", "#f0997b", "#5dcaa5")
+
+
 def format_epoch_date(epoch_seconds):
     """Formats a Yahoo epoch timestamp (earnings/ex-dividend dates) as a plain London
     date. IMPORTANT: only returns a value if the date is today or in the future — Yahoo
@@ -991,6 +1063,9 @@ def render_dashboard(data, watchlist):
                 fundamentals_parts.append(f'mkt cap <span class="val">{mcap}</span>')
             if fundamentals_parts:
                 calendar_html += f'<br/><span class="meta">📊 {" · ".join(fundamentals_parts)}</span>'
+            scales_html = pe_scale(pe) + mktcap_scale(q.get("marketCap")) + eps_scale(eps)
+            if scales_html:
+                calendar_html += f'<div style="margin-top:4px;">{scales_html}</div>'
             wk_low = q.get("fiftyTwoWeekLow")
             wk_high = q.get("fiftyTwoWeekHigh")
             if wk_low is not None and wk_high is not None:
@@ -1014,6 +1089,7 @@ def render_dashboard(data, watchlist):
             technicals_html = ""
             if rsi14 is not None:
                 technicals_html += f'<br/><span class="meta">RSI(14): <span class="val">{rsi14:.1f}</span></span>'
+                technicals_html += f'<div style="margin-top:4px;">{rsi_scale(rsi14)}</div>'
             if above_ma is not None:
                 technicals_html += f'<br/><span class="meta">Price is <span class="val">{"above" if above_ma else "below"}</span> its 20-day average</span>'
             return (
