@@ -57,6 +57,14 @@ DOWNGRADE_WORDS = [
     r"moves?\s+\S+.{0,25}\s+to\s+(sell|underweight|underperform)",
 ]
 TARGET_WORDS = ["price target", "target price", "pt raised", "pt cut"]
+# Director/PDMR (Persons Discharging Managerial Responsibilities) dealings — a standard
+# RNS announcement type disclosing when a company director has bought or sold shares.
+# Real, published, factual disclosure — not something this tool infers or predicts.
+DIRECTOR_DEALING_WORDS = [
+    "pdmr", "director/pdmr shareholding", "director shareholding",
+    "notification of transactions by persons discharging managerial responsibilities",
+    "director dealing", "directors' dealing", "holding(s) in company",
+]
 EVENT_WORDS = [
     "trading update", "results", "interim report", "final results", "agm",
     "dividend", "profit warning", "acquisition", "placing", "earnings", "guidance",
@@ -132,6 +140,8 @@ def classify(title):
         return "downgrade"
     if any(w in t for w in TARGET_WORDS):
         return "target"
+    if any(w in t for w in DIRECTOR_DEALING_WORDS):
+        return "director_dealing"
     if any(w in t for w in EVENT_WORDS):
         return "event"
     return "news"
@@ -181,7 +191,7 @@ def fetch_yahoo_analyst(ticker):
     crumb = get_yahoo_crumb()
     url = (
         f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{urllib.parse.quote(symbol)}"
-        "?modules=upgradeDowngradeHistory,recommendationTrend,financialData,calendarEvents,summaryDetail"
+        "?modules=upgradeDowngradeHistory,recommendationTrend,financialData,calendarEvents,summaryDetail,defaultKeyStatistics,price"
     )
     if crumb:
         url += f"&crumb={urllib.parse.quote(crumb)}"
@@ -200,6 +210,11 @@ def fetch_yahoo_analyst(ticker):
         div_rate = (summary.get("dividendRate") or {}).get("raw")  # currency amount per share per year
         div_yield_raw = (summary.get("dividendYield") or {}).get("raw")  # Yahoo returns this as a fraction, e.g. 0.045 = 4.5%
         div_yield_pct = div_yield_raw * 100 if div_yield_raw is not None else None
+        stats = result.get("defaultKeyStatistics") or {}
+        price_mod = result.get("price") or {}
+        trailing_pe = (summary.get("trailingPE") or {}).get("raw")
+        eps = (stats.get("trailingEps") or {}).get("raw")
+        market_cap = (price_mod.get("marketCap") or {}).get("raw")
         return {
             "history": history,
             "targetMeanPrice": (fin.get("targetMeanPrice") or {}).get("raw"),
@@ -208,6 +223,9 @@ def fetch_yahoo_analyst(ticker):
             "exDividendDate": ex_div,  # unix epoch seconds, or None
             "dividendRate": div_rate,  # per-share currency amount, or None
             "dividendYieldPct": div_yield_pct,  # already converted to a percentage, or None
+            "trailingPE": trailing_pe,
+            "trailingEps": eps,
+            "marketCap": market_cap,
         }
     except Exception as e:
         print(f"  ! yahoo analyst history failed: {ticker} ({e})", file=sys.stderr)
@@ -697,6 +715,19 @@ def save_json(path, data):
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
+def format_market_cap(value):
+    """Readable market cap — e.g. 1_234_000_000 -> '£1.23bn'. Yahoo returns this in the
+    stock's own currency (GBp for most LSE stocks, so this is already pence-scale — but
+    marketCap itself is typically reported in full currency units, not pence, by Yahoo)."""
+    if value is None:
+        return None
+    if value >= 1_000_000_000:
+        return f"£{value / 1_000_000_000:.2f}bn"
+    if value >= 1_000_000:
+        return f"£{value / 1_000_000:.1f}m"
+    return f"£{value:,.0f}"
+
+
 def format_epoch_date(epoch_seconds):
     """Formats a Yahoo epoch timestamp (earnings/ex-dividend dates) as a plain London
     date — 'today' logic doesn't apply here since these are future calendar facts, not
@@ -788,7 +819,7 @@ def render_dashboard(data, watchlist):
                 extra = f" (+{len(news_for_symbol)-1} more)" if len(news_for_symbol) > 1 else ""
                 news_html = (
                     f'<br/><a href="{esc(top.get("link","#"))}" target="_blank" '
-                    f'style="color:#7fb3ff;font-size:11px;">📰 {esc(top.get("title",""))}</a>'
+                    f'style="color:#7fb3ff;font-size:12px;font-weight:600;">📰 {esc(top.get("title",""))}</a>'
                     f'<span class="meta">{extra}</span>'
                 )
             else:
@@ -796,7 +827,7 @@ def render_dashboard(data, watchlist):
             target = q.get("targetMeanPrice")
             rec = q.get("recommendationKey")
             target_html = (
-                f'<br/><span class="meta">🎯 target {target:.2f}{f" · {esc(rec)}" if rec else ""}</span>'
+                f'<br/><span class="meta">🎯 target <span class="val">{target:.2f}</span>{f" · {esc(rec)}" if rec else ""}</span>'
                 if target else ""
             )
             earnings_date = format_epoch_date(q.get("nextEarningsDate"))
@@ -805,23 +836,35 @@ def render_dashboard(data, watchlist):
             div_yield = q.get("dividendYieldPct")
             calendar_html = ""
             if earnings_date:
-                calendar_html += f'<br/><span class="meta">📅 next earnings: {earnings_date}</span>'
+                calendar_html += f'<br/><span class="meta">📅 next earnings: <span class="val">{earnings_date}</span></span>'
             if ex_div_date:
-                calendar_html += f'<br/><span class="meta">💰 ex-dividend: {ex_div_date}</span>'
+                calendar_html += f'<br/><span class="meta">💰 ex-dividend: <span class="val">{ex_div_date}</span></span>'
             if div_rate is not None or div_yield is not None:
-                rate_str = f'{div_rate:.2f}/share' if div_rate is not None else ''
-                yield_str = f'{div_yield:.2f}% yield' if div_yield is not None else ''
+                rate_str = f'<span class="val">{div_rate:.2f}</span>/share' if div_rate is not None else ''
+                yield_str = f'<span class="val">{div_yield:.2f}%</span> yield' if div_yield is not None else ''
                 joined = " · ".join(s for s in (rate_str, yield_str) if s)
                 calendar_html += f'<br/><span class="meta">💷 dividend: {joined}</span>'
+            pe = q.get("trailingPE")
+            eps = q.get("trailingEps")
+            mcap = format_market_cap(q.get("marketCap"))
+            fundamentals_parts = []
+            if pe is not None:
+                fundamentals_parts.append(f'P/E <span class="val">{pe:.1f}</span>')
+            if eps is not None:
+                fundamentals_parts.append(f'EPS <span class="val">{eps:.2f}</span>')
+            if mcap:
+                fundamentals_parts.append(f'mkt cap <span class="val">{mcap}</span>')
+            if fundamentals_parts:
+                calendar_html += f'<br/><span class="meta">📊 {" · ".join(fundamentals_parts)}</span>'
             rsi14 = q.get("rsi14")
             above_ma = q.get("aboveMA20")
             technicals_html = ""
             if rsi14 is not None:
-                technicals_html += f'<br/><span class="meta">RSI(14): {rsi14:.1f}</span>'
+                technicals_html += f'<br/><span class="meta">RSI(14): <span class="val">{rsi14:.1f}</span></span>'
             if above_ma is not None:
-                technicals_html += f'<br/><span class="meta">Price is {"above" if above_ma else "below"} its 20-day average</span>'
+                technicals_html += f'<br/><span class="meta">Price is <span class="val">{"above" if above_ma else "below"}</span> its 20-day average</span>'
             return (
-                f'<tr><td>{i+1}</td><td><b>{esc(symbol)}</b><br/>'
+                f'<tr><td>{i+1}</td><td><b style="font-size:14px;">{esc(symbol)}</b><br/>'
                 f'<span class="meta">{name}</span>{news_html}{target_html}{calendar_html}{technicals_html}</td><td{last_cls}>{last_col}</td></tr>'
             )
         return "".join(row(i, q) for i, q in enumerate(rows)) or '<tr><td colspan="3" class="meta">No data yet</td></tr>'
@@ -906,8 +949,9 @@ def render_dashboard(data, watchlist):
 <title>UK Stock Watch</title>
 <style>
 body{{background:#0f1115;color:#e8eaed;font-family:-apple-system,sans-serif;margin:0;padding:12px;font-size:14px}}
-h1{{font-size:18px;margin:4px 0}} h2{{font-size:14px;margin:16px 0 6px}}
-h3{{font-size:12px;margin:0 0 4px;color:#9aa0a6}}
+h1{{font-size:20px;margin:4px 0;font-weight:800}}
+h2{{font-size:17px;margin:22px 0 8px;font-weight:800;border-left:4px solid #7fb3ff;padding-left:10px}}
+h3{{font-size:13px;margin:0 0 6px;color:#c2c7d0;font-weight:700}}
 .screener-grid{{display:grid;grid-template-columns:1fr;gap:10px}}
 @media(min-width:600px){{.screener-grid{{grid-template-columns:1fr 1fr 1fr}}}}
 .heatmap-grid{{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:16px}}
@@ -918,17 +962,19 @@ h3{{font-size:12px;margin:0 0 4px;color:#9aa0a6}}
 .disclaimer{{background:#1c2b25;border:1px solid #274235;color:#9aa0a6;border-radius:6px;padding:8px;font-size:11px;margin-bottom:10px}}
 .quotes{{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}}
 .q{{background:#171a21;border:1px solid #2a2e37;border-radius:6px;padding:6px 10px;font-size:12px}}
-.up{{color:#50dc96}} .down{{color:#ff6b6b}}
-table{{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12px}}
-table td, table th{{padding:5px 6px;border-bottom:1px solid #2a2e37;text-align:left}}
-.item{{background:#171a21;border:1px solid #2a2e37;border-radius:8px;padding:8px;margin-bottom:8px}}
-.item a{{color:#e8eaed;text-decoration:none;font-size:13px}}
+.up{{color:#50dc96;font-weight:800;font-size:14px}} .down{{color:#ff6b6b;font-weight:800;font-size:14px}}
+table{{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px}}
+table td, table th{{padding:7px 8px;border-bottom:1px solid #2a2e37;text-align:left}}
+.item{{background:#171a21;border:1px solid #2a2e37;border-radius:8px;padding:10px;margin-bottom:8px}}
+.item a{{color:#e8eaed;text-decoration:none;font-size:14px;font-weight:600}}
 .item a:hover{{text-decoration:underline}}
-.meta{{color:#9aa0a6;font-size:10.5px}}
+.meta{{color:#9aa0a6;font-size:12px;line-height:1.9}}
+.val{{color:#e8eaed;font-weight:700}}
 .badge{{border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-right:4px}}
 .badge.upgrade{{background:#163a2a;color:#50dc96}}
 .badge.downgrade{{background:#3a1919;color:#ff6b6b}}
 .badge.target{{background:#2a2a17;color:#e0d267}}
+.badge.director_dealing{{background:#1a2a3a;color:#7fb3ff}}
 .badge.event{{background:#1c2a3a;color:#6ab6ff}}
 .badge.news{{background:#22262f;color:#9aa0a6}}
 .broker{{background:#2a1c3a;color:#c69bf0;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-right:4px}}
@@ -1259,6 +1305,12 @@ def main():
                     entry["dividendRate"] = analyst["dividendRate"]
                 if analyst.get("dividendYieldPct") is not None:
                     entry["dividendYieldPct"] = analyst["dividendYieldPct"]
+                if analyst.get("trailingPE") is not None:
+                    entry["trailingPE"] = analyst["trailingPE"]
+                if analyst.get("trailingEps") is not None:
+                    entry["trailingEps"] = analyst["trailingEps"]
+                if analyst.get("marketCap") is not None:
+                    entry["marketCap"] = analyst["marketCap"]
                 if hist:
                     entry["rsi14"] = hist.get("rsi14")
                     entry["ma20"] = hist.get("ma20")
@@ -1383,7 +1435,7 @@ def main():
             # watchlist specifically, event-category news (mergers, trading updates,
             # profit warnings, results) is genuinely price-moving and worth pushing —
             # unlike the market-wide stream, this is scoped to stocks you actually track.
-            if it["category"] in ("upgrade", "downgrade", "target", "event") and it.get("_recent", True):
+            if it["category"] in ("upgrade", "downgrade", "target", "director_dealing", "event") and it.get("_recent", True):
                 new_alerts.append(it)
 
         time.sleep(0.5)  # be polite to free sources
@@ -1453,7 +1505,7 @@ def main():
         print(movers_msg)
         send_webhook(movers_msg)
 
-    ALERT_LABELS = {"upgrade": "⬆ UPGRADE", "downgrade": "⬇ DOWNGRADE", "target": "🎯 PRICE TARGET", "event": "📰 NEWS"}
+    ALERT_LABELS = {"upgrade": "⬆ UPGRADE", "downgrade": "⬇ DOWNGRADE", "target": "🎯 PRICE TARGET", "director_dealing": "🧑‍💼 DIRECTOR DEALING", "event": "📰 NEWS"}
     alert_cap = MAX_ALERTS_PER_RUN if _current_template() == "callmebot" else len(new_alerts)
     alerts_to_send = new_alerts[:alert_cap]
     skipped_count = len(new_alerts) - len(alerts_to_send)
