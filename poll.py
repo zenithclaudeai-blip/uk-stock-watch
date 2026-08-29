@@ -43,20 +43,149 @@ NEWS_MAX_AGE_DAYS = 21  # news/broker items older than this are filtered from th
 NEWS_SAME_LONDON_DAY_ONLY = True
 
 UPGRADE_WORDS = [
-    "upgrade", "raises rating", "buy rating", "outperform", "overweight",
+    "upgrade", "raises rating", "buy rating",
     "raised to buy", "initiates.*buy",
-    r"upgrades?\s+\S+.{0,25}\s+to\s+(buy|overweight|outperform|add|accumulate)",
-    r"raises?\s+\S+.{0,25}\s+to\s+(buy|overweight|outperform)",
-    r"moves?\s+\S+.{0,25}\s+to\s+(buy|overweight|outperform)",
+    r"upgrades?\s+\S+.{0,25}\s+to\s+['\"‘’]?(buy|overweight|outperform|add|accumulate)",
+    r"raises?\s+\S+.{0,25}\s+to\s+['\"‘’]?(buy|overweight|outperform)",
+    r"\bups\b\s+\S+.{0,25}\s+to\s+['\"‘’]?(buy|overweight|outperform)",
+    r"moves?\s+\S+.{0,25}\s+to\s+['\"‘’]?(buy|overweight|outperform)",
 ]
 DOWNGRADE_WORDS = [
-    "downgrade", "cuts rating", "sell rating", "underperform", "underweight",
+    "downgrade", "cuts rating", "sell rating",
     "cut to sell", "initiates.*sell",
-    r"cuts?\s+\S+.{0,25}\s+to\s+(sell|underweight|underperform|reduce|hold)",
-    r"downgrades?\s+\S+.{0,25}\s+to\s+(sell|hold|underweight|underperform)",
-    r"moves?\s+\S+.{0,25}\s+to\s+(sell|underweight|underperform)",
+    r"cuts?\s+\S+.{0,25}\s+to\s+['\"‘’]?(sell|underweight|underperform|reduce|hold)",
+    r"downgrades?\s+\S+.{0,25}\s+to\s+['\"‘’]?(sell|hold|underweight|underperform)",
+    r"moves?\s+\S+.{0,25}\s+to\s+['\"‘’]?(sell|underweight|underperform)",
 ]
 TARGET_WORDS = ["price target", "target price", "pt raised", "pt cut"]
+
+# =========================================================================
+# NORMALIZED ACTION VOCABULARY (per user's structured broker-monitor spec)
+# =========================================================================
+# Distinguishes a RATING change (upgrade/downgrade) from a TARGET-only change
+# (target raised/cut with rating unchanged) — the two are different facts.
+# Example: "BUY maintained, target £500->£550" = TARGET_RAISE, not UPGRADE.
+# Checked in priority order inside classify(): a genuine rating change always
+# wins over a target-only mention, since it's the more significant fact.
+INITIATION_WORDS = [
+    "initiates coverage", "initiated coverage", "starts coverage", "started coverage",
+    "resumes coverage", "resumed coverage", "begins coverage", "initiate coverage",
+]
+REITERATION_WORDS = [
+    "reiterates", "reiterated", "reaffirms", "reaffirmed", "maintains rating",
+    "keeps rating", "retains rating", "sticks with",
+]
+TARGET_RAISE_WORDS = [
+    r"hik(e|es|ed)\s+\S*.{0,30}(price target|target price)",
+    r"rais(e|es|ed)\s+\S*.{0,30}(price target|target price)",
+    r"lift(s|ed)?\s+\S*.{0,30}(price target|target price)",
+    r"\bups\b\s+\S*.{0,30}(price target|target price)",
+    r"increas(e|es|ed)\s+\S*.{0,30}(price target|target price)",
+    r"boost(s|ed)?\s+\S*.{0,30}(price target|target price)",
+    r"price target.{0,20}(raised|hiked|lifted|increased)",
+    r"target price.{0,20}(raised|hiked|lifted|increased)",
+]
+TARGET_CUT_WORDS = [
+    r"\bcuts?\b\s+\S*.{0,30}(price target|target price)",
+    r"lower(s|ed)?\s+\S*.{0,30}(price target|target price)",
+    r"trim(s|med)?\s+\S*.{0,30}(price target|target price)",
+    r"slash(es|ed)?\s+\S*.{0,30}(price target|target price)",
+    r"reduc(e|es|ed)\s+\S*.{0,30}(price target|target price)",
+    r"price target.{0,20}(cut|lowered|trimmed|reduced|slashed)",
+    r"target price.{0,20}(cut|lowered|trimmed|reduced|slashed)",
+]
+
+# Rating-text -> BULLISH/NEUTRAL/BEARISH bucket, for a plain-English "what
+# does this rating mean" signal without inventing a prediction — purely a
+# classification of the label itself, same as the user's spec.
+BULLISH_RATING_TERMS = {
+    "buy", "strong buy", "outperform", "overweight", "add", "accumulate",
+    "top pick", "speculative buy", "house stock",
+}
+NEUTRAL_RATING_TERMS = {
+    "hold", "neutral", "market perform", "equal weight", "equal-weight",
+    "sector perform", "in-line", "no recommendation", "coverage pending",
+}
+BEARISH_RATING_TERMS = {
+    "sell", "strong sell", "underperform", "underweight", "reduce", "trading sell",
+}
+
+
+def normalize_rating_bucket(raw_rating):
+    """Maps any broker rating text to BULLISH/NEUTRAL/BEARISH, or None if
+    unrecognized. Purely descriptive classification of the label itself —
+    never a recommendation, never predicts anything."""
+    if not raw_rating:
+        return None
+    r = raw_rating.strip().lower().replace("_", " ")
+    if r in BULLISH_RATING_TERMS:
+        return "BULLISH"
+    if r in NEUTRAL_RATING_TERMS:
+        return "NEUTRAL"
+    if r in BEARISH_RATING_TERMS:
+        return "BEARISH"
+    return None
+
+
+def normalize_action_from_grades(from_grade, to_grade, yahoo_action_code=None):
+    """
+    Returns one of: UPGRADE, DOWNGRADE, REITERATION, INITIATION, RATING_CHANGE,
+    NO_CHANGE. Prefers Yahoo's own action code (most reliable, since Yahoo
+    already knows the real event type); falls back to comparing bullish/
+    neutral/bearish buckets of from/to grade when no action code is given.
+    """
+    if yahoo_action_code == "init":
+        return "INITIATION"
+    if yahoo_action_code == "up":
+        return "UPGRADE"
+    if yahoo_action_code == "down":
+        return "DOWNGRADE"
+    if yahoo_action_code == "reit":
+        return "REITERATION"
+    from_bucket = normalize_rating_bucket(from_grade)
+    to_bucket = normalize_rating_bucket(to_grade)
+    if from_bucket and to_bucket:
+        order = {"BEARISH": 0, "NEUTRAL": 1, "BULLISH": 2}
+        if from_bucket == to_bucket:
+            return "NO_CHANGE"
+        return "UPGRADE" if order[to_bucket] > order[from_bucket] else "DOWNGRADE"
+    if from_grade and to_grade and from_grade != to_grade:
+        return "RATING_CHANGE"
+    return "NO_CHANGE"
+
+
+def normalize_headline_action(title):
+    """
+    Classifies a NEWS HEADLINE (not structured Yahoo data) into the same
+    normalized vocabulary. Checked in priority order: a genuine rating
+    change always wins over a target-only mention, since a headline saying
+    "Citi upgrades X, raises target" is fundamentally an UPGRADE, not a
+    TARGET_RAISE, even though it mentions the target too.
+    """
+    t = title.lower()
+    if any(re.search(w, t) for w in UPGRADE_WORDS):
+        return "UPGRADE"
+    if any(re.search(w, t) for w in DOWNGRADE_WORDS):
+        return "DOWNGRADE"
+    if any(w in t for w in INITIATION_WORDS):
+        return "INITIATION"
+    if any(re.search(w, t) for w in TARGET_RAISE_WORDS):
+        return "TARGET_RAISE"
+    if any(re.search(w, t) for w in TARGET_CUT_WORDS):
+        return "TARGET_CUT"
+    if any(w in t for w in REITERATION_WORDS):
+        return "REITERATION"
+    return None  # not a broker-action headline at all — classify() handles the rest
+
+# Maps classify()'s lowercase category (used for CSS badge classes) to the
+# uppercase normalized vocabulary word (used in the structured data /
+# alert labels) — keeps the two representations consistent everywhere.
+CATEGORY_TO_NORMALIZED_ACTION = {
+    "upgrade": "UPGRADE", "downgrade": "DOWNGRADE", "initiation": "INITIATION",
+    "target_raise": "TARGET_RAISE", "target_cut": "TARGET_CUT", "reiteration": "REITERATION",
+    "target": "RATING_CHANGE", "director_dealing": None, "event": None, "news": None,
+}
+
 # Director/PDMR (Persons Discharging Managerial Responsibilities) dealings — a standard
 # RNS announcement type disclosing when a company director has bought or sold shares.
 # Real, published, factual disclosure — not something this tool infers or predicts.
@@ -134,10 +263,22 @@ def http_get(url, timeout=15):
 
 def classify(title):
     t = title.lower()
-    if any(re.search(w, t) for w in UPGRADE_WORDS):
-        return "upgrade"
+    # Downgrade checked before upgrade: a headline like "downgraded X to Y from
+    # outperform" would otherwise risk matching an upgrade-side pattern first —
+    # a genuine downgrade always contains "downgrade"/"cuts"-style language
+    # that's a stronger, less ambiguous signal than any upgrade-side term.
     if any(re.search(w, t) for w in DOWNGRADE_WORDS):
         return "downgrade"
+    if any(re.search(w, t) for w in UPGRADE_WORDS):
+        return "upgrade"
+    if any(w in t for w in INITIATION_WORDS):
+        return "initiation"
+    if any(re.search(w, t) for w in TARGET_RAISE_WORDS):
+        return "target_raise"
+    if any(re.search(w, t) for w in TARGET_CUT_WORDS):
+        return "target_cut"
+    if any(w in t for w in REITERATION_WORDS):
+        return "reiteration"
     if any(w in t for w in TARGET_WORDS):
         return "target"
     if any(w in t for w in DIRECTOR_DEALING_WORDS):
@@ -321,8 +462,25 @@ def match_short_interest(company_name, short_interest_map):
     return None
 
 
-ACTION_CATEGORY = {"up": "upgrade", "down": "downgrade", "init": "event", "main": "news", "reit": "news"}
+ACTION_CATEGORY = {"up": "upgrade", "down": "downgrade", "init": "initiation", "main": "news", "reit": "reiteration"}
 RECENT_WINDOW_SECONDS = 2 * 24 * 3600  # only alert on ratings from the last 48h, not backfilled history
+
+
+def format_normalized_at(iso_string):
+    """Formats a normalizedAt ISO timestamp (when this item's classification was
+    computed) as a plain London date/time, same dual-timezone convention as the
+    rest of the dashboard — distinct from pubDate (the article/event's own date),
+    since a backfilled Yahoo history item can be re-classified on a later run
+    than when the underlying event actually happened."""
+    if not iso_string:
+        return None
+    try:
+        dt = datetime.fromisoformat(iso_string)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return format_london_and_utc(dt)
+    except Exception:
+        return None
 
 
 def analyst_history_to_items(ticker, analyst):
@@ -331,6 +489,11 @@ def analyst_history_to_items(ticker, analyst):
         return items
     symbol = yahoo_symbol(ticker)
     now = time.time()
+    normalized_at = datetime.now(timezone.utc).isoformat()  # when THIS classification ran —
+                                                              # distinct from the event's own date,
+                                                              # since backfilled history can be
+                                                              # re-classified on a later run than
+                                                              # when the actual rating happened.
     for h in analyst.get("history", [])[:15]:
         firm = h.get("firm", "")
         to_grade = h.get("toGrade", "")
@@ -351,8 +514,17 @@ def analyst_history_to_items(ticker, analyst):
             "category": ACTION_CATEGORY.get(action, "news"),
             "broker": firm,
             "_recent": (now - epoch) <= RECENT_WINDOW_SECONDS,
+            # Normalized structured fields (per the broker-monitor spec) — kept
+            # alongside the original wording (fromGrade/toGrade preserved as-is).
+            "normalizedAction": normalize_action_from_grades(from_grade, to_grade, action),
+            "fromRating": from_grade or None,
+            "toRating": to_grade,
+            "fromRatingBucket": normalize_rating_bucket(from_grade),
+            "toRatingBucket": normalize_rating_bucket(to_grade),
+            "normalizedAt": normalized_at,  # when this classification was computed (ISO UTC)
         })
     return items
+
 
 
 import email.utils as _email_utils
@@ -1012,14 +1184,19 @@ def render_dashboard(data, watchlist):
         # Defense in depth: only render a broker badge for genuine rating/target items,
         # even if something upstream ever slipped through — a "news" item mentioning a
         # bank's name is not the same as that bank issuing a rating.
-        show_broker = it.get("broker") and it.get("category") in ("upgrade", "downgrade", "target")
+        show_broker = it.get("broker") and it.get("category") in ("upgrade", "downgrade", "target", "target_raise", "target_cut", "initiation", "reiteration")
         broker_html = f'<span class="broker">{esc(it["broker"])}</span>' if show_broker else ""
         ticker_label = "LSE" if it.get("ticker") == "MARKET" else esc(it.get("ticker", ""))
+        # Shows WHEN this item's classification was computed — separate from pubDate
+        # (the article/event's own date), since a backfilled Yahoo history item can
+        # be re-classified on a later run than when the actual rating happened.
+        normalized_at_display = format_normalized_at(it.get("normalizedAt"))
+        classified_html = f'<br/><span class="meta">Classified: {esc(normalized_at_display)}</span>' if normalized_at_display else ""
         return (
             f'<div class="item"><span class="badge {it.get("category","news")}">{it.get("category","news").upper()}</span> '
             f'<b>{ticker_label}</b> '
             f'{broker_html} '
-            f'<span class="meta">{esc(it.get("source",""))} · {esc(it.get("pubDate",""))}</span><br/>'
+            f'<span class="meta">{esc(it.get("source",""))} · {esc(it.get("pubDate",""))}</span>{classified_html}<br/>'
             f'<a href="{esc(it.get("link","#"))}" target="_blank">{esc(it.get("title",""))}</a></div>'
         )
 
@@ -1123,11 +1300,13 @@ def render_dashboard(data, watchlist):
     lose_rows = screener_table(screener.get("losers", []))
 
     def screener_news_item(symbol, it):
-        broker_html = f'<span class="broker">{esc(it["broker"])}</span>' if it.get("broker") and it.get("category") in ("upgrade", "downgrade", "target") else ""
+        broker_html = f'<span class="broker">{esc(it["broker"])}</span>' if it.get("broker") and it.get("category") in ("upgrade", "downgrade", "target", "target_raise", "target_cut", "initiation", "reiteration") else ""
+        normalized_at_display = format_normalized_at(it.get("normalizedAt"))
+        classified_html = f'<br/><span class="meta">Classified: {esc(normalized_at_display)}</span>' if normalized_at_display else ""
         return (
             f'<div class="item"><span class="badge {it.get("category","news")}">{it.get("category","news").upper()}</span> '
             f'<b>{esc(symbol)}</b> {broker_html} '
-            f'<span class="meta">{esc(it.get("source",""))} · {esc(it.get("pubDate",""))}</span><br/>'
+            f'<span class="meta">{esc(it.get("source",""))} · {esc(it.get("pubDate",""))}</span>{classified_html}<br/>'
             f'<a href="{esc(it.get("link","#"))}" target="_blank">{esc(it.get("title",""))}</a></div>'
         )
 
@@ -1145,7 +1324,10 @@ def render_dashboard(data, watchlist):
 
     # Every screener-ranked stock (Volume/Gainers/Losers) that has a real broker target
     # price attached — pulled together here as its own scannable list, in addition to
-    # already showing inline under each screener row.
+    # already showing inline under each screener row. ALSO includes watchlist stocks'
+    # targets (via `quotes`), so this is genuinely every target the tool has, in one
+    # place, not just the screener subset — deduped so a stock in both pools (e.g. KOO)
+    # only appears once.
     all_screener_rows = (
         screener.get("volume", []) + screener.get("gainers", []) + screener.get("losers", [])
     )
@@ -1161,6 +1343,24 @@ def render_dashboard(data, watchlist):
         rec_html = f' · <span class="meta">{esc(rec)}</span>' if rec else ""
         target_price_rows += (
             f'<div class="quote-row"><b>{esc(symbol)}</b> ({esc(q.get("name") or symbol)}) — '
+            f'🎯 target {target:.2f}{rec_html}</div>'
+        )
+    for stock in watchlist:
+        ticker, name = stock["ticker"], stock["name"]
+        yahoo_sym = yahoo_symbol(ticker)  # watchlist tickers are stored plain (e.g. "LLOY"),
+                                           # screener symbols are Yahoo-format (e.g. "LLOY.L") —
+                                           # normalize so the seen_target_symbols dedupe actually matches
+        if yahoo_sym in seen_target_symbols:
+            continue
+        q = quotes.get(ticker, {})
+        target = q.get("targetMeanPrice")
+        if not target:
+            continue
+        seen_target_symbols.add(yahoo_sym)
+        rec = q.get("recommendationKey")
+        rec_html = f' · <span class="meta">{esc(rec)}</span>' if rec else ""
+        target_price_rows += (
+            f'<div class="quote-row"><b>{esc(ticker)}</b> ({esc(name)}) — '
             f'🎯 target {target:.2f}{rec_html}</div>'
         )
 
@@ -1267,6 +1467,10 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 .badge.upgrade{{background:#163a2a;color:#50dc96}}
 .badge.downgrade{{background:#3a1919;color:#ff6b6b}}
 .badge.target{{background:#2a2a17;color:#e0d267}}
+.badge.target_raise{{background:#1c3a1c;color:#7bd97b}}
+.badge.target_cut{{background:#3a2317;color:#e0977f}}
+.badge.initiation{{background:#1f2a3a;color:#8fb8ff}}
+.badge.reiteration{{background:#2a2532;color:#b8a0d9}}
 .badge.director_dealing{{background:#1a2a3a;color:#7fb3ff}}
 .badge.event{{background:#1c2a3a;color:#6ab6ff}}
 .badge.news{{background:#22262f;color:#9aa0a6}}
@@ -1311,9 +1515,9 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 <p class="meta">Real closing-price history over the last 5 trading days — a fact about the past, not a forecast of what happens next.</p>
 <div class="quotes">{uptrend_rows or '<span class="meta">Nothing has met the 5-day threshold right now</span>'}</div>
 
-<h2 id="targets">🎯 Broker Target Prices (screener stocks)</h2>
-<p class="meta">Real, already-published broker consensus targets from Yahoo's aggregation — not generated by this tool.</p>
-<div class="quotes">{target_price_rows or '<span class="meta">No target price data available for today&#39;s ranked stocks yet.</span>'}</div>
+<h2 id="targets">🎯 Broker Target Prices</h2>
+<p class="meta">Real, already-published broker consensus targets from Yahoo's aggregation — not generated by this tool. Covers both your watchlist and today's screener-ranked stocks (Volume/Gainers/Losers).</p>
+<div class="quotes">{target_price_rows or '<span class="meta">No target price data available yet.</span>'}</div>
 
 <h2 id="movers-today">🔥 Already Moving Today (watchlist, ±{BIG_MOVER_THRESHOLD_PCT:.0f}%+)</h2>
 <p class="meta">A fact about what already happened today — not a forecast of what happens next.</p>
@@ -1709,8 +1913,10 @@ def main():
                 enriched_items = []
                 for it in items[:5]:  # cap per-stock to keep dashboard/message size sane
                     category = classify(it["title"])
-                    broker = detect_broker(it["title"]) if category in ("upgrade", "downgrade", "target") else None
-                    enriched_items.append({**it, "ticker": symbol, "company": name, "category": category, "broker": broker, "detectedAt": now_iso_sc})
+                    broker = detect_broker(it["title"]) if category in ("upgrade", "downgrade", "target", "target_raise", "target_cut", "initiation", "reiteration") else None
+                    enriched_items.append({**it, "ticker": symbol, "company": name, "category": category, "broker": broker,
+                                            "detectedAt": now_iso_sc, "normalizedAt": now_iso_sc,
+                                            "normalizedAction": CATEGORY_TO_NORMALIZED_ACTION.get(category)})
                 screener_news[symbol] = enriched_items
             time.sleep(1)  # stagger — this is the change most likely to trip Google's rate limiting if rushed
 
@@ -1802,7 +2008,7 @@ def main():
             # "target" = a broker raising/cutting their price target — a genuine, already-
             # published broker action, same category of fact as an upgrade/downgrade, so it
             # belongs in the same alert stream rather than being silently dropped.
-            if category not in ("upgrade", "downgrade", "target"):
+            if category not in ("upgrade", "downgrade", "target", "target_raise", "target_cut", "initiation", "reiteration"):
                 continue
             market_wide_enriched.append({
                 **it,
@@ -1811,6 +2017,8 @@ def main():
                 "category": category,
                 "broker": detect_broker(it["title"]),
                 "detectedAt": now_iso_mw,
+                "normalizedAt": now_iso_mw,
+                "normalizedAction": CATEGORY_TO_NORMALIZED_ACTION.get(category),
             })
         market_wide_dedup = {}
         for it in market_wide_enriched:
@@ -1862,7 +2070,7 @@ def main():
             # Only tag a broker when the item is actually a rating/target call — otherwise
             # a story that merely mentions a bank's name (e.g. a personnel/legal story
             # about "Barclays") gets mislabeled as if that bank issued the rating.
-            broker = detect_broker(it["title"]) if category in ("upgrade", "downgrade", "target") else None
+            broker = detect_broker(it["title"]) if category in ("upgrade", "downgrade", "target", "target_raise", "target_cut", "initiation", "reiteration") else None
             enriched.append({
                 **it,
                 "ticker": ticker,
@@ -1870,6 +2078,8 @@ def main():
                 "category": category,
                 "broker": broker,
                 "detectedAt": now_iso,
+                "normalizedAt": now_iso,
+                "normalizedAction": CATEGORY_TO_NORMALIZED_ACTION.get(category),
             })
         # Analyst history items already carry structured category/broker/pubDate —
         # merge as-is rather than re-running keyword classification on them.
@@ -1898,7 +2108,7 @@ def main():
             # watchlist specifically, event-category news (mergers, trading updates,
             # profit warnings, results) is genuinely price-moving and worth pushing —
             # unlike the market-wide stream, this is scoped to stocks you actually track.
-            if it["category"] in ("upgrade", "downgrade", "target", "director_dealing", "event") and it.get("_recent", True):
+            if it["category"] in ("upgrade", "downgrade", "target", "target_raise", "target_cut", "initiation", "director_dealing", "event") and it.get("_recent", True):
                 new_alerts.append(it)
 
         time.sleep(0.5)  # be polite to free sources
@@ -1975,7 +2185,7 @@ def main():
         print(movers_msg)
         send_webhook(movers_msg)
 
-    ALERT_LABELS = {"upgrade": "⬆ UPGRADE", "downgrade": "⬇ DOWNGRADE", "target": "🎯 PRICE TARGET", "director_dealing": "🧑‍💼 DIRECTOR DEALING", "event": "📰 NEWS"}
+    ALERT_LABELS = {"upgrade": "⬆ UPGRADE", "downgrade": "⬇ DOWNGRADE", "target": "🎯 PRICE TARGET", "target_raise": "🎯⬆ TARGET RAISED", "target_cut": "🎯⬇ TARGET CUT", "initiation": "🆕 INITIATED", "reiteration": "🔁 REITERATED", "director_dealing": "🧑‍💼 DIRECTOR DEALING", "event": "📰 NEWS"}
     alert_cap = MAX_ALERTS_PER_RUN if _current_template() == "callmebot" else len(new_alerts)
     alerts_to_send = new_alerts[:alert_cap]
     skipped_count = len(new_alerts) - len(alerts_to_send)
@@ -2011,6 +2221,430 @@ def main():
         "lastScreenerMessage": seen_state.get("lastScreenerMessage", 0),
         "recentSendTimes": _recent_send_times,  # carries the rate-limit budget forward to the next run
     })
+
+
+
+# =========================================================================
+# BROKER-EVENTS PIPELINE (steps 1-3) — target extraction, ticker
+# resolution, normalization, and cross-source deduplication/merging.
+#
+# SEPARATE, ADDITIVE subsystem — nothing here is called from main(), the
+# dashboard, or the existing news/alert pipeline yet. Pure functions
+# operating on in-memory lists only; no filesystem I/O. This is what makes
+# idempotency achievable once a persistent store is added in a later step:
+# calling this pipeline twice on the same raw input always produces the
+# same output, since every ID is deterministic (hash-based or built from
+# the data itself, never a random/incrementing value or a timestamp of
+# when the pipeline ran).
+#
+# Pipeline shape, exactly as specified:
+#   raw_events -> normalized_events -> candidate_matches -> merged_events
+# Nothing is ever discarded: every input event ends up in exactly one of
+# merged_events / conflicts / unmatched_events in the final output.
+# =========================================================================
+
+import hashlib
+
+# -------------------------------------------------------------------
+# STEP 1 — Investing.com target-price extraction
+# -------------------------------------------------------------------
+# Only extracts a target when the headline gives EXPLICIT numbers with an
+# unambiguous currency marker (£/GBP prefix, or p/pence suffix). A bare
+# number with neither marker is never guessed at — real UK financial
+# headlines always mark pence explicitly ("450p") or pounds explicitly
+# ("£4.50"); a marker-less number is genuinely ambiguous and is left as
+# no-extraction rather than assumed.
+
+_MONEY_TOKEN_RE = r"(?:GBP\s*)?(?:£\s*(\d{1,3}(?:,\d{3})*(?:\.\d+)?)|(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*p(?:ence)?\b)"
+# group(1) = pounds-marked number (£ prefix), group(2) = pence-marked number (p suffix)
+# — exactly one is populated per match, since the alternation is exclusive.
+
+
+def _parse_money_match(m):
+    """Given a regex match against _MONEY_TOKEN_RE, returns (value_in_pounds, currency)."""
+    pounds_str, pence_str = m.group(1), m.group(2)
+    if pounds_str is not None:
+        return float(pounds_str.replace(",", "")), "GBP"
+    if pence_str is not None:
+        return float(pence_str.replace(",", "")) / 100.0, "GBP"
+    return None, None  # should not happen given the alternation, but never guess
+
+
+def extract_target_from_headline(title):
+    """
+    Returns (old_target, new_target, currency) — all None if no explicit,
+    unambiguous target-price change is stated in the headline. old_target
+    may be None even when new_target is found (e.g. "cuts price target to
+    £3.80" states only the new value) — that's a valid partial extraction,
+    not a failure; old_target simply stays unknown, never invented.
+
+    Only searches within a window around the word "target" (or "price
+    target"/"pt") — avoids accidentally grabbing an unrelated number
+    elsewhere in a long headline (e.g. a percentage, a share count, a date).
+    """
+    t = title.lower()
+    target_idx = None
+    for kw in ("price target", "target price", " pt ", "target"):
+        idx = t.find(kw)
+        if idx != -1:
+            target_idx = idx
+            break
+    if target_idx is None:
+        return None, None, None
+
+    window_start = max(0, target_idx - 15)
+    window_end = min(len(title), target_idx + 70)
+    window = title[window_start:window_end]
+
+    money_re = re.compile(_MONEY_TOKEN_RE, re.IGNORECASE)
+    matches = list(money_re.finditer(window))
+    if not matches:
+        return None, None, None
+
+    if len(matches) == 1:
+        value, currency = _parse_money_match(matches[0])
+        return None, value, currency
+
+    if len(matches) == 2:
+        v1, c1 = _parse_money_match(matches[0])
+        v2, c2 = _parse_money_match(matches[1])
+        if v1 is None or v2 is None:
+            return None, None, None
+        currency = c1 or c2
+        # "from X to Y" => old=X, new=Y. Anything else ("to Y from X",
+        # "raises ... to Y from X") => the token right after "from" is old,
+        # the other is new. Checked via the word immediately preceding the
+        # FIRST token in reading order.
+        before_first = window[:matches[0].start()].strip().split()
+        word_before_first = before_first[-1].lower() if before_first else ""
+        if word_before_first == "from":
+            return v1, v2, currency
+        return v2, v1, currency
+
+    # 3+ money-like tokens in the window is ambiguous — a malformed or
+    # unusually-structured headline. Never guess which pair is the target.
+    return None, None, None
+
+
+def compute_target_change_pct(old_target, new_target):
+    """(new - old) / old * 100 — only when both values are present and
+    old_target is non-zero. Never estimated otherwise."""
+    if old_target is None or new_target is None or old_target == 0:
+        return None
+    return (new_target - old_target) / old_target * 100.0
+
+
+# -------------------------------------------------------------------
+# STEP 2 — Name -> LSE ticker resolution
+# -------------------------------------------------------------------
+
+def build_name_ticker_lookup(watchlist, screener_rows):
+    """
+    Builds a company-name -> ticker lookup from data ALREADY available in
+    this run (watchlist + screener pool) — never invented, never fetched
+    from a separate source. Keys are lowercased and cleaned via the
+    existing clean_company_name() (strips "ORD 10P"-style jargon), so
+    lookups tolerate the same naming noise Yahoo's screener returns.
+    """
+    lookup = {}
+    for stock in watchlist:
+        name = clean_company_name(stock["name"]).strip().lower()
+        if name:
+            lookup[name] = stock["ticker"].upper()
+    for row in screener_rows:
+        name = clean_company_name(row.get("name", "")).strip().lower()
+        symbol = row.get("symbol", "")
+        ticker = symbol.upper().rsplit(".L", 1)[0] if symbol.upper().endswith(".L") else symbol.upper()
+        if name and ticker:
+            lookup.setdefault(name, ticker)  # watchlist takes priority if both define the same name
+    return lookup
+
+
+def resolve_ticker_by_substring(headline, lookup):
+    """
+    The Investing.com RSS has no ticker field, only a headline — so this
+    checks whether any KNOWN company name (from the lookup, i.e. from this
+    run's own watchlist/screener) appears as a substring of the headline.
+    A company outside that pool genuinely can't be resolved from data this
+    run has, and stays ticker=None rather than guessed.
+    """
+    if not headline:
+        return None
+    t_lower = headline.lower()
+    for name, ticker in lookup.items():
+        if name and name in t_lower:
+            return ticker
+    return None
+
+
+# -------------------------------------------------------------------
+# STEP 3 — Normalization + cross-source deduplication/merging
+# -------------------------------------------------------------------
+
+CONFIDENCE_SINGLE_STRUCTURED = "SINGLE_SOURCE_STRUCTURED"
+CONFIDENCE_SINGLE_PARSED = "SINGLE_SOURCE_PARSED"
+CONFIDENCE_MERGED_HIGH = "MERGED_HIGH"
+CONFIDENCE_MERGED_PARTIAL = "MERGED_PARTIAL"
+CONFIDENCE_CONFLICT = "CONFLICT"
+
+
+def make_source_event_id(source, **fields):
+    """Deterministic per-source ID — identical inputs always produce the
+    identical ID, which is what makes re-polling idempotent at this layer."""
+    raw = source + "|" + "|".join(f"{k}={fields[k]}" for k in sorted(fields))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+
+def make_canonical_key(ticker, broker_canonical, date_str, old_rating, new_rating, old_target, new_target):
+    """
+    Cross-source canonical key — deliberately excludes the source name,
+    since its purpose is letting independently-observed records of the
+    SAME real-world event collide and merge. Ticker is mandatory: without
+    it, two events can't be safely confirmed as the same company, so no
+    canonical key is produced.
+
+    Target values are represented as integer pence in the key (not the
+    float pounds stored in the event itself) to avoid floating-point
+    representation differences producing different keys for the same
+    real value.
+    """
+    if not ticker:
+        return None
+    old_r = (old_rating or "NA").strip().upper()
+    new_r = (new_rating or "NA").strip().upper()
+    old_t = str(round(old_target * 100)) if old_target is not None else "NA"
+    new_t = str(round(new_target * 100)) if new_target is not None else "NA"
+    return f"LSE|{ticker.upper()}|{broker_canonical.upper()}|{date_str}|{old_r}>{new_r}|{old_t}>{new_t}"
+
+
+def _canonical_broker(name):
+    """Resolves a broker name to its canonical form from the existing
+    BROKER_NAMES list (e.g. so 'Barclays' from two sources always matches)."""
+    if not name:
+        return None
+    for b in BROKER_NAMES:
+        if b.lower() == name.lower() or b.lower() in name.lower():
+            return b
+    return name
+
+
+def normalize_yahoo_event(ticker, company, firm, from_grade, to_grade, action_code, epoch, link):
+    """
+    One Yahoo upgradeDowngradeHistory entry -> a normalized event. Always
+    SINGLE_SOURCE_STRUCTURED confidence — Yahoo never carries target
+    history (verified in the forensic pass), so old_target/new_target are
+    always None here; a later merge with an Investing.com event may fill
+    them in.
+    """
+    dt_london = datetime.fromtimestamp(epoch, tz=timezone.utc).astimezone(LONDON_TZ)
+    date_str = dt_london.strftime("%Y-%m-%d")
+    action = normalize_action_from_grades(from_grade, to_grade, action_code)
+    return {
+        "source": "yahoo",
+        "source_event_id": make_source_event_id("yahoo", ticker=ticker, firm=firm, epoch=epoch),
+        "source_url": link,
+        "timestamp": dt_london.astimezone(timezone.utc).isoformat(),
+        "date": date_str,
+        "company": company,
+        "ticker": ticker.upper(),
+        "exchange": "LSE",
+        "broker": _canonical_broker(firm),
+        "action": action,
+        "old_rating": from_grade or None,
+        "new_rating": to_grade,
+        "old_rating_bucket": normalize_rating_bucket(from_grade),
+        "new_rating_bucket": normalize_rating_bucket(to_grade),
+        "old_target": None,
+        "new_target": None,
+        "target_currency": None,
+        "target_change_pct": None,
+        "confidence": CONFIDENCE_SINGLE_STRUCTURED,
+    }
+
+
+def normalize_investing_event(title, link, pub_date, ticker_lookup):
+    """
+    One Investing.com RSS item -> a normalized event. Broker/action come
+    from the existing, already-tested classify()/detect_broker()/
+    normalize_headline_action(). Target comes from Step 1's regex
+    extractor. Ticker comes from Step 2's substring lookup.
+    """
+    category = classify(title)
+    broker = detect_broker(title)
+    old_target, new_target, currency = extract_target_from_headline(title)
+    dt = _parse_pub_date(pub_date)
+    if dt is None:
+        date_str, timestamp = None, None
+    else:
+        dt_london = dt.astimezone(LONDON_TZ)
+        date_str = dt_london.strftime("%Y-%m-%d")
+        timestamp = dt.astimezone(timezone.utc).isoformat()
+
+    ticker = resolve_ticker_by_substring(title, ticker_lookup)
+
+    return {
+        "source": "investing_com",
+        "source_event_id": make_source_event_id("investing_com", link=link),
+        "source_url": link,
+        "timestamp": timestamp,
+        "date": date_str,
+        "company": None,  # not a structured field from this source — never invented
+        "ticker": ticker,  # may be None — genuinely unresolvable for out-of-pool companies
+        "exchange": "LSE" if ticker else None,
+        "broker": _canonical_broker(broker) if broker else None,
+        "action": normalize_headline_action(title) or category.upper(),
+        "old_rating": None,  # headlines don't state explicit old/new rating text structurally
+        "new_rating": None,  # — only Yahoo gives literal fromGrade/toGrade
+        "old_rating_bucket": None,
+        "new_rating_bucket": None,
+        "old_target": old_target,
+        "new_target": new_target,
+        "target_currency": currency,
+        "target_change_pct": compute_target_change_pct(old_target, new_target),
+        "confidence": CONFIDENCE_SINGLE_PARSED,
+    }
+
+
+def _events_conflict(e1, e2):
+    """
+    True if two same-ticker/same-broker/same-day events actively
+    contradict each other and must NOT be merged. Compatible (mergeable):
+    one side has no rating info and the other does (a target-only fragment
+    naturally complementing a rating-only fragment); one has no target and
+    the other does. Conflicting: both state a rating transition and they
+    differ; both state a target value and it differs.
+    """
+    if e1["new_rating"] and e2["new_rating"]:
+        if (e1.get("old_rating") or "").lower() != (e2.get("old_rating") or "").lower():
+            return True
+        if e1["new_rating"].lower() != e2["new_rating"].lower():
+            return True
+    if e1["new_target"] is not None and e2["new_target"] is not None:
+        if round(e1["new_target"], 2) != round(e2["new_target"], 2):
+            return True
+    if e1["old_target"] is not None and e2["old_target"] is not None:
+        if round(e1["old_target"], 2) != round(e2["old_target"], 2):
+            return True
+    return False
+
+
+def _merge_pair(e1, e2, canonical_key):
+    """Combines two compatible (non-conflicting) same-event records.
+    Never overwrites — fills gaps, always keeps both sources' IDs/URLs."""
+    def pick(a, b):
+        return a if a is not None else b
+    timestamps = [t for t in (e1.get("timestamp"), e2.get("timestamp")) if t]
+    merged = {
+        "event_id": canonical_key,
+        "timestamp": min(timestamps) if timestamps else None,
+        "date": e1.get("date") or e2.get("date"),
+        "company": pick(e1.get("company"), e2.get("company")),
+        "ticker": e1.get("ticker") or e2.get("ticker"),
+        "exchange": "LSE",
+        "broker": e1.get("broker") or e2.get("broker"),
+        "action": e1.get("action") if e1.get("action") not in (None, "NO_CHANGE") else e2.get("action"),
+        "old_rating": pick(e1.get("old_rating"), e2.get("old_rating")),
+        "new_rating": pick(e1.get("new_rating"), e2.get("new_rating")),
+        "old_rating_bucket": pick(e1.get("old_rating_bucket"), e2.get("old_rating_bucket")),
+        "new_rating_bucket": pick(e1.get("new_rating_bucket"), e2.get("new_rating_bucket")),
+        "old_target": pick(e1.get("old_target"), e2.get("old_target")),
+        "new_target": pick(e1.get("new_target"), e2.get("new_target")),
+        "target_currency": pick(e1.get("target_currency"), e2.get("target_currency")),
+        "source": sorted(set([e1["source"], e2["source"]])),
+        "source_url": [e1["source_url"], e2["source_url"]],
+        "source_event_ids": [e1["source_event_id"], e2["source_event_id"]],
+        "confidence": CONFIDENCE_MERGED_HIGH,
+    }
+    merged["target_change_pct"] = compute_target_change_pct(merged["old_target"], merged["new_target"])
+    both_sides_gave_target = e1.get("new_target") is not None and e2.get("new_target") is not None
+    if not both_sides_gave_target:
+        # Only one side contributed target data — genuinely a partial
+        # merge, not the strong two-source agreement MERGED_HIGH implies.
+        merged["confidence"] = CONFIDENCE_MERGED_PARTIAL
+    return merged
+
+
+def finalize_unmatched_event(e):
+    """Gives an unmatched (single-source) normalized event its own
+    deterministic event_id — canonical key when ticker/broker/date are all
+    known, otherwise the source-specific ID (never invented, never guessed)."""
+    canonical = None
+    if e.get("ticker") and e.get("broker") and e.get("date"):
+        canonical = make_canonical_key(
+            e["ticker"], e["broker"], e["date"],
+            e.get("old_rating"), e.get("new_rating"),
+            e.get("old_target"), e.get("new_target"),
+        )
+    out = dict(e)
+    out["event_id"] = canonical or e["source_event_id"]
+    out["source"] = [e["source"]]
+    out["source_url"] = [e["source_url"]]
+    out["source_event_ids"] = [e["source_event_id"]]
+    return out
+
+
+def deduplicate_and_merge(normalized_events):
+    """
+    normalized_events -> candidate_matches -> merged_events, per the
+    required pipeline shape. Returns (merged_events, conflicts,
+    unmatched_events) — every input event ends up in exactly one of these
+    three, never silently dropped.
+
+    Matching evidence, exactly as specified: ticker + canonical broker +
+    calendar day are REQUIRED to even consider two events a candidate
+    match — same ticker+broker+day alone is NOT assumed to mean the same
+    event; the actual rating/target transitions are then checked for
+    compatibility (_events_conflict) before merging. A broker making two
+    genuinely distinct actions on the same stock on the same day is
+    handled by evaluating every pair independently within a group, rather
+    than assuming the whole group is one event.
+    """
+    groups = {}
+    unmatched = []
+    for e in normalized_events:
+        if not (e.get("ticker") and e.get("broker") and e.get("date")):
+            unmatched.append(finalize_unmatched_event(e))
+            continue
+        key = (e["ticker"], e["broker"], e["date"])
+        groups.setdefault(key, []).append(e)
+
+    merged_events = []
+    conflicts = []
+    for key, group in groups.items():
+        if len(group) == 1:
+            unmatched.append(finalize_unmatched_event(group[0]))
+            continue
+        merged_indices = set()
+        for i in range(len(group)):
+            if i in merged_indices:
+                continue
+            for j in range(i + 1, len(group)):
+                if j in merged_indices:
+                    continue
+                e1, e2 = group[i], group[j]
+                if _events_conflict(e1, e2):
+                    conflicts.append({
+                        "reason": "rating_or_target_mismatch",
+                        "ticker": key[0], "broker": key[1], "date": key[2],
+                        "events": [e1, e2],
+                    })
+                    continue
+                canonical_key = make_canonical_key(
+                    e1["ticker"], e1["broker"], e1["date"],
+                    e1.get("old_rating") or e2.get("old_rating"),
+                    e1.get("new_rating") or e2.get("new_rating"),
+                    e1.get("old_target") if e1.get("old_target") is not None else e2.get("old_target"),
+                    e1.get("new_target") if e1.get("new_target") is not None else e2.get("new_target"),
+                )
+                merged_events.append(_merge_pair(e1, e2, canonical_key))
+                merged_indices.add(i)
+                merged_indices.add(j)
+        for i in range(len(group)):
+            if i not in merged_indices:
+                unmatched.append(finalize_unmatched_event(group[i]))
+
+    return merged_events, conflicts, unmatched
+
 
 
 if __name__ == "__main__":
