@@ -856,13 +856,14 @@ def clean_company_name(name):
 # noun (seashell, artillery shell, "shell script", "shell company") with
 # no relation to Shell plc in most ordinary usage. "BP" is short enough
 # (2 characters) that even a clean whole-word match still has meaningful
-# collision risk with unrelated initialisms (blood pressure, British
-# Pounds, etc). Names like "Aviva" or "Haleon", despite also being
+# collision risk with unrelated initialisms (blood pressure, basis
+# points, etc). Names like "Aviva" or "Haleon", despite also being
 # short, are NOT included here — they are invented brand strings with no
 # competing ordinary-English meaning, so their collision risk is much
 # lower and treating them the same way would only reduce genuine recall
-# for no real safety benefit.
-HIGH_COLLISION_RISK_NAMES = {"bp", "shell"}
+# for no real safety benefit. This set of NAMES lives as the keys of
+# HIGH_COLLISION_DISQUALIFIER_PHRASES below — kept as a single source of
+# truth rather than a separate list that could drift out of sync.
 
 # Legal-suffix names where the STORED name (as supplied on the
 # watchlist) is a real company name but is meaningfully more specific
@@ -917,34 +918,80 @@ def _is_relevant_to_company(title, cleaned_name):
     return False
 
 
-# Small, fixed, auditable set of finance/corporate-reporting vocabulary —
-# used ONLY as the second check for HIGH_COLLISION_RISK_NAMES, never as a
-# relevance signal on its own. Deliberately excludes generic business
-# words like "company"/"business"/"firm": those are exactly what would
-# let something like "Shell company used for fraud investigation" pass.
-# This is a bounded, explainable heuristic, not an attempt at real
-# language understanding — a genuine story about a high-collision-risk
-# company that happens not to use any of these specific words (e.g. "BP
-# faces investor lawsuit over pipeline leak") will be missed. That's an
-# accepted, disclosed trade-off for keeping this deterministic and
-# auditable rather than probabilistic.
-FINANCE_CONTEXT_WORDS = {
-    "shares", "share price", "stock price", "stock exchange",
-    "results", "earnings", "profit", "revenue", "quarterly",
-    "interim results", "annual results", "target price", "price target",
-    "rating", "upgrade", "downgrade", "outlook", "guidance", "dividend",
-    "chief executive", "chairman", "acquisition", "takeover", "merger",
-    "ftse", "london stock exchange", "analyst", "broker",
-    "shareholders", "plc", "ltd", "limited", "ipo", "market cap",
+# Small, fixed, auditable set of well-known idiomatic phrases that
+# specifically signal a NON-company usage of a high-collision-risk name —
+# used ONLY as the second check for names in HIGH_COLLISION_DISQUALIFIER_PHRASES, never as a
+# relevance signal on its own.
+#
+# This inverts an earlier, rejected design (a positive "finance context
+# word" whitelist): that approach tried to enumerate every possible
+# LEGITIMATE company-news topic, an unbounded and inevitably incomplete
+# list — confirmed directly when it rejected obviously genuine headlines
+# like "Shell announces new refinery investment" and "BP faces investor
+# lawsuit over pipeline leak" purely for not containing an earnings/
+# ratings-style word. The set of "ways a company can legitimately be in
+# the news" is unbounded; the set of "common English idioms that happen
+# to use this specific word" is small and can realistically approach
+# completeness. A word-boundary match on a high-collision name is now
+# ACCEPTED BY DEFAULT — exactly as permissive as any ordinary company
+# name — UNLESS the headline also contains one of these known
+# disqualifying phrases.
+#
+# "Shell" and "BP" get their OWN separate phrase sets, deliberately not
+# shared — they are different KINDS of collision risk. "Shell" is an
+# ordinary English noun/verb with a small, genuinely closed set of
+# common idiomatic uses (shell script, shell company, shell shock,
+# seashell, artillery shell, nutshell — there are only so many). "BP" is
+# a short initialism that collides with OTHER short initialisms and
+# jargon (blood pressure, basis points) — and unlike Shell's idioms,
+# bare medical "BP" usage ("High BP linked to heart disease risk") is
+# structurally more open-ended than Shell's closed idiom set, so this
+# list is knowingly less complete than Shell's; that's a disclosed
+# property of the collision type, not an oversight.
+HIGH_COLLISION_DISQUALIFIER_PHRASES = {
+    "shell": {
+        "shell script", "shell scripting", "bash shell", "unix shell",
+        "shell command", "shell prompt", "command shell",
+        "shell company", "shell corporation", "shell corporations",
+        "shell shock", "shellshocked", "shell-shocked",
+        "sea shell", "seashell", "seashells",
+        "turtle shell", "egg shell", "eggshell",
+        "artillery shell", "mortar shell", "shell fire", "shelling",
+        "nutshell",
+    },
+    "bp": {
+        "blood pressure", "bp reading", "bp level", "bp levels", "bp monitor",
+        "bp measurement", "basis points", "basis point",
+        "high bp", "low bp", "checking bp", "monitor bp", "monitor your bp",
+        "heart disease", "hypertension", "doctors",
+    },
 }
 
 
-def _has_finance_context(title):
-    """True if any FINANCE_CONTEXT_WORDS term appears anywhere in `title`."""
-    if not title:
+def _has_disqualifying_phrase(title, cleaned_name):
+    """
+    Plain substring check (deliberately NOT word-boundary, unlike
+    _is_relevant_to_company) against the small, explicit disqualifier
+    phrase set for this collision-risk name. Substring matching is safe
+    here — these are specific, multi-word strings with negligible risk
+    of appearing embedded inside an unrelated legitimate headline by
+    coincidence — and it's necessary: word-boundary matching on "shell
+    script" would miss "shell scripting" (no boundary between "script"
+    and "ing", both being word characters), incorrectly letting that
+    headline through. The asymmetry (word-boundary for the positive
+    company-name check, substring for the negative disqualifier check)
+    is intentional, not an inconsistency: the positive check needed
+    word-boundary because short names like "BP" have real embedding
+    risk (GBP); these disqualifier phrases are long and specific enough
+    that the same risk doesn't apply.
+    """
+    if not title or not cleaned_name:
+        return False
+    phrases = HIGH_COLLISION_DISQUALIFIER_PHRASES.get(cleaned_name.lower(), set())
+    if not phrases:
         return False
     title_lower = title.lower()
-    return any(word in title_lower for word in FINANCE_CONTEXT_WORDS)
+    return any(phrase in title_lower for phrase in phrases)
 
 
 def passes_relevance_filter(title, cleaned_name, fetch_source=None):
@@ -959,26 +1006,29 @@ def passes_relevance_filter(title, cleaned_name, fetch_source=None):
     the outcome. That's deliberate: it's what guarantees the same
     headline and the same company always produce the same relevance
     result, whether the item was just fetched (from any source) or is
-    being carried forward from an earlier run. An earlier version of
-    this function blanket-rejected every match from Yahoo's per-ticker
-    feed for high-collision-risk names — simple and safe, but too broad:
-    it discarded genuine headlines like "Shell plc announces new
-    refinery investment" purely for arriving via that one source.
-    Replaced with a headline-aware check instead of a source-wide one.
+    being carried forward from an earlier run.
+
+    Two earlier designs were tried and rejected here, for reference:
+    (1) a blanket rejection of every Yahoo-sourced match for
+    high-collision names — simple, but too broad, discarding genuine
+    headlines purely for arriving via one source; (2) a positive
+    "finance context word" whitelist — closer, but an unbounded,
+    inevitably incomplete list that rejected obviously genuine
+    headlines like investment/legal/operational news. Replaced with a
+    small, disclosed disqualifier-phrase check (see
+    HIGH_COLLISION_DISQUALIFIER_PHRASES) — accept by default, reject
+    only on a known non-company idiom.
 
     For ordinary names, a word-boundary company-name match
-    (_is_relevant_to_company) is sufficient. For names flagged in
-    HIGH_COLLISION_RISK_NAMES — names that are also genuine, unrelated
-    English words or dangerously short initialisms — a word-boundary
-    match is necessary but not sufficient: the headline must ALSO
-    contain at least one term from FINANCE_CONTEXT_WORDS, since a bare
-    word-boundary match on "shell" can't distinguish Shell plc from a
-    seashell, a shell script, or a shell company fraud story.
+    (_is_relevant_to_company) is sufficient on its own. For names
+    flagged in HIGH_COLLISION_DISQUALIFIER_PHRASES, that match is
+    necessary but not sufficient: the headline must NOT also contain
+    one of that name's own disqualifying phrases.
     """
     if not _is_relevant_to_company(title, cleaned_name):
         return False
-    if cleaned_name and cleaned_name.lower() in HIGH_COLLISION_RISK_NAMES:
-        return _has_finance_context(title)
+    if cleaned_name and cleaned_name.lower() in HIGH_COLLISION_DISQUALIFIER_PHRASES:
+        return not _has_disqualifying_phrase(title, cleaned_name)
     return True
 
 
