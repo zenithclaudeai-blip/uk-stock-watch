@@ -833,6 +833,195 @@ def clean_company_name(name):
     return cleaned or name  # never return an empty string
 
 
+# =========================================================================
+# News relevance — ONE shared rule, applied identically wherever a
+# headline needs to be judged relevant to a company, whether it's a
+# freshly fetched item or a stored one being carried forward to another
+# run. Deliberately separate from date/staleness filtering
+# (passes_news_filters): an item can be perfectly fresh and still be
+# about the wrong company (the confirmed real cases: an ABDN-tagged item
+# about a bond coupon schedule with no mention of "abrdn" anywhere, and
+# a SHEL-tagged item about an Allianz/AA takeover with no mention of
+# "Shell" anywhere).
+# =========================================================================
+
+# Names identified by direct audit of the actual watchlist (not
+# speculative) as carrying real collision risk with ordinary English
+# vocabulary or unrelated short initialisms — word-boundary matching
+# alone does not protect against these, because the risk isn't a
+# company name being embedded INSIDE an unrelated word (that's what
+# word-boundary matching fixes, e.g. "BP" inside "GBP"); it's the
+# company name being a genuine, ordinary whole word or a very short,
+# generic-looking token in its own right. "Shell" is a common English
+# noun (seashell, artillery shell, "shell script", "shell company") with
+# no relation to Shell plc in most ordinary usage. "BP" is short enough
+# (2 characters) that even a clean whole-word match still has meaningful
+# collision risk with unrelated initialisms (blood pressure, British
+# Pounds, etc). Names like "Aviva" or "Haleon", despite also being
+# short, are NOT included here — they are invented brand strings with no
+# competing ordinary-English meaning, so their collision risk is much
+# lower and treating them the same way would only reduce genuine recall
+# for no real safety benefit.
+HIGH_COLLISION_RISK_NAMES = {"bp", "shell"}
+
+# Legal-suffix names where the STORED name (as supplied on the
+# watchlist) is a real company name but is meaningfully more specific
+# than how the company is normally referred to in headlines — "GSK plc"
+# in a headline is rare; "GSK reports strong quarter" is how it's
+# actually written. Rather than a general suffix-stripping rule applied
+# to everything (which could shorten a name into something genuinely
+# more ambiguous), this is scoped narrowly: only strip a trailing legal
+# suffix, and only as an ADDITIONAL accepted variant alongside the full
+# name — never a replacement for it.
+_LEGAL_SUFFIX_RE = re.compile(r"\s+(plc|ltd|limited)\s*$", re.IGNORECASE)
+
+
+def _relevance_name_variants(cleaned_name):
+    """
+    Returns the set of name forms to accept a match against — normally
+    just the cleaned name itself, plus (only when a trailing legal
+    suffix is present) the same name with that suffix stripped, so
+    "GSK reports strong quarter" still matches "GSK plc" without
+    requiring the suffix verbatim in the headline.
+    """
+    if not cleaned_name:
+        return set()
+    variants = {cleaned_name}
+    stripped = _LEGAL_SUFFIX_RE.sub("", cleaned_name).strip()
+    if stripped and stripped != cleaned_name:
+        variants.add(stripped)
+    return variants
+
+
+def _is_relevant_to_company(title, cleaned_name):
+    """
+    Word-boundary-aware match of `cleaned_name` (already run through
+    clean_company_name()) against `title` — not a plain substring check.
+    This matters most for short names: BP is on the watchlist with
+    exactly that 2-character name, and a plain substring check would
+    incorrectly accept "GBP falls against the dollar" (the letters "bp"
+    appear inside "GBP", but BP the company is never mentioned).
+    Case-insensitive. Regex-special characters in the name (e.g. the
+    "&" in "Legal & General", the "." some tickers carry) are escaped,
+    since they're literal characters in a company name, not regex
+    syntax. Checks every legal-suffix variant from
+    _relevance_name_variants, not just the exact stored form.
+    """
+    if not cleaned_name or not title:
+        return False
+    title_lower = title.lower()
+    for variant in _relevance_name_variants(cleaned_name):
+        pattern = r"\b" + re.escape(variant.lower()) + r"\b"
+        if re.search(pattern, title_lower):
+            return True
+    return False
+
+
+# Small, fixed, auditable set of finance/corporate-reporting vocabulary —
+# used ONLY as the second check for HIGH_COLLISION_RISK_NAMES, never as a
+# relevance signal on its own. Deliberately excludes generic business
+# words like "company"/"business"/"firm": those are exactly what would
+# let something like "Shell company used for fraud investigation" pass.
+# This is a bounded, explainable heuristic, not an attempt at real
+# language understanding — a genuine story about a high-collision-risk
+# company that happens not to use any of these specific words (e.g. "BP
+# faces investor lawsuit over pipeline leak") will be missed. That's an
+# accepted, disclosed trade-off for keeping this deterministic and
+# auditable rather than probabilistic.
+FINANCE_CONTEXT_WORDS = {
+    "shares", "share price", "stock price", "stock exchange",
+    "results", "earnings", "profit", "revenue", "quarterly",
+    "interim results", "annual results", "target price", "price target",
+    "rating", "upgrade", "downgrade", "outlook", "guidance", "dividend",
+    "chief executive", "chairman", "acquisition", "takeover", "merger",
+    "ftse", "london stock exchange", "analyst", "broker",
+    "shareholders", "plc", "ltd", "limited", "ipo", "market cap",
+}
+
+
+def _has_finance_context(title):
+    """True if any FINANCE_CONTEXT_WORDS term appears anywhere in `title`."""
+    if not title:
+        return False
+    title_lower = title.lower()
+    return any(word in title_lower for word in FINANCE_CONTEXT_WORDS)
+
+
+def passes_relevance_filter(title, cleaned_name, fetch_source=None):
+    """
+    THE single relevance gate — used identically everywhere a title
+    needs judging against a company name: every fetch source (g/rb/
+    ratings/y) and carried-forward stored items being re-evaluated on a
+    later run.
+
+    This is a PURE function of (title, cleaned_name) alone — fetch_source
+    is accepted only for optional diagnostic tagging and never changes
+    the outcome. That's deliberate: it's what guarantees the same
+    headline and the same company always produce the same relevance
+    result, whether the item was just fetched (from any source) or is
+    being carried forward from an earlier run. An earlier version of
+    this function blanket-rejected every match from Yahoo's per-ticker
+    feed for high-collision-risk names — simple and safe, but too broad:
+    it discarded genuine headlines like "Shell plc announces new
+    refinery investment" purely for arriving via that one source.
+    Replaced with a headline-aware check instead of a source-wide one.
+
+    For ordinary names, a word-boundary company-name match
+    (_is_relevant_to_company) is sufficient. For names flagged in
+    HIGH_COLLISION_RISK_NAMES — names that are also genuine, unrelated
+    English words or dangerously short initialisms — a word-boundary
+    match is necessary but not sufficient: the headline must ALSO
+    contain at least one term from FINANCE_CONTEXT_WORDS, since a bare
+    word-boundary match on "shell" can't distinguish Shell plc from a
+    seashell, a shell script, or a shell company fraud story.
+    """
+    if not _is_relevant_to_company(title, cleaned_name):
+        return False
+    if cleaned_name and cleaned_name.lower() in HIGH_COLLISION_RISK_NAMES:
+        return _has_finance_context(title)
+    return True
+
+
+def revalidate_stored_news_items(stored_items, current_name):
+    """
+    Re-validates a ticker's carried-forward news items against BOTH
+    today's date filter (passes_news_filters) AND today's relevance
+    rule (passes_relevance_filter) — not date alone. Previously, only
+    date was re-checked on carry-forward, so an item that would fail
+    relevance if fetched fresh today kept appearing indefinitely as
+    long as its date stayed "today": confirmed live with an ABDN item
+    about a bond coupon schedule and a SHEL item about an unrelated
+    Allianz/AA takeover, neither mentioning the company at all.
+
+    Each item is judged purely from its OWN recorded title/company/
+    fetchSource — never from whether THIS run's fresh fetch of any
+    source succeeded. A temporarily-unavailable source (a 503, a
+    timeout) has zero effect here: it cannot cause a genuinely
+    relevant, already-stored item to be discarded, because this
+    function never looks at this run's fetch results at all.
+
+    Items with no recorded fetchSource (stored before this fix existed)
+    are judged on relevance alone, with no source-specific refinement —
+    there's no source to apply one to. Items tagged "analyst" (Yahoo's
+    structured analyst-history API, ticker-scoped by construction, not
+    a text search) are exempt from relevance re-checking, same as at
+    fetch time.
+    """
+    kept = []
+    for it in stored_items:
+        if not passes_news_filters(it.get("pubDate")):
+            continue
+        fetch_source = it.get("fetchSource")
+        if fetch_source == "analyst":
+            kept.append(it)
+            continue
+        item_company = it.get("company") or current_name
+        cleaned = clean_company_name(item_company)
+        if passes_relevance_filter(it.get("title", ""), cleaned, fetch_source):
+            kept.append(it)
+    return kept
+
+
 def google_news_url(company_name):
     q = f'{company_name} (LSE OR "London Stock Exchange") (upgrade OR downgrade OR "price target" OR rating)'
     return "https://news.google.com/rss/search?" + urllib.parse.urlencode(
@@ -2784,25 +2973,26 @@ def main():
         g_items, _ = fetch_feed(google_news_url(name))
         y_items, _ = fetch_feed(yahoo_news_url(ticker))
         rb_items, _ = fetch_feed(reuters_bloomberg_url(name))
-        matched_ratings = [it for it in ratings_items if name.lower() in it["title"].lower()]
-        # g_items/rb_items come from a Google News keyword SEARCH — Google matches
-        # against full article content, not just the headline, so a result can surface
-        # here without the searched company ever being named in its OWN title.
-        # Confirmed live: a "Kooth" search returned headlines actually about 3i Group
-        # and Hays, both mistagged as Kooth news/target items. Requiring the company's
-        # own (cleaned) name to appear in the item's title closes that gap — the same
-        # check matched_ratings already applies above. y_items (Yahoo's own per-ticker
-        # feed, already ticker-scoped by Yahoo itself, not a keyword search) is left
-        # unfiltered — it isn't the same kind of source and doesn't have this failure mode.
-        _cleaned_name = clean_company_name(name).lower()
-        g_items = [it for it in g_items if _cleaned_name in it.get("title", "").lower()]
-        rb_items = [it for it in rb_items if _cleaned_name in it.get("title", "").lower()]
-        combined = g_items + y_items + rb_items + matched_ratings
-        combined = [it for it in combined if passes_news_filters(it.get("pubDate"))]
+        _cleaned_name = clean_company_name(name)
+        # ONE shared relevance gate (passes_relevance_filter) now applied to every
+        # source, including y_items — investigated directly, not assumed exempt: Yahoo's
+        # per-ticker feed has no query-level scoping of its own, and real live examples
+        # (an ABDN-tagged bond-coupon item, a SHEL-tagged Allianz/AA takeover item —
+        # neither mentioning the company at all) confirmed items were reaching the
+        # dashboard without ever being relevance-checked. matched_ratings now also uses
+        # the cleaned name (previously used the raw, uncleaned name — inconsistent with
+        # every other source here).
+        g_items = [it for it in g_items if passes_relevance_filter(it.get("title", ""), _cleaned_name, "g")]
+        y_items = [it for it in y_items if passes_relevance_filter(it.get("title", ""), _cleaned_name, "y")]
+        rb_items = [it for it in rb_items if passes_relevance_filter(it.get("title", ""), _cleaned_name, "rb")]
+        matched_ratings = [it for it in ratings_items if passes_relevance_filter(it.get("title", ""), _cleaned_name, "ratings")]
+        combined_tagged = [("g", it) for it in g_items] + [("y", it) for it in y_items] \
+            + [("rb", it) for it in rb_items] + [("ratings", it) for it in matched_ratings]
+        combined_tagged = [(src, it) for src, it in combined_tagged if passes_news_filters(it.get("pubDate"))]
         # Purely a count of real, already-published items mentioning this stock today
         # (deduped by link) — a fact about today's coverage volume, not a prediction of
         # anything. NEWS_SAME_LONDON_DAY_ONLY already restricts `combined` to today.
-        mention_links = {it["link"] for it in combined}
+        mention_links = {it["link"] for _, it in combined_tagged}
         mention_counts[ticker] = {"name": name, "count": len(mention_links)}
 
         quote = fetch_yahoo_quote(ticker)
@@ -2821,7 +3011,7 @@ def main():
 
         now_iso = datetime.now(timezone.utc).isoformat()
         enriched = []
-        for it in combined:
+        for fetch_source, it in combined_tagged:
             category = classify(it["title"])
             # Only tag a broker when the item is actually a rating/target call — otherwise
             # a story that merely mentions a bank's name (e.g. a personnel/legal story
@@ -2836,20 +3026,30 @@ def main():
                 "detectedAt": now_iso,
                 "normalizedAt": now_iso,
                 "normalizedAction": CATEGORY_TO_NORMALIZED_ACTION.get(category),
+                # Recorded so a LATER run can re-apply the correct, source-aware
+                # relevance policy when this item is carried forward — see
+                # revalidate_stored_news_items().
+                "fetchSource": fetch_source,
             })
         # Analyst history items already carry structured category/broker/pubDate —
-        # merge as-is rather than re-running keyword classification on them.
+        # merge as-is rather than re-running keyword classification on them. Not a text
+        # search result at all (Yahoo's quoteSummary API returns these keyed directly to
+        # this exact ticker), so relevance checking doesn't apply — tagged "analyst" so
+        # carry-forward revalidation knows to exempt these too, not just this run.
         for it in analyst_items:
-            enriched.append({**it, "ticker": ticker, "company": name, "detectedAt": now_iso})
+            enriched.append({**it, "ticker": ticker, "company": name, "detectedAt": now_iso, "fetchSource": "analyst"})
 
-        # Re-validate PERSISTED items against today's filter too, not just freshly
-        # fetched ones — an item that passed is_today_in_london() when it was first
-        # added stays in this list on every subsequent run otherwise, since it's
-        # never re-checked against the (now different) current day. Confirmed live:
-        # items from a previous day were still showing a full day later despite
-        # NEWS_SAME_LONDON_DAY_ONLY=True, because only "enriched" (this run's fresh
-        # items) went through passes_news_filters — "existing" never did.
-        existing = [it for it in items_by_ticker.get(ticker, []) if passes_news_filters(it.get("pubDate"))]
+        # Re-validate PERSISTED items against TODAY's date filter AND today's relevance
+        # rule — not date alone. A stored item that would fail the relevance check if
+        # fetched fresh today doesn't get a free pass just because it arrived on an
+        # earlier run: confirmed live, an ABDN item about a bond coupon schedule and a
+        # SHEL item about an unrelated Allianz/AA takeover — neither mentioning the
+        # company at all — persisted for hours because only date was ever re-checked.
+        # This check is purely a function of each stored item's OWN recorded title/
+        # company/fetchSource — never affected by whether THIS run's fresh fetch of any
+        # source succeeded or failed, so a temporarily-unavailable source can never cause
+        # a genuinely relevant, already-stored item to be discarded.
+        existing = revalidate_stored_news_items(items_by_ticker.get(ticker, []), name)
         merged = enriched + existing
         seen_links = set()
         deduped = []
