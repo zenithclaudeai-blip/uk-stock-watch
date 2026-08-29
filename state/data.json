@@ -11,8 +11,8 @@
         "company": "Barclays",
         "category": "news",
         "broker": null,
-        "detectedAt": "2026-08-29T21:44:44.834437+00:00",
-        "normalizedAt": "2026-08-29T21:44:44.834437+00:00",
+        "detectedAt": "2026-08-29T22:13:06.855755+00:00",
+        "normalizedAt": "2026-08-29T22:13:06.855755+00:00",
         "normalizedAction": null
       }
     ],
@@ -595,8 +595,17 @@
   ],
   "marketWide": [],
   "marketResearch": {},
-  "lastPoll": "2026-08-29 21:45:42",
+  "lastPoll": "2026-08-29 22:13:55",
   "ftseUniverseStatus": "healthy",
   "ftseUniverseSource": "ftse100+ftse250",
-  "ftseUniverseCount": 350
+  "ftseUniverseCount": 350,
+  "pipelineHealth": {
+    "status": "market_closed",
+    "lastPoll": "2026-08-29 22:13:55",
+    "ageMinutes": 0.0,
+    "marketHours": false,
+    "message": "Markets are closed. Last successful poll 0.0h ago.",
+    "evaluatedAt": "2026-08-29T22:13:55.385289+00:00",
+    "note": "Computed once, at the moment this data was written — does NOT reflect time elapsed since. Current freshness is determined by the dashboard's client-side script from lastPoll, independently of this persisted status."
+  }
 }

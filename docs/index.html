@@ -41,10 +41,67 @@ table td, table th{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:l
 .badge.news{background:#22262f;color:#9aa0a6}
 .broker{background:#2a1c3a;color:#c69bf0;border-radius:4px;padding:2px 8px;font-size:12px;font-weight:700;margin-right:4px}
 .lastpoll{color:#9aa0a6;font-size:11px;text-align:right}
+.status-neutral{color:#9aa0a6;font-size:15px;font-weight:600}
 </style></head>
 <body>
 <h1>UK Stock Watch — Live Feed</h1>
-<p class="lastpoll" style="text-align:left;font-size:13px;color:#50dc96;margin:0 0 10px;">🕐 Live as of Sat 29 Aug 2026, 22:45 BST (21:45 UTC) — this page auto-refreshes every 90s (data itself updates every ~5 min)</p>
+<p id="pipeline-status" class="status-neutral" style="text-align:left;font-size:13px;margin:0 0 10px;">🕐 Last successful poll: Sat 29 Aug 2026, 23:13 BST (22:13 UTC) — checking freshness…</p>
+<script>
+(function() {
+  var lastPollIso = "2026-08-29T22:13:55Z";
+  var el = document.getElementById('pipeline-status');
+  if (!el) return;
+  var GREEN_MIN = 15;
+  var AMBER_MIN = 45;
+  var STALE_OOH_MIN = 1440;
+  var OPEN_MIN = 480;
+  var CLOSE_MIN = 990;
+
+  function isUkMarketHours(now) {
+    // Intl with an explicit IANA zone handles the GMT/BST switch automatically,
+    // the same way Python's zoneinfo does server-side — never a fixed UTC offset.
+    var parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/London', hour: 'numeric', minute: 'numeric',
+      hour12: false, weekday: 'short'
+    }).formatToParts(now);
+    var weekday, hour, minute;
+    parts.forEach(function(p) {
+      if (p.type === 'weekday') weekday = p.value;
+      if (p.type === 'hour') hour = parseInt(p.value, 10);
+      if (p.type === 'minute') minute = parseInt(p.value, 10);
+    });
+    if (weekday === 'Sat' || weekday === 'Sun') return false;
+    var minutesSinceMidnight = hour * 60 + minute;
+    return minutesSinceMidnight >= OPEN_MIN && minutesSinceMidnight < CLOSE_MIN;
+  }
+
+  function update() {
+    if (!lastPollIso) {
+      el.textContent = '⚪ No successful poll has been recorded yet.';
+      el.className = 'status-neutral';
+      return;
+    }
+    var now = new Date();
+    var lastPoll = new Date(lastPollIso);
+    var ageMinutes = (now - lastPoll) / 60000;
+    var marketHours = isUkMarketHours(now);
+    var label = lastPoll.toUTCString().replace('GMT', 'UTC') + ' (' + ageMinutes.toFixed(0) + ' min ago)';
+    var cls, text;
+    if (marketHours) {
+      if (ageMinutes <= GREEN_MIN) { cls = 'status-ok'; text = '✅ Up to date — last poll ' + label; }
+      else if (ageMinutes <= AMBER_MIN) { cls = 'status-warn'; text = '⚠️ Delayed — last poll ' + label; }
+      else { cls = 'status-bad'; text = '🛑 Overdue — last poll ' + label; }
+    } else {
+      if (ageMinutes <= STALE_OOH_MIN) { cls = 'status-neutral'; text = '⚪ Markets closed — last poll ' + label; }
+      else { cls = 'status-warn'; text = '⚠️ Markets closed, but no poll in ' + (ageMinutes / 60).toFixed(1) + 'h — worth checking'; }
+    }
+    el.className = cls;
+    el.textContent = text + ' — this page checks its own freshness every 30s.';
+  }
+  update();
+  setInterval(update, 30000);
+})();
+</script>
 <p style="font-size:14px;margin:0 0 10px;">FTSE 100: <span class="up">10,824.26 ▲0.07%</span></p>
 <p class="disclaimer">LSE-listed stocks only. Informational only — not investment advice, not a guarantee of any outcome.</p>
 
@@ -101,6 +158,6 @@ table td, table th{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:l
 <p class="meta">No market-wide alerts yet.</p>
 
 <h2 id="news-feed">📰 News &amp; Broker Feed (watchlist)</h2>
-<div class="item"><span class="badge news">NEWS</span> <b>BARC</b>  <span class="meta">uk.advfn.com · Sat, 29 Aug 2026 14:59:20 +0000</span><br/><span class="meta">Classified: Sat 29 Aug 2026, 22:44 BST (21:44 UTC)</span><br/><a href="https://uk.advfn.com/market-news/article/21958/fed-tightening-has-historically-favoured-value-over-growth-barclays-finds?.tsrc=rss" target="_blank">Fed tightening has historically favoured Value over Growth, Barclays finds</a></div><div class="item"><span class="badge event">EVENT</span> <b>SHEL</b>  <span class="meta">Reuters · Sat, 29 Aug 2026 09:30:55 GMT</span><br/><span class="meta">Classified: Sat 29 Aug 2026, 18:35 BST (17:35 UTC)</span><br/><a href="https://news.google.com/rss/articles/CBMi0AFBVV95cUxOVHdIWDVuam5pSU5Cb3IzQjJDZWhBcXdmNVFVcVl5OWc4LUo1VnlGVnh0cFlrOE5mMzdsdDVSNmlrTDVJMHR1cDVsWkZxZlladGtXUXpaeUU1eVg5TTdrQUpWZnpXUnZLX1FKR19SWkxobzVRMjh4MVFWdmo1cGttOHVCbmVtTjFyYnZXYzRiQmZ4NzJMdFVfMlJpa2hobnZMZ2JLYVNCeXdOb1ZiZ291bjJiZThSWWh1WllUbElVamhZT2hhUU5JaUpia1lQbEJI?oc=5" target="_blank">German insurer Allianz weighs $6.77 billion takeover of AA roadside rescue giant, Sky News reports - Reuters</a></div><div class="item"><span class="badge news">NEWS</span> <b>ABDN</b>  <span class="meta">TradingView · Sat, 29 Aug 2026 00:19:42 GMT</span><br/><span class="meta">Classified: Sat 29 Aug 2026, 18:36 BST (17:36 UTC)</span><br/><a href="https://news.google.com/rss/articles/CBMibEFVX3lxTE1IX0dva2pNUWdpV3JWYWJqSm4zNW5pTVkxQXlmNjZBSjIxa3dOR0htVkw3ckxCaUp5RE5yb2tBMkdwVllPNTN6NUZjcjktc2lmNWxGTWlVeG43SXdjVVRzN2FCamZBZVdhYW9idg?oc=5" target="_blank">94QO Bond Coupon Profile — Rate &amp; Payments - TradingView</a></div>
-<p class="lastpoll">Last checked: Sat 29 Aug 2026, 22:45 BST (21:45 UTC)</p>
+<div class="item"><span class="badge news">NEWS</span> <b>BARC</b>  <span class="meta">uk.advfn.com · Sat, 29 Aug 2026 14:59:20 +0000</span><br/><span class="meta">Classified: Sat 29 Aug 2026, 23:13 BST (22:13 UTC)</span><br/><a href="https://uk.advfn.com/market-news/article/21958/fed-tightening-has-historically-favoured-value-over-growth-barclays-finds?.tsrc=rss" target="_blank">Fed tightening has historically favoured Value over Growth, Barclays finds</a></div><div class="item"><span class="badge event">EVENT</span> <b>SHEL</b>  <span class="meta">Reuters · Sat, 29 Aug 2026 09:30:55 GMT</span><br/><span class="meta">Classified: Sat 29 Aug 2026, 18:35 BST (17:35 UTC)</span><br/><a href="https://news.google.com/rss/articles/CBMi0AFBVV95cUxOVHdIWDVuam5pSU5Cb3IzQjJDZWhBcXdmNVFVcVl5OWc4LUo1VnlGVnh0cFlrOE5mMzdsdDVSNmlrTDVJMHR1cDVsWkZxZlladGtXUXpaeUU1eVg5TTdrQUpWZnpXUnZLX1FKR19SWkxobzVRMjh4MVFWdmo1cGttOHVCbmVtTjFyYnZXYzRiQmZ4NzJMdFVfMlJpa2hobnZMZ2JLYVNCeXdOb1ZiZ291bjJiZThSWWh1WllUbElVamhZT2hhUU5JaUpia1lQbEJI?oc=5" target="_blank">German insurer Allianz weighs $6.77 billion takeover of AA roadside rescue giant, Sky News reports - Reuters</a></div><div class="item"><span class="badge news">NEWS</span> <b>ABDN</b>  <span class="meta">TradingView · Sat, 29 Aug 2026 00:19:42 GMT</span><br/><span class="meta">Classified: Sat 29 Aug 2026, 18:36 BST (17:36 UTC)</span><br/><a href="https://news.google.com/rss/articles/CBMibEFVX3lxTE1IX0dva2pNUWdpV3JWYWJqSm4zNW5pTVkxQXlmNjZBSjIxa3dOR0htVkw3ckxCaUp5RE5yb2tBMkdwVllPNTN6NUZjcjktc2lmNWxGTWlVeG43SXdjVVRzN2FCamZBZVdhYW9idg?oc=5" target="_blank">94QO Bond Coupon Profile — Rate &amp; Payments - TradingView</a></div>
+<p class="lastpoll">Last checked: Sat 29 Aug 2026, 23:13 BST (22:13 UTC)</p>
 </body></html>
