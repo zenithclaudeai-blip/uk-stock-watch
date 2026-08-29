@@ -592,6 +592,104 @@ import email.utils as _email_utils
 
 LONDON_TZ = ZoneInfo("Europe/London")
 
+# =========================================================================
+# Pipeline health — freshness of the poll ITSELF, deliberately separate
+# from feed-level health (e.g. ftseUniverseStatus). This block never
+# claims anything about Yahoo, Google News, broker feeds, or FTSE
+# constituents — only "when did this pipeline last successfully write
+# data, and how does that compare to expectations."
+# =========================================================================
+
+PIPELINE_GREEN_THRESHOLD_MIN = 15    # market hours: fresher than this -> green
+PIPELINE_AMBER_THRESHOLD_MIN = 45    # market hours: fresher than this -> amber, else red
+PIPELINE_OUT_OF_HOURS_STALE_THRESHOLD_MIN = 24 * 60  # outside market hours: beyond this -> worth flagging anyway
+UK_MARKET_OPEN_MINUTES = 8 * 60       # 08:00
+UK_MARKET_CLOSE_MINUTES = 16 * 60 + 30  # 16:30
+
+
+def _is_uk_market_hours(dt_utc):
+    """
+    Mon-Fri, 08:00-16:30 Europe/London LOCAL time (standard LSE trading
+    hours) — correctly handles the GMT/BST switch via zoneinfo (the same
+    LONDON_TZ already used elsewhere), not a fixed UTC offset.
+    """
+    dt_london = dt_utc.astimezone(LONDON_TZ)
+    if dt_london.weekday() >= 5:  # Saturday=5, Sunday=6
+        return False
+    minutes_since_midnight = dt_london.hour * 60 + dt_london.minute
+    return UK_MARKET_OPEN_MINUTES <= minutes_since_midnight < UK_MARKET_CLOSE_MINUTES
+
+
+def compute_pipeline_health(last_poll_str, now_utc=None):
+    """
+    Pure function — no I/O. Returns a dict describing how fresh the LAST
+    SUCCESSFUL WRITE of state/data.json is, relative to `now_utc`.
+
+    IMPORTANT, stated both here and in the returned dict itself: this is
+    a WRITE-TIME EVALUATION. main() calls this at the same moment it sets
+    `lastPoll`, so the persisted status will always show as fresh
+    ("green"/"market_closed" with age~0) at the instant it's written —
+    a run that stops happening can't recompute its own staleness. This
+    persisted value is NOT proof the pipeline is currently healthy by
+    the time someone reads state/data.json later; it only proves what
+    the state was AT THAT WRITE. Determining CURRENT freshness — "how
+    stale is this relative to right now" — is the dashboard's
+    client-side script's job (see render_dashboard), which recomputes
+    continuously from the embedded `lastPoll` value using the visitor's
+    own real clock, completely independent of this persisted snapshot.
+
+    Returns dict with: status, lastPoll, ageMinutes, marketHours,
+    message, evaluatedAt, note.
+    """
+    now_utc = now_utc or datetime.now(timezone.utc)
+    market_hours = _is_uk_market_hours(now_utc)
+    note = ("Computed once, at the moment this data was written — does NOT reflect time "
+            "elapsed since. Current freshness is determined by the dashboard's client-side "
+            "script from lastPoll, independently of this persisted status.")
+
+    if not last_poll_str:
+        return {
+            "status": "unknown", "lastPoll": None, "ageMinutes": None,
+            "marketHours": market_hours,
+            "message": "No successful poll has been recorded yet.",
+            "evaluatedAt": now_utc.isoformat(), "note": note,
+        }
+    try:
+        last_poll_dt = datetime.strptime(last_poll_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+    except Exception:
+        return {
+            "status": "unknown", "lastPoll": last_poll_str, "ageMinutes": None,
+            "marketHours": market_hours,
+            "message": "The last-poll timestamp could not be parsed.",
+            "evaluatedAt": now_utc.isoformat(), "note": note,
+        }
+
+    age_minutes = (now_utc - last_poll_dt).total_seconds() / 60
+
+    if market_hours:
+        if age_minutes <= PIPELINE_GREEN_THRESHOLD_MIN:
+            status = "green"
+            message = f"Last successful poll {age_minutes:.0f} min ago — up to date."
+        elif age_minutes <= PIPELINE_AMBER_THRESHOLD_MIN:
+            status = "amber"
+            message = f"Last successful poll {age_minutes:.0f} min ago — later than usual during market hours."
+        else:
+            status = "red"
+            message = f"Last successful poll {age_minutes:.0f} min ago — significantly overdue during market hours."
+    else:
+        if age_minutes <= PIPELINE_OUT_OF_HOURS_STALE_THRESHOLD_MIN:
+            status = "market_closed"
+            message = f"Markets are closed. Last successful poll {age_minutes / 60:.1f}h ago."
+        else:
+            status = "stale_out_of_hours"
+            message = f"Markets are closed, but no successful poll in {age_minutes / 60:.1f}h — worth checking."
+
+    return {
+        "status": status, "lastPoll": last_poll_str, "ageMinutes": round(age_minutes, 1),
+        "marketHours": market_hours, "message": message,
+        "evaluatedAt": now_utc.isoformat(), "note": note,
+    }
+
 
 def _parse_pub_date(pub_date_str):
     """
@@ -1600,11 +1698,19 @@ def render_dashboard(data, watchlist):
     last_poll_raw = data.get("lastPoll")
     if last_poll_raw:
         try:
-            last_poll = format_london_and_utc(datetime.strptime(last_poll_raw, "%Y-%m-%d %H:%M:%S"))
+            _last_poll_dt = datetime.strptime(last_poll_raw, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+            last_poll = format_london_and_utc(_last_poll_dt)
+            # ISO-8601 with an explicit "Z" — JS's `new Date(...)` parses this
+            # unambiguously as UTC everywhere; a naive "YYYY-MM-DD HH:MM:SS" string
+            # gets interpreted inconsistently (some engines treat it as local time),
+            # which would silently corrupt every staleness calculation below.
+            last_poll_iso_z = _last_poll_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
         except Exception:
             last_poll = last_poll_raw  # fall back to raw string if format ever changes
+            last_poll_iso_z = ""
     else:
         last_poll = "never"
+        last_poll_iso_z = ""
     all_items = []
     for ticker, its in items_by_ticker.items():
         all_items.extend(its)
@@ -1952,10 +2058,67 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 .badge.news{{background:#22262f;color:#9aa0a6}}
 .broker{{background:#2a1c3a;color:#c69bf0;border-radius:4px;padding:2px 8px;font-size:12px;font-weight:700;margin-right:4px}}
 .lastpoll{{color:#9aa0a6;font-size:11px;text-align:right}}
+.status-neutral{{color:#9aa0a6;font-size:15px;font-weight:600}}
 </style></head>
 <body>
 <h1>UK Stock Watch — Live Feed</h1>
-<p class="lastpoll" style="text-align:left;font-size:13px;color:#50dc96;margin:0 0 10px;">🕐 Live as of {esc(str(last_poll))} — this page auto-refreshes every 90s (data itself updates every ~5 min)</p>
+<p id="pipeline-status" class="status-neutral" style="text-align:left;font-size:13px;margin:0 0 10px;">🕐 Last successful poll: {esc(str(last_poll))} — checking freshness…</p>
+<script>
+(function() {{
+  var lastPollIso = {json.dumps(last_poll_iso_z)};
+  var el = document.getElementById('pipeline-status');
+  if (!el) return;
+  var GREEN_MIN = {PIPELINE_GREEN_THRESHOLD_MIN};
+  var AMBER_MIN = {PIPELINE_AMBER_THRESHOLD_MIN};
+  var STALE_OOH_MIN = {PIPELINE_OUT_OF_HOURS_STALE_THRESHOLD_MIN};
+  var OPEN_MIN = {UK_MARKET_OPEN_MINUTES};
+  var CLOSE_MIN = {UK_MARKET_CLOSE_MINUTES};
+
+  function isUkMarketHours(now) {{
+    // Intl with an explicit IANA zone handles the GMT/BST switch automatically,
+    // the same way Python's zoneinfo does server-side — never a fixed UTC offset.
+    var parts = new Intl.DateTimeFormat('en-GB', {{
+      timeZone: 'Europe/London', hour: 'numeric', minute: 'numeric',
+      hour12: false, weekday: 'short'
+    }}).formatToParts(now);
+    var weekday, hour, minute;
+    parts.forEach(function(p) {{
+      if (p.type === 'weekday') weekday = p.value;
+      if (p.type === 'hour') hour = parseInt(p.value, 10);
+      if (p.type === 'minute') minute = parseInt(p.value, 10);
+    }});
+    if (weekday === 'Sat' || weekday === 'Sun') return false;
+    var minutesSinceMidnight = hour * 60 + minute;
+    return minutesSinceMidnight >= OPEN_MIN && minutesSinceMidnight < CLOSE_MIN;
+  }}
+
+  function update() {{
+    if (!lastPollIso) {{
+      el.textContent = '⚪ No successful poll has been recorded yet.';
+      el.className = 'status-neutral';
+      return;
+    }}
+    var now = new Date();
+    var lastPoll = new Date(lastPollIso);
+    var ageMinutes = (now - lastPoll) / 60000;
+    var marketHours = isUkMarketHours(now);
+    var label = lastPoll.toUTCString().replace('GMT', 'UTC') + ' (' + ageMinutes.toFixed(0) + ' min ago)';
+    var cls, text;
+    if (marketHours) {{
+      if (ageMinutes <= GREEN_MIN) {{ cls = 'status-ok'; text = '✅ Up to date — last poll ' + label; }}
+      else if (ageMinutes <= AMBER_MIN) {{ cls = 'status-warn'; text = '⚠️ Delayed — last poll ' + label; }}
+      else {{ cls = 'status-bad'; text = '🛑 Overdue — last poll ' + label; }}
+    }} else {{
+      if (ageMinutes <= STALE_OOH_MIN) {{ cls = 'status-neutral'; text = '⚪ Markets closed — last poll ' + label; }}
+      else {{ cls = 'status-warn'; text = '⚠️ Markets closed, but no poll in ' + (ageMinutes / 60).toFixed(1) + 'h — worth checking'; }}
+    }}
+    el.className = cls;
+    el.textContent = text + ' — this page checks its own freshness every 30s.';
+  }}
+  update();
+  setInterval(update, 30000);
+}})();
+</script>
 {ftse_html}
 <p class="disclaimer">LSE-listed stocks only. Informational only — not investment advice, not a guarantee of any outcome.</p>
 
@@ -2734,6 +2897,8 @@ def main():
     # freshly-gathered items_by_ticker/quotes as the factual source.
     market_research = update_market_research(watchlist, quotes, items_by_ticker, market_research)
 
+    _last_poll_now = datetime.now(timezone.utc)
+    _last_poll_str = _last_poll_now.strftime("%Y-%m-%d %H:%M:%S")
     data = {
         "items": items_by_ticker,
         "quotes": quotes,
@@ -2744,7 +2909,7 @@ def main():
         "bigMovers": big_movers,
         "marketWide": deduped_market_wide,
         "marketResearch": market_research,
-        "lastPoll": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+        "lastPoll": _last_poll_str,
         # Explicit, persisted universe/source status — surfaced on the dashboard itself
         # (not just in the workflow log) specifically so a drop from full FTSE 100+250
         # coverage down to FTSE-100-only, a stale cache, or fully unrestricted can never
@@ -2752,6 +2917,11 @@ def main():
         "ftseUniverseStatus": ftse_universe_status,
         "ftseUniverseSource": ftse_universe_source,
         "ftseUniverseCount": len(ftse_universe_names) if ftse_universe_names is not None else 0,
+        # Pipeline (write-time) freshness — deliberately separate from feed-level health
+        # above. See compute_pipeline_health()'s docstring: this is a snapshot evaluated
+        # NOW, at write time — it is not proof of current health once the file ages. The
+        # dashboard's own client-side script is what determines CURRENT freshness.
+        "pipelineHealth": compute_pipeline_health(_last_poll_str, _last_poll_now),
     }
     save_json(DATA_FILE, data)
     render_dashboard(data, watchlist)
