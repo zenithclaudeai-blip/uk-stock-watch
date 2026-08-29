@@ -2647,6 +2647,264 @@ def deduplicate_and_merge(normalized_events):
 
 
 
+
+# =========================================================================
+# PERSISTENT EVENT STORE — state/events.json
+#
+# SEPARATE from state/data.json entirely — different file, different
+# functions, never touches the existing data.json load/save calls. This
+# layer is additive: nothing here is called from main() yet (verified by
+# the same "not wired in" check used for the pipeline itself).
+#
+# Design principles, per spec:
+# - Append-only: existing entries are NEVER modified or removed by normal
+#   operation. Only explicit user action (not built here) would ever
+#   remove an event.
+# - Idempotent: running the exact same poll cycle twice produces byte-
+#   identical file content the second time (0 events added, same sorted
+#   order) — this is verified directly in the tests below.
+# - Atomic writes: temp file + os.replace(), so a crash or interruption
+#   mid-write can never leave a truncated/corrupt events.json in place —
+#   either the old file survives intact, or the new one lands complete.
+# - A CORRUPT existing file is never silently overwritten. If the file
+#   can't be parsed as the expected {version, events} shape, persistence
+#   is skipped for that cycle entirely and the corrupt file is left
+#   exactly as found — overwriting it with a "fresh" store would destroy
+#   whatever real history it might still contain in partially-recoverable
+#   form, which is a worse outcome than just skipping a cycle.
+# =========================================================================
+
+import tempfile
+
+EVENTS_STATE_FILE = os.path.join(STATE_DIR, "events.json")
+EVENTS_STORE_VERSION = 1
+
+
+class EventsStoreCorruptError(Exception):
+    """Raised when state/events.json exists but doesn't parse as valid
+    JSON, or doesn't match the expected {version, events} shape. The
+    caller must NOT write a fresh store in response to this — see the
+    module docstring above."""
+    pass
+
+
+def load_events_store(path=None):
+    """
+    Loads the events store. A MISSING file is the only case that
+    legitimately produces a fresh empty store (first run ever) — a file
+    that EXISTS but fails to parse raises EventsStoreCorruptError instead
+    of silently returning empty, since those are very different
+    situations: one has no history yet, the other has history that must
+    not be destroyed.
+    """
+    path = path or EVENTS_STATE_FILE
+    if not os.path.exists(path):
+        return {"version": EVENTS_STORE_VERSION, "events": []}
+    with open(path, "r", encoding="utf-8") as f:
+        raw = f.read()
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise EventsStoreCorruptError(f"{path} contains invalid JSON: {e}") from e
+    if not isinstance(data, dict) or not isinstance(data.get("events"), list):
+        raise EventsStoreCorruptError(f"{path} does not match the expected {{version, events}} shape")
+    return data
+
+
+def atomic_write_json(path, data):
+    """
+    Writes JSON atomically: content goes to a temp file in the SAME
+    directory first (so the final os.replace is a same-filesystem rename,
+    guaranteed atomic on POSIX and Windows), then replaces the target in
+    one step. An interrupted write leaves the ORIGINAL file completely
+    intact — there is no window where a half-written file sits at the
+    real path.
+    """
+    dir_name = os.path.dirname(path) or "."
+    os.makedirs(dir_name, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(dir=dir_name, prefix=".events_tmp_", suffix=".json")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+def merge_events_into_store(store, new_events):
+    """
+    Append-only, idempotent merge. An event whose event_id is already
+    present is left COMPLETELY untouched — "if the same event is
+    encountered again, do nothing" is implemented literally, including
+    not enriching an existing single-source record even if this run's
+    merge could now add a second source to it. This is the simplest rule
+    that can never corrupt or silently rewrite something already stored;
+    a known, accepted limitation (not a bug) is that a previously-stored
+    single-source event won't retroactively gain a second source later —
+    documented here rather than hidden.
+
+    Returns (updated_store, added_count). added_count == 0 on a repeated/
+    duplicate run is the CORRECT outcome, not a failure.
+
+    Events are kept sorted by event_id after every merge — this makes the
+    file's byte content (not just its logical content) identical across
+    runs that produce the same event set, so idempotency can be verified
+    at the file level directly, not just by re-parsing and comparing.
+    """
+    existing_ids = {e["event_id"] for e in store["events"]}
+    added = 0
+    for e in new_events:
+        if e["event_id"] in existing_ids:
+            continue
+        store["events"].append(e)
+        existing_ids.add(e["event_id"])
+        added += 1
+    store["events"].sort(key=lambda e: e["event_id"])
+    return store, added
+
+
+def fetch_yahoo_broker_events(watchlist):
+    """
+    Fetches and normalizes Yahoo upgradeDowngradeHistory events for every
+    watchlist ticker. Fails soft per-ticker AND overall — one ticker's
+    fetch failing never blocks the rest (same pattern as every other
+    fetch_* in this file), and if Yahoo is down entirely this returns []
+    rather than raising, so the caller can proceed with Investing.com
+    alone.
+    """
+    events = []
+    for stock in watchlist:
+        ticker, name = stock["ticker"], stock["name"]
+        try:
+            analyst = fetch_yahoo_analyst(ticker)
+            if not analyst:
+                continue
+            for h in analyst.get("history", [])[:15]:
+                firm = h.get("firm", "")
+                to_grade = h.get("toGrade", "")
+                epoch = h.get("epochGradeDate")
+                if not firm or not to_grade or not epoch:
+                    continue
+                link = f"https://finance.yahoo.com/quote/{yahoo_symbol(ticker)}/analysis#{firm}-{epoch}".replace(" ", "-")
+                events.append(normalize_yahoo_event(
+                    ticker=ticker, company=name, firm=firm,
+                    from_grade=h.get("fromGrade"), to_grade=to_grade,
+                    action_code=h.get("action", ""), epoch=epoch, link=link,
+                ))
+        except Exception as e:
+            print(f"  ! events pipeline: yahoo fetch failed for {ticker}: {e}", file=sys.stderr)
+            continue
+    return events
+
+
+def fetch_investing_broker_events(ticker_lookup):
+    """Fetches and normalizes Investing.com analyst-ratings RSS events.
+    Fails soft — returns [] on any error, never raises, so the caller can
+    proceed with Yahoo's events alone."""
+    try:
+        items, had_error = fetch_feed(ANALYST_RATINGS_FEED_URL)
+        if had_error:
+            return []
+        return [
+            normalize_investing_event(
+                title=it["title"], link=it["link"], pub_date=it.get("pubDate"),
+                ticker_lookup=ticker_lookup,
+            )
+            for it in items
+        ]
+    except Exception as e:
+        print(f"  ! events pipeline: investing.com fetch failed: {e}", file=sys.stderr)
+        return []
+
+
+def collect_and_persist_broker_events(watchlist, screener_rows=None, dry_run=False, path=None):
+    """
+    ONE full poll-cycle pass: fetch both sources -> normalize -> dedupe/
+    merge -> load existing store -> add genuinely new events -> write
+    atomically. This is the single function a future main() would call;
+    it is NOT called from main() yet (see the module-load check in the
+    test suite).
+
+    Failure handling, exactly as specified:
+    - Yahoo fails -> proceeds using Investing.com's events only.
+    - Investing.com fails -> proceeds using Yahoo's events only.
+    - Both fail -> new_events is empty; the existing store is loaded and
+      re-saved (0 added) rather than skipped — safe because
+      merge_events_into_store only ever appends, so re-saving unchanged
+      content can never truncate or lose data.
+    - Existing store is CORRUPT -> persistence is skipped entirely this
+      cycle; the corrupt file is left exactly as-is, loudly logged.
+    - Write itself fails (disk full, permissions, etc) -> reported, the
+      PREVIOUS file on disk is untouched (atomic_write_json guarantees
+      this structurally, not just by convention).
+
+    Conflicting pairs (from deduplicate_and_merge) are never merged into
+    one event, but neither underlying single-source record is discarded —
+    both are individually persisted (each keeping its own original
+    confidence and event_id) via finalize_unmatched_event, exactly as
+    "conflicting events remain separate" requires. The conflict itself
+    (the fact that two records disagreed) is returned in the result dict
+    for logging/inspection, not stored as its own event-shaped record.
+
+    dry_run=True runs the full pipeline and returns the result WITHOUT
+    writing anything to disk.
+    """
+    path = path or EVENTS_STATE_FILE
+    screener_rows = screener_rows or []
+
+    yahoo_events = fetch_yahoo_broker_events(watchlist)
+    ticker_lookup = build_name_ticker_lookup(watchlist, screener_rows)
+    investing_events = fetch_investing_broker_events(ticker_lookup)
+
+    all_normalized = yahoo_events + investing_events
+    merged, conflicts, unmatched = deduplicate_and_merge(all_normalized)
+
+    new_events = merged + unmatched
+    for c in conflicts:
+        for e in c["events"]:
+            new_events.append(finalize_unmatched_event(e))
+
+    try:
+        store = load_events_store(path)
+    except EventsStoreCorruptError as e:
+        print(f"  ! events store CORRUPT — skipping persistence this cycle to avoid data loss: {e}", file=sys.stderr)
+        return {
+            "written": False, "reason": "existing_store_corrupt",
+            "new_events_found": len(new_events), "added": 0,
+            "conflicts": conflicts, "store": None,
+        }
+
+    updated_store, added = merge_events_into_store(store, new_events)
+
+    if dry_run:
+        return {
+            "written": False, "reason": "dry_run",
+            "new_events_found": len(new_events), "added": added,
+            "conflicts": conflicts, "store": updated_store,
+        }
+
+    try:
+        atomic_write_json(path, updated_store)
+    except Exception as e:
+        print(f"  ! events store write FAILED — previous file left untouched: {e}", file=sys.stderr)
+        return {
+            "written": False, "reason": "write_failed",
+            "new_events_found": len(new_events), "added": 0,
+            "conflicts": conflicts, "store": None,
+        }
+
+    return {
+        "written": True, "reason": "ok",
+        "new_events_found": len(new_events), "added": added,
+        "conflicts": conflicts, "store": updated_store,
+    }
+
+
+
 if __name__ == "__main__":
     try:
         main()
