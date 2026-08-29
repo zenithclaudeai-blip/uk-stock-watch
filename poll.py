@@ -2722,6 +2722,17 @@ def _merge_pair(e1, e2, canonical_key):
         "source": sorted(set([e1["source"], e2["source"]])),
         "source_url": [e1["source_url"], e2["source_url"]],
         "source_event_ids": [e1["source_event_id"], e2["source_event_id"]],
+        # source_refs: correctly-PAIRED (source, source_event_id) entries —
+        # NOTE "source" above is sorted(set(...)), independently of
+        # source_url/source_event_ids' e1-then-e2 order, so those three
+        # lists are NOT safely zippable back together. source_refs exists
+        # specifically to give supersession-matching (added in a later
+        # stage) an unambiguous pairing to rely on, without touching or
+        # reordering any of the three existing fields above.
+        "source_refs": [
+            {"source": e1["source"], "source_event_id": e1["source_event_id"]},
+            {"source": e2["source"], "source_event_id": e2["source_event_id"]},
+        ],
         "confidence": CONFIDENCE_MERGED_HIGH,
     }
     merged["target_change_pct"] = compute_target_change_pct(merged["old_target"], merged["new_target"])
@@ -2766,6 +2777,7 @@ def finalize_unmatched_event(e, is_conflict_side=False):
     out["source"] = [e["source"]]
     out["source_url"] = [e["source_url"]]
     out["source_event_ids"] = [e["source_event_id"]]
+    out["source_refs"] = [{"source": e["source"], "source_event_id": e["source_event_id"]}]
     out["evidence_fingerprint"] = compute_evidence_fingerprint(out)  # descriptive only, see docstring
     return out
 
@@ -2790,6 +2802,7 @@ def _fold_compatible_fragment(acc, fragment):
     acc_sources = list(acc_source) if acc_is_finalized else [acc_source]
     acc_source_urls = list(acc.get("source_url")) if acc_is_finalized else [acc.get("source_url")]
     acc_source_ids = list(acc.get("source_event_ids")) if acc_is_finalized else [acc.get("source_event_id")]
+    acc_source_refs = list(acc.get("source_refs")) if acc_is_finalized else [{"source": acc.get("source"), "source_event_id": acc.get("source_event_id")}]
     acc_had_own_target = acc.get("new_target") is not None  # BEFORE this fold — needed for the confidence rule below
 
     merged = dict(acc)
@@ -2813,6 +2826,7 @@ def _fold_compatible_fragment(acc, fragment):
     merged["source"] = sorted(set(acc_sources))
     merged["source_url"] = acc_source_urls + [fragment["source_url"]]
     merged["source_event_ids"] = acc_source_ids + [fragment["source_event_id"]]
+    merged["source_refs"] = acc_source_refs + [{"source": fragment["source"], "source_event_id": fragment["source_event_id"]}]
 
     # MERGED_HIGH requires genuine independent agreement — the accumulator
     # already had its OWN target before this fold, AND this fragment
@@ -3069,6 +3083,17 @@ def _event_conflicts_with_stored(candidate, stored):
     return False
 
 
+# Actions that carry little/no real information about what actually
+# happened — a classifier fallback, not a genuine finding. Anything else
+# (UPGRADE, DOWNGRADE, INITIATION, REITERATION, TARGET_RAISE, TARGET_CUT,
+# RATING_CHANGE) is "meaningful": a real, specific classification.
+_WEAK_ACTIONS = {None, "", "NEWS", "NO_CHANGE"}
+
+
+def _is_weak_action(action):
+    return action in _WEAK_ACTIONS
+
+
 def enrich_stored_event(stored, candidate, now_iso):
     """
     Fills gaps in an existing stored event using a compatible candidate
@@ -3077,32 +3102,50 @@ def enrich_stored_event(stored, candidate, now_iso):
 
     `candidate` here is always an already-FINALIZED event (from
     finalize_unmatched_event or _merge_pair), meaning its "source",
-    "source_url", and "source_event_ids" fields are already lists (one
-    element for a single-fragment candidate, two for a same-run merge) —
-    NOT the raw normalized event's plain-string "source" field. Every
-    list field here is combined by concatenation/union, never by
-    wrapping an already-list value in another list.
+    "source_url", "source_event_ids", and "source_refs" fields are already
+    lists — NOT the raw normalized event's plain-string fields. Every list
+    field here is combined by concatenation/union, never by wrapping an
+    already-list value in another list.
 
-    If ALL of the candidate's source_event_ids are already present in the
-    stored event's source_event_ids (a pure repeat of previously-seen
-    evidence, e.g. re-polling the same day again), this is a genuine
-    no-op: the returned dict is the ORIGINAL stored dict, completely
-    unchanged — including last_seen, which must NOT bump on a repeat,
-    only on genuinely new evidence.
+    IMPORTANT: whether the candidate's source_event_id(s) were already
+    present in the stored record is NOT used to short-circuit BEFORE
+    comparing fields — an earlier version did this, which meant a
+    same-source-event re-arriving with IMPROVED normalized data (e.g. a
+    parser fix now extracting a rating that used to be null) was silently
+    discarded, since the "already seen" check fired before any field
+    comparison ever happened. Fixed: fields are always computed first: a
+    genuine no-op is now determined by comparing the RESULT against what
+    was already stored, not by source_event_id novelty alone.
+    Note: rating/target/company fields only ever FILL a null (pick()) —
+    never overwrite one non-null value with a different non-null value.
+
+    `action` is the one field handled DIFFERENTLY from the null-fill
+    pattern above, because a classifier ALWAYS produces some action value
+    (never null) — "NEWS"/"NO_CHANGE" are the classifier's OWN way of
+    saying "couldn't tell", not a genuine absence of information the way
+    a null rating is. So: a WEAK stored action (NEWS/NO_CHANGE/absent)
+    CAN be corrected to a MEANINGFUL one from the candidate (this is what
+    lets a parser-classification fix like "NEWS" -> "DOWNGRADE" actually
+    take effect on reprocessing). But a stored action that's ALREADY
+    meaningful is never silently overwritten by a DIFFERENT candidate
+    action, even if that candidate action is also meaningful — two
+    meaningful-but-different classifications for the same event_id is a
+    genuine disagreement, and resolving that is _event_conflicts_with_stored's
+    job (checked by the caller before this function is ever reached), not
+    a silent overwrite here.
 
     Otherwise: rating/target/currency fields are filled ONLY where
-    currently null (never overwrites a real value with a different one —
-    callers must have already confirmed compatibility via
-    _event_conflicts_with_stored before calling this), source/source_url/
-    source_event_ids are unioned (never replaced), confidence is
-    recalculated from the resulting source count and target completeness,
-    last_seen is bumped to now, and first_seen/event_id are always
-    preserved exactly as they were.
+    currently null, source/source_url/source_event_ids/source_refs are
+    unioned (each new entry added at most once — never duplicated, even
+    when the candidate carries a source_event_id already present),
+    confidence is recalculated from the resulting source count and target
+    completeness, last_seen is bumped to now only when something actually
+    changed, and first_seen/event_id are always preserved exactly as they
+    were.
     """
     candidate_source_ids = candidate.get("source_event_ids") or [candidate.get("source_event_id")]
     stored_source_ids = stored.get("source_event_ids", [])
-    if all(sid in stored_source_ids for sid in candidate_source_ids):
-        return stored, False  # pure repeat — nothing changes, not even last_seen
+    new_source_ids = [sid for sid in candidate_source_ids if sid not in stored_source_ids]
 
     def pick(a, b):
         return a if a is not None else b
@@ -3118,16 +3161,47 @@ def enrich_stored_event(stored, candidate, now_iso):
     enriched["target_change_pct"] = compute_target_change_pct(enriched["old_target"], enriched["new_target"])
     if enriched.get("company") is None:
         enriched["company"] = candidate.get("company")
-    if not enriched.get("action") or enriched.get("action") == "NO_CHANGE":
+    if _is_weak_action(enriched.get("action")) and not _is_weak_action(candidate.get("action")):
         enriched["action"] = candidate.get("action")
+    # else: stored action is either already meaningful (never blindly
+    # overwritten by a different candidate action — see docstring), or the
+    # candidate brings nothing better than what's already stored.
 
+    # Only add entries that are genuinely NEW — guards against duplicating
+    # source_url/source_refs when the candidate's source_event_id(s) were
+    # already present (previously this path was unreachable due to the
+    # early-return above, which masked the fact these appends had no such
+    # guard; now that field-improvement can flow through even for an
+    # already-seen source_event_id, the guard is required to avoid
+    # introducing duplicate entries here).
     sources = list(stored.get("source", []))
     for s in candidate.get("source", []):
         if s not in sources:
             sources.append(s)
     enriched["source"] = sorted(set(sources))
-    enriched["source_url"] = list(stored.get("source_url", [])) + list(candidate.get("source_url", []))
-    enriched["source_event_ids"] = list(stored_source_ids) + [sid for sid in candidate_source_ids if sid not in stored_source_ids]
+
+    stored_refs = list(stored.get("source_refs", []))
+    stored_ref_keys = {(r["source"], r["source_event_id"]) for r in stored_refs}
+    new_refs = [r for r in candidate.get("source_refs", []) if (r["source"], r["source_event_id"]) not in stored_ref_keys]
+    enriched["source_refs"] = stored_refs + new_refs
+
+    if new_source_ids:
+        # New evidence: append its url/id alongside the existing ones.
+        candidate_urls_by_id = dict(zip(candidate_source_ids, candidate.get("source_url", [])))
+        new_urls = [candidate_urls_by_id[sid] for sid in new_source_ids if sid in candidate_urls_by_id]
+        enriched["source_url"] = list(stored.get("source_url", [])) + new_urls
+        enriched["source_event_ids"] = list(stored_source_ids) + new_source_ids
+    # else: every source_event_id the candidate carries was already known —
+    # source_url/source_event_ids stay exactly as stored, unchanged.
+
+    fields_changed = any(
+        enriched.get(f) != stored.get(f)
+        for f in ("old_rating", "new_rating", "old_rating_bucket", "new_rating_bucket",
+                   "old_target", "new_target", "target_currency", "target_change_pct",
+                   "company", "action", "source", "source_event_ids")
+    )
+    if not fields_changed:
+        return stored, False  # genuine no-op — nothing new, not even a field improved
 
     # MERGED_HIGH requires genuine independent agreement: the incoming
     # candidate AND the already-stored record must EACH have reported
@@ -3145,15 +3219,42 @@ def enrich_stored_event(stored, candidate, now_iso):
             enriched["confidence"] = CONFIDENCE_MERGED_HIGH
         else:
             enriched["confidence"] = CONFIDENCE_MERGED_PARTIAL
-    # else: still single-source overall (shouldn't normally happen here, since
-    # reaching this function means a second source WAS just added) — left as-is
-    # defensively rather than asserted, since confidence display should never
-    # crash the pipeline over an edge case.
+    # else: still single-source overall (e.g. an already-seen source improved
+    # one of its own fields) — left as-is defensively rather than asserted,
+    # since confidence display should never crash the pipeline over an edge case.
 
     enriched["first_seen"] = stored.get("first_seen", now_iso)  # explicitly preserved, never changed
     enriched["last_seen"] = now_iso
     enriched["evidence_fingerprint"] = compute_evidence_fingerprint(enriched)  # recomputed to reflect new fields
     return enriched, True
+
+
+def _find_active_superseded_candidate(events_by_id, source, source_event_id):
+    """
+    Scans currently ACTIVE (non-superseded) records for one whose
+    source_refs contains this exact (source, source_event_id) pair.
+    Restricted to SINGLE-SOURCE stored records only — a conservative,
+    explicit scope limit: disentangling which specific source contributed
+    which field on an already-multi-source-enriched record, if that
+    record's data needs correcting, is a materially harder problem this
+    implementation deliberately doesn't attempt yet. A multi-source
+    record is simply never returned here, so it falls through to the
+    ordinary event_id-based enrich/conflict path unchanged.
+
+    Returns the matching record, or None. A record with superseded_by
+    already set is never matched again — it has already been superseded
+    once, and the CURRENT active representative for that source item is
+    whichever record superseded it, not the stale one itself.
+    """
+    for rec in events_by_id.values():
+        if rec.get("superseded_by"):
+            continue
+        if len(rec.get("source", [])) != 1:
+            continue
+        for ref in rec.get("source_refs", []):
+            if ref["source"] == source and ref["source_event_id"] == source_event_id:
+                return rec
+    return None
 
 
 def reconcile_events_with_store(store, candidate_events, now_iso=None):
@@ -3162,32 +3263,62 @@ def reconcile_events_with_store(store, candidate_events, now_iso=None):
     For each candidate event from THIS run (already carrying its event_id
     from the normalize/merge stage):
 
-      - event_id not yet in the store -> appended as a brand-new record
-        (first_seen = last_seen = now).
-      - event_id already in the store, and the candidate is COMPATIBLE
-        with what's stored -> enriched in place (gaps filled, sources
-        unioned, confidence recalculated, last_seen bumped) via
-        enrich_stored_event() — unless it's a pure repeat of already-seen
-        evidence, which is a true no-op (see enrich_stored_event).
-      - event_id already in the store, but the candidate ACTIVELY
-        CONFLICTS with what's stored -> the stored record is NEVER
-        touched. The candidate is re-keyed via make_conflict_key() and
-        appended as its OWN separate record instead (or matched against
-        an existing conflict-side record with that same disambiguated
-        key, if this exact conflict was already seen before — so repeats
-        of a conflicting fragment are still idempotent, not re-appended).
+    0. SUPERSESSION CHECK (single-source candidates only): if this exact
+       (source, source_event_id) pair was already recorded under a
+       DIFFERENT event_id on some other ACTIVE single-source record —
+       meaning our own parser/classification logic changed and this same
+       source article now derives a different event_id than it used to
+       (e.g. a ticker-resolution bug fix) — that OLD record is marked
+       `superseded_by: <this candidate's event_id>`. It is NEVER deleted,
+       NEVER overwritten, and its first_seen/event_id/other fields are
+       completely untouched — only the one new `superseded_by` key is
+       added. The candidate itself then proceeds through the NORMAL steps
+       below using its own event_id, same as any other candidate. This is
+       genuinely different from steps 1-3: those are about NEW EVIDENCE
+       about the same real-world event; this is about OUR OWN
+       classification of the SAME source article changing.
+
+    1. event_id not yet in the store -> appended as a brand-new record
+       (first_seen = last_seen = now).
+    2. event_id already in the store, and the candidate is COMPATIBLE
+       with what's stored -> enriched in place (gaps filled, sources
+       unioned, confidence recalculated, last_seen bumped ONLY if a field
+       actually changed) via enrich_stored_event() — this also now
+       correctly handles a same-source-event returning with IMPROVED
+       data (previously silently discarded; see enrich_stored_event's
+       docstring for that fix).
+    3. event_id already in the store, but the candidate ACTIVELY
+       CONFLICTS with what's stored -> the stored record is NEVER
+       touched. The candidate is re-keyed via make_conflict_key() and
+       appended as its OWN separate record instead (or matched against
+       an existing conflict-side record with that same disambiguated
+       key, if this exact conflict was already seen before — so repeats
+       of a conflicting fragment are still idempotent, not re-appended).
 
     Returns (updated_store, stats) where stats = {"added", "enriched",
-    "conflicts_recorded"}.
+    "conflicts_recorded", "superseded"}.
     """
     now_iso = now_iso or datetime.now(timezone.utc).isoformat()
     events_by_id = {e["event_id"]: e for e in store["events"]}
     added = 0
     enriched_count = 0
     conflicts_recorded = 0
+    superseded_count = 0
 
     for cand in candidate_events:
         eid = cand["event_id"]
+
+        cand_refs = cand.get("source_refs", [])
+        if len(cand_refs) == 1:
+            ref = cand_refs[0]
+            stale = _find_active_superseded_candidate(events_by_id, ref["source"], ref["source_event_id"])
+            if stale is not None and stale["event_id"] != eid:
+                events_by_id[stale["event_id"]] = dict(stale, superseded_by=eid)
+                superseded_count += 1
+            # If stale is not None and stale["event_id"] == eid, this is the
+            # SAME slot as before — nothing special here, falls through to
+            # the ordinary logic below exactly as always.
+
         if eid not in events_by_id:
             new_record = dict(cand)
             new_record.setdefault("first_seen", now_iso)
@@ -3222,7 +3353,7 @@ def reconcile_events_with_store(store, candidate_events, now_iso=None):
 
     updated_events = sorted(events_by_id.values(), key=lambda e: e["event_id"])
     store["events"] = updated_events
-    return store, {"added": added, "enriched": enriched_count, "conflicts_recorded": conflicts_recorded}
+    return store, {"added": added, "enriched": enriched_count, "conflicts_recorded": conflicts_recorded, "superseded": superseded_count}
 
 
 def fetch_yahoo_broker_events(watchlist):
