@@ -56,6 +56,16 @@ DOWNGRADE_WORDS = [
     r"cuts?\s+\S+.{0,25}\s+to\s+['\"‘’]?(sell|underweight|underperform|reduce|hold)",
     r"downgrades?\s+\S+.{0,25}\s+to\s+['\"‘’]?(sell|hold|underweight|underperform)",
     r"moves?\s+\S+.{0,25}\s+to\s+['\"‘’]?(sell|underweight|underperform)",
+    # Narrow addition: "Broker cuts Company('s) [stock] rating" — no
+    # destination rating stated, just the fact a rating was cut. Bounded
+    # to at most ONE extra intervening word (covers a two-word company
+    # name, e.g. "JD Sports") — deliberately NOT a wider allowance: an
+    # adversarial test during development showed a {0,3}-word gap could
+    # bridge across an unrelated clause ("cuts marketing costs while
+    # credit rating agency...") and wrongly fire. {0,1} still matches
+    # both real confirmed headlines ("cuts Pearson rating", "cuts
+    # Beiersdorf stock rating") while resisting that false positive.
+    r"\bcuts?\s+\S+(?:\s+\S+){0,1}\s+(?:stock\s+)?rating\b",
 ]
 TARGET_WORDS = ["price target", "target price", "pt raised", "pt cut"]
 
@@ -125,6 +135,40 @@ def normalize_rating_bucket(raw_rating):
     if r in BEARISH_RATING_TERMS:
         return "BEARISH"
     return None
+
+
+# Combined vocabulary for extract_new_rating_from_headline() below — reuses
+# the SAME rating terms already defined above for bucket classification,
+# rather than introducing a second/parallel rating vocabulary. Sorted
+# longest-first so e.g. "strong buy" matches before the shorter "buy".
+_ALL_RATING_TERMS_SORTED = sorted(
+    BULLISH_RATING_TERMS | NEUTRAL_RATING_TERMS | BEARISH_RATING_TERMS,
+    key=len, reverse=True,
+)
+_RATING_TERMS_ALTERNATION = "|".join(re.escape(t) for t in _ALL_RATING_TERMS_SORTED)
+_NEW_RATING_RE = re.compile(
+    rf"\b(?:upgrade[sd]?|downgrade[sd]?|cuts?|raise[sd]?)\s+to\s+['\"‘’]?({_RATING_TERMS_ALTERNATION})\b",
+    re.IGNORECASE,
+)
+
+
+def extract_new_rating_from_headline(title):
+    """
+    Narrow, EXPLICIT-only extractor for a stated destination rating —
+    "upgrade to Neutral", "downgrade to Buy", "cut to Hold". Only fires
+    when an action word (upgrade/downgrade/cut/raise) is directly
+    followed by "to <a known rating term>", using the SAME rating
+    vocabulary already defined above — no new/parallel classification
+    scheme. Returns the rating text exactly as it appeared in the
+    headline (preserves original casing, e.g. "Neutral"), or None if no
+    explicit rating is stated. NEVER inferred from the action word alone
+    — "UBS downgrades Boliden" with no destination stated returns None,
+    not a guessed rating.
+    """
+    m = _NEW_RATING_RE.search(title)
+    if not m:
+        return None
+    return m.group(1)
 
 
 def normalize_action_from_grades(from_grade, to_grade, yahoo_action_code=None):
@@ -289,11 +333,25 @@ def classify(title):
 
 
 def detect_broker(title):
+    """
+    Returns whichever known broker name appears EARLIEST in the actual
+    headline TEXT — not earliest in the BROKER_NAMES list. The previous
+    list-order-only approach meant a headline like "Berenberg downgrades
+    Barclays to Hold" incorrectly returned "Barclays" as the broker,
+    purely because "Barclays" happens to be listed before "Berenberg" in
+    BROKER_NAMES, even though "Berenberg" is the one actually performing
+    the action. Found and confirmed while testing the ticker-resolution
+    fix above — a genuine, separate pre-existing bug, not introduced by
+    that change, fixed here since correct broker attribution is a
+    prerequisite for that fix to work correctly.
+    """
     t = title.lower()
+    best_name, best_pos = "", None
     for b in BROKER_NAMES:
-        if b.lower() in t:
-            return b
-    return ""
+        idx = t.find(b.lower())
+        if idx != -1 and (best_pos is None or idx < best_pos):
+            best_name, best_pos = b, idx
+    return best_name
 
 
 def parse_rss(xml_bytes):
@@ -2359,41 +2417,62 @@ def compute_target_change_pct(old_target, new_target):
 
 def build_name_ticker_lookup(watchlist, screener_rows):
     """
-    Builds a company-name -> ticker lookup from data ALREADY available in
-    this run (watchlist + screener pool) — never invented, never fetched
-    from a separate source. Keys are lowercased and cleaned via the
-    existing clean_company_name() (strips "ORD 10P"-style jargon), so
-    lookups tolerate the same naming noise Yahoo's screener returns.
+    Builds a company-name -> (ticker, display_name) lookup from data
+    ALREADY available in this run (watchlist + screener pool) — never
+    invented, never fetched from a separate source. Keys are lowercased
+    and cleaned via the existing clean_company_name() (strips "ORD
+    10P"-style jargon), so lookups tolerate the same naming noise Yahoo's
+    screener returns. display_name is the SAME cleaned name, kept
+    alongside the ticker so a successful match can populate the event's
+    "company" field from the identical source that resolved the ticker —
+    never a separately-invented value.
     """
     lookup = {}
     for stock in watchlist:
-        name = clean_company_name(stock["name"]).strip().lower()
-        if name:
-            lookup[name] = stock["ticker"].upper()
+        cleaned = clean_company_name(stock["name"]).strip()
+        key = cleaned.lower()
+        if key:
+            lookup[key] = (stock["ticker"].upper(), cleaned)
     for row in screener_rows:
-        name = clean_company_name(row.get("name", "")).strip().lower()
+        cleaned = clean_company_name(row.get("name", "")).strip()
+        key = cleaned.lower()
         symbol = row.get("symbol", "")
         ticker = symbol.upper().rsplit(".L", 1)[0] if symbol.upper().endswith(".L") else symbol.upper()
-        if name and ticker:
-            lookup.setdefault(name, ticker)  # watchlist takes priority if both define the same name
+        if key and ticker:
+            lookup.setdefault(key, (ticker, cleaned))  # watchlist takes priority if both define the same name
     return lookup
 
 
-def resolve_ticker_by_substring(headline, lookup):
+def resolve_ticker_by_substring(headline, lookup, exclude_name=None):
     """
     The Investing.com RSS has no ticker field, only a headline — so this
     checks whether any KNOWN company name (from the lookup, i.e. from this
     run's own watchlist/screener) appears as a substring of the headline.
     A company outside that pool genuinely can't be resolved from data this
-    run has, and stays ticker=None rather than guessed.
+    run has, and stays (None, None) rather than guessed.
+
+    Returns (ticker, company_name) — company_name comes from the SAME
+    matched lookup entry that produced the ticker, never invented
+    separately.
+
+    exclude_name: typically the broker ALREADY detected in this same
+    headline. Any lookup entry whose cleaned name equals it is skipped as
+    a match candidate — fixes a confirmed real bug: "Barclays cuts
+    Pearson rating" was resolving ticker=BARC, because "Barclays" is both
+    the ACTING BROKER in this headline and a company on the watchlist.
+    The broker performing an action is never the SUBJECT of that action.
     """
     if not headline:
-        return None
+        return None, None
     t_lower = headline.lower()
-    for name, ticker in lookup.items():
-        if name and name in t_lower:
-            return ticker
-    return None
+    exclude_lower = exclude_name.strip().lower() if exclude_name else None
+    for name, (ticker, display_name) in lookup.items():
+        if not name or name not in t_lower:
+            continue
+        if exclude_lower and name == exclude_lower:
+            continue
+        return ticker, display_name
+    return None, None
 
 
 # -------------------------------------------------------------------
@@ -2505,11 +2584,16 @@ def normalize_investing_event(title, link, pub_date, ticker_lookup):
     One Investing.com RSS item -> a normalized event. Broker/action come
     from the existing, already-tested classify()/detect_broker()/
     normalize_headline_action(). Target comes from Step 1's regex
-    extractor. Ticker comes from Step 2's substring lookup.
+    extractor. Ticker AND company come together from the SAME resolved
+    lookup match (Step 2), with the detected broker excluded as a
+    candidate so the broker can never be mistaken for the subject
+    company. new_rating comes from the narrow explicit-destination-rating
+    extractor — only populated when the headline states one outright.
     """
     category = classify(title)
     broker = detect_broker(title)
     old_target, new_target, currency = extract_target_from_headline(title)
+    new_rating_text = extract_new_rating_from_headline(title)
     dt = _parse_pub_date(pub_date)
     if dt is None:
         date_str, timestamp = None, None
@@ -2518,7 +2602,7 @@ def normalize_investing_event(title, link, pub_date, ticker_lookup):
         date_str = dt_london.strftime("%Y-%m-%d")
         timestamp = dt.astimezone(timezone.utc).isoformat()
 
-    ticker = resolve_ticker_by_substring(title, ticker_lookup)
+    ticker, matched_company = resolve_ticker_by_substring(title, ticker_lookup, exclude_name=broker)
 
     return {
         "source": "investing_com",
@@ -2526,15 +2610,15 @@ def normalize_investing_event(title, link, pub_date, ticker_lookup):
         "source_url": link,
         "timestamp": timestamp,
         "date": date_str,
-        "company": None,  # not a structured field from this source — never invented
+        "company": matched_company,  # from the SAME match that resolved ticker — never invented separately
         "ticker": ticker,  # may be None — genuinely unresolvable for out-of-pool companies
         "exchange": "LSE" if ticker else None,
         "broker": _canonical_broker(broker) if broker else None,
         "action": normalize_headline_action(title) or category.upper(),
-        "old_rating": None,  # headlines don't state explicit old/new rating text structurally
-        "new_rating": None,  # — only Yahoo gives literal fromGrade/toGrade
+        "old_rating": None,  # headlines don't reliably state an explicit OLD rating structurally
+        "new_rating": new_rating_text,  # only when explicitly stated, e.g. "upgrade to Neutral"
         "old_rating_bucket": None,
-        "new_rating_bucket": None,
+        "new_rating_bucket": normalize_rating_bucket(new_rating_text) if new_rating_text else None,
         "old_target": old_target,
         "new_target": new_target,
         "target_currency": currency,
@@ -3155,6 +3239,8 @@ def fetch_yahoo_broker_events(watchlist):
         ticker, name = stock["ticker"], stock["name"]
         try:
             analyst = fetch_yahoo_analyst(ticker)
+            history_count = len((analyst or {}).get("history", []))
+            print(f"Broker events: Yahoo {ticker} — {history_count} analyst-history record(s) returned")
             if not analyst:
                 continue
             for h in analyst.get("history", [])[:15]:
