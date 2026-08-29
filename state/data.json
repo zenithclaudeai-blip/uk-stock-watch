@@ -11,27 +11,14 @@
         "company": "Barclays",
         "category": "news",
         "broker": null,
-        "detectedAt": "2026-08-29T22:13:06.855755+00:00",
-        "normalizedAt": "2026-08-29T22:13:06.855755+00:00",
-        "normalizedAction": null
+        "detectedAt": "2026-08-29T22:46:58.304123+00:00",
+        "normalizedAt": "2026-08-29T22:46:58.304123+00:00",
+        "normalizedAction": null,
+        "fetchSource": "y"
       }
     ],
     "BP.": [],
-    "SHEL": [
-      {
-        "title": "German insurer Allianz weighs $6.77 billion takeover of AA roadside rescue giant, Sky News reports - Reuters",
-        "link": "https://news.google.com/rss/articles/CBMi0AFBVV95cUxOVHdIWDVuam5pSU5Cb3IzQjJDZWhBcXdmNVFVcVl5OWc4LUo1VnlGVnh0cFlrOE5mMzdsdDVSNmlrTDVJMHR1cDVsWkZxZlladGtXUXpaeUU1eVg5TTdrQUpWZnpXUnZLX1FKR19SWkxobzVRMjh4MVFWdmo1cGttOHVCbmVtTjFyYnZXYzRiQmZ4NzJMdFVfMlJpa2hobnZMZ2JLYVNCeXdOb1ZiZ291bjJiZThSWWh1WllUbElVamhZT2hhUU5JaUpia1lQbEJI?oc=5",
-        "pubDate": "Sat, 29 Aug 2026 09:30:55 GMT",
-        "source": "Reuters",
-        "ticker": "SHEL",
-        "company": "Shell",
-        "category": "event",
-        "broker": null,
-        "detectedAt": "2026-08-29T17:35:47.166649+00:00",
-        "normalizedAt": "2026-08-29T17:35:47.166649+00:00",
-        "normalizedAction": null
-      }
-    ],
+    "SHEL": [],
     "VOD": [],
     "KOO": [],
     "TLW": [],
@@ -42,21 +29,7 @@
     "NG": [],
     "LGEN": [],
     "CNA": [],
-    "ABDN": [
-      {
-        "title": "94QO Bond Coupon Profile — Rate & Payments - TradingView",
-        "link": "https://news.google.com/rss/articles/CBMibEFVX3lxTE1IX0dva2pNUWdpV3JWYWJqSm4zNW5pTVkxQXlmNjZBSjIxa3dOR0htVkw3ckxCaUp5RE5yb2tBMkdwVllPNTN6NUZjcjktc2lmNWxGTWlVeG43SXdjVVRzN2FCamZBZVdhYW9idg?oc=5",
-        "pubDate": "Sat, 29 Aug 2026 00:19:42 GMT",
-        "source": "TradingView",
-        "ticker": "ABDN",
-        "company": "abrdn",
-        "category": "news",
-        "broker": null,
-        "detectedAt": "2026-08-29T17:36:06.422039+00:00",
-        "normalizedAt": "2026-08-29T17:36:06.422039+00:00",
-        "normalizedAction": null
-      }
-    ],
+    "ABDN": [],
     "ASC": [],
     "UKW": [],
     "GSK": [],
@@ -369,7 +342,7 @@
       "rangePct": 3.3948374760994255,
       "asOf": 1787940772000,
       "targetMeanPrice": 2342.789,
-      "recommendationKey": "none"
+      "recommendationKey": "buy"
     },
     "JIM": {
       "price": 7.0,
@@ -462,7 +435,7 @@
         "dividendYieldPct": 2.11,
         "trailingPE": 18.048483,
         "trailingEps": 0.33,
-        "marketCap": 69904203776,
+        "marketCap": 69792555008,
         "fiftyTwoWeekLow": 281.926,
         "fiftyTwoWeekHigh": 707.2,
         "heldPercentInsidersPct": 13.722999999999999,
@@ -474,6 +447,33 @@
         "aboveMA20": true,
         "shortInterestPct": 0.52,
         "shortInterestDate": "2015-11-17 00:00:00"
+      },
+      {
+        "symbol": "MNG.L",
+        "name": "M&G plc",
+        "volume": 9895365,
+        "price": 351.0,
+        "changePct": 0.65958923,
+        "targetMeanPrice": 322.426,
+        "recommendationKey": "hold",
+        "nextEarningsDate": 1788449400,
+        "exDividendDate": 1773878400,
+        "dividendRate": 0.21,
+        "dividendYieldPct": 5.88,
+        "trailingPE": 29.25,
+        "trailingEps": 0.12,
+        "marketCap": 8362189312,
+        "fiftyTwoWeekLow": 247.0,
+        "fiftyTwoWeekHigh": 367.1,
+        "heldPercentInsidersPct": 17.501,
+        "sector": "Financial Services",
+        "industry": "Asset Management",
+        "businessSummary": "M&G plc, through its subsidiaries, provides investment and savings products to institutional clients and individual policyholders in the United Kingdom and internationally. The company operates through Asset...",
+        "rsi14": 32.518362766487684,
+        "ma20": 354.3449981689453,
+        "aboveMA20": false,
+        "shortInterestPct": 0.51,
+        "shortInterestDate": "2022-10-19 00:00:00"
       },
       {
         "symbol": "TSCO.L",
@@ -595,17 +595,17 @@
   ],
   "marketWide": [],
   "marketResearch": {},
-  "lastPoll": "2026-08-29 22:13:55",
+  "lastPoll": "2026-08-29 22:47:48",
   "ftseUniverseStatus": "healthy",
   "ftseUniverseSource": "ftse100+ftse250",
   "ftseUniverseCount": 350,
   "pipelineHealth": {
     "status": "market_closed",
-    "lastPoll": "2026-08-29 22:13:55",
+    "lastPoll": "2026-08-29 22:47:48",
     "ageMinutes": 0.0,
     "marketHours": false,
     "message": "Markets are closed. Last successful poll 0.0h ago.",
-    "evaluatedAt": "2026-08-29T22:13:55.385289+00:00",
+    "evaluatedAt": "2026-08-29T22:47:48.695297+00:00",
     "note": "Computed once, at the moment this data was written — does NOT reflect time elapsed since. Current freshness is determined by the dashboard's client-side script from lastPoll, independently of this persisted status."
   }
 }
