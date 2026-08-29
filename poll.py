@@ -17,6 +17,7 @@ import os
 import re
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -675,12 +676,43 @@ def item_sort_key(it):
     return dt
 
 
-def fetch_feed(url):
-    try:
-        return parse_rss(http_get(url)), False
-    except Exception as e:
-        print(f"  ! feed fetch failed: {url} ({e})", file=sys.stderr)
-        return [], True
+# HTTP codes worth retrying — genuinely transient (rate-limiting, upstream
+# overload), confirmed happening repeatedly against Google News in
+# production. 404/DNS-failure/etc are NOT included: those won't resolve on
+# retry, so retrying them only wastes time inside the 5-minute poll window.
+_TRANSIENT_HTTP_CODES = {429, 500, 502, 503, 504}
+
+
+def fetch_feed(url, max_retries=1, backoff_seconds=2.0):
+    """
+    Fetches and parses an RSS feed, with a short, capped retry specifically
+    for TRANSIENT failures (503 Service Unavailable and similar upstream
+    codes, plus timeouts/connection errors) — exactly the failure pattern
+    observed repeatedly against Google News in production (a run showing
+    dozens of consecutive 503s). A non-transient HTTP error (404, etc) is
+    NOT retried, since retrying an error that will never resolve just
+    wastes time. max_retries=1 (try twice total) with a short fixed
+    backoff keeps the worst-case added delay per feed small (~2s) — this
+    fetch happens many times per poll cycle, so an aggressive retry policy
+    could itself meaningfully extend the run, especially in exactly the
+    mass-rate-limiting scenario where retries matter most.
+    """
+    last_error = None
+    for attempt in range(max_retries + 1):
+        try:
+            return parse_rss(http_get(url)), False
+        except urllib.error.HTTPError as e:
+            last_error = e
+            if e.code not in _TRANSIENT_HTTP_CODES or attempt == max_retries:
+                break
+            time.sleep(backoff_seconds)
+        except Exception as e:
+            last_error = e
+            if attempt == max_retries:
+                break
+            time.sleep(backoff_seconds)
+    print(f"  ! feed fetch failed: {url} ({last_error})", file=sys.stderr)
+    return [], True
 
 
 def clean_company_name(name):
@@ -935,7 +967,14 @@ def fetch_gb_screener(sort_field, sort_type="DESC", count=10):
                     continue
             out.append({
                 "symbol": symbol,
-                "name": q.get("shortName", symbol),
+                # Yahoo's "shortName" is known to be truncated at a fixed length for
+                # longer UK share-class names (confirmed on the live dashboard: names
+                # were cut off mid-word with no ellipsis, e.g. "PREMIER AFRICAN
+                # MINERALS LIMITE"). "longName" is the fuller field Yahoo's screener
+                # response also carries; preferring it when present is a strict
+                # improvement — falls through to the exact same behavior as before
+                # when a given quote doesn't happen to include it.
+                "name": q.get("longName") or q.get("shortName", symbol),
                 "volume": volume,
                 "price": price,
                 "changePct": q.get("regularMarketChangePercent"),
@@ -1964,8 +2003,15 @@ def main():
             # Search using a cleaned name (see clean_company_name docstring) — the
             # dashboard still displays the full "name" as-is, only the search query
             # uses the cleaned version, since that's what actually matches real news.
-            items, _ = fetch_feed(general_news_url(clean_company_name(name)))
+            cleaned_name = clean_company_name(name)
+            items, _ = fetch_feed(general_news_url(cleaned_name))
             items = [it for it in items if passes_news_filters(it.get("pubDate"))]
+            # Google matches a keyword search against full article content, not just
+            # the headline — confirmed live: this pool surfaced items unrelated to the
+            # searched stock. Requiring the (cleaned) company name to actually appear
+            # in the item's own title before tagging it with this stock's ticker closes
+            # that gap — same fix applied to the watchlist's own per-stock news loop.
+            items = [it for it in items if cleaned_name.lower() in it.get("title", "").lower()]
             if items:
                 now_iso_sc = datetime.now(timezone.utc).isoformat()
                 enriched_items = []
@@ -1980,10 +2026,32 @@ def main():
 
         # 5-day uptrend: real closing-price history for the same deduped stock set (no
         # extra tickers beyond what's already being fetched news for) plus the watchlist.
+        # Deduped by BARE ticker (stripping the screener's ".L" suffix for comparison
+        # only) — screener symbols and watchlist tickers refer to the same stock but
+        # were never compared as equal before, so a stock present in BOTH pools (e.g.
+        # KOO.L from the screener and KOO from the watchlist) was silently checked and
+        # displayed TWICE. Whichever pool is seen first keeps its own key format
+        # unchanged (screener_news's own lookups elsewhere depend on the raw ".L" key,
+        # so that dict itself is never touched) — this only prevents the same real
+        # stock from entering uptrend_targets under two different-looking keys.
         uptrend_stocks = []
-        uptrend_targets = dict(ranked_stocks)
+        uptrend_targets = {}
+        _seen_bare_tickers = set()
+        for symbol, name in ranked_stocks.items():
+            bare = symbol.upper().rsplit(".L", 1)[0] if symbol.upper().endswith(".L") else symbol.upper()
+            bare = bare.rstrip(".")  # matches yahoo_symbol()'s own normalization — a
+            # ticker like "BP." (a real, literal trailing dot, not a suffix to strip)
+            # must compare equal to the screener's "BP.L" -> bare "BP", not stay "BP."
+            # and silently fail to match, which was a real gap in an earlier version
+            # of this exact fix, caught by its own test.
+            if bare not in _seen_bare_tickers:
+                uptrend_targets[symbol] = name
+                _seen_bare_tickers.add(bare)
         for stock in watchlist:
-            uptrend_targets.setdefault(stock["ticker"], stock["name"])
+            bare = stock["ticker"].upper().rstrip(".")
+            if bare not in _seen_bare_tickers:
+                uptrend_targets[stock["ticker"]] = stock["name"]
+                _seen_bare_tickers.add(bare)
         print(f"Checking price technicals, targets, earnings/dividend dates for {len(uptrend_targets)} stocks...")
         short_interest_map = fetch_short_interest()  # one fetch per run, not per ticker
         screener_targets = {}  # symbol -> {targetMeanPrice, recommendationKey, nextEarningsDate, exDividendDate, rsi14, ma20, aboveMA20}
@@ -2058,7 +2126,37 @@ def main():
         # (surfaced US broker actions on Workday, Ulta Beauty, Elastic, Autodesk as if
         # they were "all LSE" alerts). Not reused elsewhere either, so keeping the fetch
         # around would just be a wasted request for data that's no longer used anywhere.
-        market_wide_pool = ratings_items + market_wide_items
+        #
+        # ratings_items (ANALYST_RATINGS_FEED_URL) turned out to have the EXACT SAME
+        # problem, confirmed live on the deployed dashboard: "DA Davidson raises Workday
+        # stock price target", "...raises Ulta Beauty...", "...raises Elastic..." — all
+        # US stocks — were appearing in this "all LSE" section. The "uk." subdomain does
+        # not mean UK-only content; it's a global analyst-ratings feed. There is no free
+        # source that gives a full LSE company universe to check against (see project
+        # history — short-interest work hit the identical wall), so items from this feed
+        # are only kept when their subject company resolves to a ticker from THIS run's
+        # own watchlist/screener pool — the same resolve_ticker_by_substring() machinery
+        # already built and tested for the broker-events pipeline, including excluding
+        # the detected broker's own name as a candidate subject. This is a real,
+        # documented trade-off: it narrows Investing.com-sourced market-wide coverage to
+        # companies already in the pool (fewer items, but every one confirmed genuinely
+        # LSE-relevant) rather than the previous unfiltered/unverified global feed.
+        # market_wide_items (Google News) is NOT put through this same gate — its query
+        # is already scoped to "(LSE OR London Stock Exchange)" text, and requiring
+        # pool-membership there would defeat the point of covering LSE companies beyond
+        # the ~50-80 stock pool, which is what genuinely makes this section market-WIDE.
+        mw_ticker_lookup = build_name_ticker_lookup(
+            watchlist, screener.get("volume", []) + screener.get("gainers", []) + screener.get("losers", [])
+        )
+        ratings_resolved = {}  # link -> (ticker, company), only for CONFIRMED pool matches
+        confirmed_ratings_items = []
+        for it in ratings_items:
+            rb = detect_broker(it["title"])
+            r_ticker, r_company = resolve_ticker_by_substring(it["title"], mw_ticker_lookup, exclude_name=rb)
+            if r_ticker:
+                confirmed_ratings_items.append(it)
+                ratings_resolved[it["link"]] = (r_ticker, r_company)
+        market_wide_pool = confirmed_ratings_items + market_wide_items
         market_wide_pool = [it for it in market_wide_pool if passes_news_filters(it.get("pubDate"))]
         now_iso_mw = datetime.now(timezone.utc).isoformat()
         for it in market_wide_pool:
@@ -2068,10 +2166,11 @@ def main():
             # belongs in the same alert stream rather than being silently dropped.
             if category not in ("upgrade", "downgrade", "target", "target_raise", "target_cut", "initiation", "reiteration"):
                 continue
+            resolved = ratings_resolved.get(it["link"])
             market_wide_enriched.append({
                 **it,
-                "ticker": "MARKET",
-                "company": "",
+                "ticker": resolved[0] if resolved else "MARKET",
+                "company": resolved[1] if resolved else "",
                 "category": category,
                 "broker": detect_broker(it["title"]),
                 "detectedAt": now_iso_mw,
@@ -2099,6 +2198,18 @@ def main():
         y_items, _ = fetch_feed(yahoo_news_url(ticker))
         rb_items, _ = fetch_feed(reuters_bloomberg_url(name))
         matched_ratings = [it for it in ratings_items if name.lower() in it["title"].lower()]
+        # g_items/rb_items come from a Google News keyword SEARCH — Google matches
+        # against full article content, not just the headline, so a result can surface
+        # here without the searched company ever being named in its OWN title.
+        # Confirmed live: a "Kooth" search returned headlines actually about 3i Group
+        # and Hays, both mistagged as Kooth news/target items. Requiring the company's
+        # own (cleaned) name to appear in the item's title closes that gap — the same
+        # check matched_ratings already applies above. y_items (Yahoo's own per-ticker
+        # feed, already ticker-scoped by Yahoo itself, not a keyword search) is left
+        # unfiltered — it isn't the same kind of source and doesn't have this failure mode.
+        _cleaned_name = clean_company_name(name).lower()
+        g_items = [it for it in g_items if _cleaned_name in it.get("title", "").lower()]
+        rb_items = [it for it in rb_items if _cleaned_name in it.get("title", "").lower()]
         combined = g_items + y_items + rb_items + matched_ratings
         combined = [it for it in combined if passes_news_filters(it.get("pubDate"))]
         # Purely a count of real, already-published items mentioning this stock today
