@@ -21,6 +21,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+from html.parser import HTMLParser
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
@@ -987,12 +988,370 @@ def fetch_gb_screener(sort_field, sort_type="DESC", count=10):
         return []
 
 
-def fetch_lse_screener():
+def fetch_lse_screener(raw_count=10):
     return {
-        "volume": fetch_gb_screener("dayvolume", "DESC", 10),
-        "gainers": fetch_gb_screener("percentchange", "DESC", 10),
-        "losers": fetch_gb_screener("percentchange", "ASC", 10),
+        "volume": fetch_gb_screener("dayvolume", "DESC", raw_count),
+        "gainers": fetch_gb_screener("percentchange", "DESC", raw_count),
+        "losers": fetch_gb_screener("percentchange", "ASC", raw_count),
     }
+
+
+# =========================================================================
+# FTSE 100 / FTSE 250 universe — restricts the market-wide screener (and
+# everything downstream of it: News on Movers, 5-Day Uptrend, Broker
+# Target Prices, and — via the shared ticker_lookup pool — Market-wide
+# Broker Alerts) to genuine FTSE 350 constituents, instead of Yahoo's
+# whole LSE universe (which includes AIM micro-caps with no relation to
+# either index — confirmed live: Forgent, Tower Resources, Premier
+# African Minerals were all appearing under "LSE Screener" despite none
+# being FTSE 100/250 members).
+# =========================================================================
+
+FTSE100_CONSTITUENTS_URL = "https://yfiua.github.io/index-constituents/constituents-ftse100.json"
+FTSE250_WIKI_API_URL = (
+    "https://en.wikipedia.org/w/api.php?action=parse&page=FTSE_250_Index"
+    "&format=json&prop=text"
+)
+FTSE_UNIVERSE_CACHE_FILE = os.path.join(STATE_DIR, "ftse_universe.json")
+FTSE_UNIVERSE_MAX_AGE_HOURS = 24  # index membership changes quarterly at most
+FTSE100_EXPECTED_RANGE = (85, 115)   # plausible row-count band; real value is ~100
+FTSE250_EXPECTED_RANGE = (210, 290)  # plausible row-count band; real value is ~250
+_TICKER_SHAPE_RE = re.compile(r"^[A-Z0-9]{1,5}[./]?[A-Z0-9]{0,3}$")
+
+
+# --- Pure parsers: no I/O, no network, fully unit-testable against saved
+# fixtures built from genuinely captured real source data. Each returns a
+# list of {"name": str, "ticker": str} dicts, or raises on structurally
+# unparseable input (caught by the fetch_* wrappers below). -------------
+
+def _parse_ftse100_json(raw_text):
+    """
+    Parses yfiua/index-constituents' FTSE 100 JSON — confirmed by direct
+    live fetch during development to be a flat `[{"Symbol":..,"Name":..}]`
+    list; tested against that exact captured real response
+    (fixtures/ftse100_yfiua_real_response.json).
+    """
+    data = json.loads(raw_text)
+    rows = []
+    for row in data:
+        name = (row.get("Name") or "").strip()
+        symbol = (row.get("Symbol") or "").strip().upper()
+        ticker = symbol.rsplit(".L", 1)[0] if symbol.endswith(".L") else symbol
+        rows.append({"name": name, "ticker": ticker})
+    return rows
+
+
+def _parse_ftse250_wiki_html(raw_html):
+    """
+    Parses MediaWiki's rendered HTML for the FTSE_250_Index article,
+    identifying the constituents table by its HEADER CONTENT ("company"
+    AND "ticker" both present) rather than by position on the page — the
+    article also contains two unrelated historical annual-return tables,
+    and the constituents table's position could shift with future edits.
+    Never assumes a fixed table index.
+
+    Tested against fixtures/ftse250_wikipedia_real_data.html — a
+    reconstruction using genuinely captured real constituent data (all
+    250 real company/ticker/sector rows, fetched and transcribed from
+    the live page during development) wrapped in standard, well-
+    documented MediaWiki wikitable HTML conventions. The DATA is real
+    and verified; the exact markup shape has NOT been independently
+    confirmed against a live call to this specific API endpoint from any
+    environment available during development (no network path to
+    Wikipedia's API existed there) — see fetch_ftse250_constituents()
+    for how this gap is handled: aggressive validation, safe fallback to
+    cached data, and an explicit first-live-run verification note.
+    """
+    parser = _WikiTableParser()
+    parser.feed(raw_html)
+    table = _find_constituents_table(parser.tables)
+    if table is None:
+        raise ValueError("constituents table not found (no table header contained both 'company' and 'ticker')")
+    rows = []
+    for row in table[1:]:
+        if len(row) >= 2:
+            rows.append({"name": row[0].strip(), "ticker": row[1].strip().upper()})
+    return rows
+
+
+class _WikiTableParser(HTMLParser):
+    """
+    Minimal HTML table parser (stdlib only, no new dependency) — collects
+    EVERY table on a page as a list of rows, each row a list of cell
+    strings. Identifying which table is the constituents table happens
+    separately (_find_constituents_table), after parsing completes.
+    """
+    def __init__(self):
+        super().__init__()
+        self.tables = []
+        self._cur_table = None
+        self._cur_row = None
+        self._cur_cell_parts = None
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "table":
+            self._cur_table = []
+        elif tag == "tr" and self._cur_table is not None:
+            self._cur_row = []
+        elif tag in ("td", "th") and self._cur_row is not None:
+            self._cur_cell_parts = []
+
+    def handle_endtag(self, tag):
+        if tag == "table" and self._cur_table is not None:
+            self.tables.append(self._cur_table)
+            self._cur_table = None
+        elif tag == "tr" and self._cur_row is not None:
+            if self._cur_table is not None:
+                self._cur_table.append(self._cur_row)
+            self._cur_row = None
+        elif tag in ("td", "th") and self._cur_cell_parts is not None:
+            if self._cur_row is not None:
+                self._cur_row.append("".join(self._cur_cell_parts).strip())
+            self._cur_cell_parts = None
+
+    def handle_data(self, data):
+        if self._cur_cell_parts is not None:
+            self._cur_cell_parts.append(data)
+
+
+def _find_constituents_table(tables):
+    """Finds the table whose header row mentions BOTH "company" and
+    "ticker" (case-insensitive) — never assumes table position. Returns
+    None if no such table exists."""
+    for table in tables:
+        if not table:
+            continue
+        header = " ".join(table[0]).lower()
+        if "company" in header and "ticker" in header:
+            return table
+    return None
+
+
+def _validate_constituent_rows(rows, index_label, expected_range):
+    """
+    Generic validator applied identically to both FTSE 100 and FTSE 250
+    parsed row lists. Checks, in order:
+      - row count plausibly within expected_range
+      - every row has a non-empty name and a ticker matching a permissive
+        real-ticker shape (letters/digits, optional single "." or "/"
+        separator — covers UK conventions like "BP.", "BT/A")
+      - no duplicate tickers
+    Tolerates a SMALL number of individually malformed rows (parsing
+    imperfections on a handful of entries out of ~100-250 shouldn't
+    invalidate an otherwise-good fetch) but rejects if more than 5% of
+    rows are malformed, or if any ticker is duplicated (a duplicate
+    suggests the parse genuinely went wrong, not just an isolated
+    formatting quirk).
+
+    Returns (is_valid: bool, issues: list[str]) — issues always explains
+    why when is_valid is False.
+    """
+    issues = []
+    lo, hi = expected_range
+    if not (lo <= len(rows) <= hi):
+        issues.append(f"{index_label}: row count {len(rows)} outside plausible range [{lo}, {hi}]")
+        return False, issues
+
+    seen_tickers = set()
+    malformed = 0
+    for row in rows:
+        name = (row.get("name") or "").strip()
+        ticker = (row.get("ticker") or "").strip().upper()
+        if not name or not ticker or not _TICKER_SHAPE_RE.match(ticker):
+            malformed += 1
+            continue
+        if ticker in seen_tickers:
+            issues.append(f"{index_label}: duplicate ticker '{ticker}'")
+            return False, issues
+        seen_tickers.add(ticker)
+
+    if malformed:
+        issues.append(f"{index_label}: {malformed}/{len(rows)} malformed row(s) (missing name or invalid ticker shape)")
+        if malformed > len(rows) * 0.05:
+            return False, issues
+
+    return True, issues
+
+
+# --- I/O wrappers: fetch -> parse -> validate. Each returns a set of
+# cleaned company names on success, or None on ANY failure — callers
+# must treat None as "couldn't determine this run", never as "confirmed
+# empty universe". ------------------------------------------------------
+
+def fetch_ftse100_constituents():
+    try:
+        raw = http_get(FTSE100_CONSTITUENTS_URL)
+        rows = _parse_ftse100_json(raw)
+    except Exception as e:
+        print(f"  ! FTSE 100 fetch/parse failed: {e}", file=sys.stderr)
+        return None
+    is_valid, issues = _validate_constituent_rows(rows, "FTSE100", FTSE100_EXPECTED_RANGE)
+    for msg in issues:
+        print(f"  {'!' if not is_valid else '~'} {msg}", file=sys.stderr)
+    if not is_valid:
+        return None
+    return {clean_company_name(r["name"]).lower() for r in rows if r["name"]}
+
+
+def fetch_ftse250_constituents():
+    """
+    See _parse_ftse250_wiki_html's docstring for the important caveat:
+    the exact markup shape this expects has not been independently
+    confirmed against a live call to Wikipedia's API from any
+    development environment available. This function's job is to make
+    that gap SAFE, not to pretend it doesn't exist: validation is
+    aggressive (row count, per-row shape, duplicate tickers), and ANY
+    failure — fetch, parse, or validation — returns None, which
+    load_ftse_universe() treats as "keep whatever was already cached",
+    never as license to wipe or corrupt the existing universe.
+    """
+    try:
+        raw = http_get(FTSE250_WIKI_API_URL)
+        data = json.loads(raw)
+        html_content = data["parse"]["text"]["*"]
+        rows = _parse_ftse250_wiki_html(html_content)
+    except Exception as e:
+        print(f"  ! FTSE 250 fetch/parse failed: {e}", file=sys.stderr)
+        return None
+    is_valid, issues = _validate_constituent_rows(rows, "FTSE250", FTSE250_EXPECTED_RANGE)
+    for msg in issues:
+        print(f"  {'!' if not is_valid else '~'} {msg}", file=sys.stderr)
+    if not is_valid:
+        return None
+    return {clean_company_name(r["name"]).lower() for r in rows if r["name"]}
+
+
+def load_ftse_universe(path=None, now=None):
+    """
+    Returns (names_set, source_description) for the combined FTSE 100 +
+    FTSE 250 universe used to scope the market-wide screener to genuine
+    FTSE 350 constituents. Re-fetches at most once every
+    FTSE_UNIVERSE_MAX_AGE_HOURS — index membership changes quarterly at
+    most, so this is deliberately kept OUT of the normal 5-minute poll
+    cadence (a fresh cache short-circuits to zero network calls).
+
+    Fail-safe contract, in priority order — bad or missing source data
+    must NEVER wipe or corrupt an existing good universe:
+    1. Fresh cache -> used directly.
+    2. Both sources fetch AND validate successfully -> combined, compared
+       against the previous cached list for turnover, cached, used.
+    3. Only FTSE 100 succeeds -> FTSE-100-only (a real improvement over
+       no filtering), cached as partial, logged clearly.
+    4. Either/both fail validation or fetch, but ANY previous cache
+       exists (even stale, even partial) -> that previous cache is kept
+       and reused UNCHANGED. A failed refresh attempt never overwrites
+       good data with nothing or with bad data.
+    5. Both fail and no cache exists at all -> returns (None,
+       "unavailable"); callers MUST skip FTSE filtering entirely this
+       run, never treat this as an empty-but-valid universe.
+
+    Every path logs: which source(s) were used, the timestamp, the row
+    count, the validation outcome, and whether a fallback was activated —
+    so production logs make the actual behaviour of any given run
+    inspectable after the fact, not just assumed.
+    """
+    path = path or FTSE_UNIVERSE_CACHE_FILE
+    now = now or datetime.now(timezone.utc)
+    cached = load_json(path, None)
+
+    if cached:
+        try:
+            fetched_at = datetime.fromisoformat(cached["fetched_at"])
+            age_hours = (now - fetched_at).total_seconds() / 3600
+            if age_hours < FTSE_UNIVERSE_MAX_AGE_HOURS:
+                print(f"FTSE universe: using fresh cache (source={cached.get('source')}, "
+                      f"{len(cached.get('names', []))} names, age={age_hours:.1f}h)")
+                return set(cached["names"]), cached.get("source", "cache")
+        except Exception:
+            pass  # corrupt/unexpected cache shape — fall through to refetch
+
+    ftse100_names = fetch_ftse100_constituents()
+    ftse250_names = fetch_ftse250_constituents()
+
+    if ftse100_names is not None and ftse250_names is not None:
+        combined = ftse100_names | ftse250_names
+        source = "ftse100+ftse250"
+    elif ftse100_names is not None:
+        combined = ftse100_names
+        source = "ftse100_only"
+        print("  ! FTSE 250 unavailable this run — scoping to FTSE 100 only", file=sys.stderr)
+    elif cached:
+        combined = set(cached["names"])
+        source = cached.get("source", "cache") + "_stale"
+        print(f"  ! Both FTSE constituent sources failed this run — keeping previous cached universe "
+              f"unchanged (source={cached.get('source')}, {len(combined)} names, "
+              f"cached {cached.get('fetched_at')})", file=sys.stderr)
+        return combined, source
+    else:
+        print("  ! Both FTSE constituent sources failed and no cache exists — FTSE filtering skipped this run", file=sys.stderr)
+        return None, "unavailable"
+
+    # Turnover check against the previous known-good list, if one exists —
+    # a genuine quarterly rebalancing can legitimately change a handful of
+    # names, but a huge swing usually means something parsed wrong even
+    # though it technically passed the row-count/shape validation above.
+    # This does NOT block the update (a real large rebalance is possible
+    # and shouldn't get the tool stuck on stale data forever) — it's
+    # logged prominently for human review, nothing more.
+    if cached and cached.get("names"):
+        previous = set(cached["names"])
+        if previous:
+            unchanged = len(previous & combined)
+            turnover_pct = 100 * (1 - unchanged / len(previous))
+            level = "!" if turnover_pct > 15 else "~"
+            print(f"  {level} FTSE universe turnover vs previous cache: {turnover_pct:.1f}% "
+                  f"({len(previous)} -> {len(combined)} names)" +
+                  (" — unusually large, worth a manual check" if turnover_pct > 15 else ""))
+
+    print(f"FTSE universe: refreshed (source={source}, {len(combined)} names)")
+
+    try:
+        save_json(path, {
+            "names": sorted(combined),
+            "source": source,
+            "fetched_at": now.isoformat(),
+        })
+    except Exception as e:
+        print(f"  ! Could not cache FTSE universe: {e}", file=sys.stderr)
+
+    return combined, source
+
+
+def ftse_universe_status_label(source):
+    """
+    Maps load_ftse_universe()'s internal `source` string into one of four
+    CLEARLY DISTINCT, human-readable states — specifically so these never
+    get silently collapsed into each other, on the dashboard or anywhere
+    else:
+
+    - "healthy": both FTSE 100 and FTSE 250 are present and current
+      (fresh fetch this run, or a fresh — not stale — cache).
+    - "degraded_ftse100_only": FTSE 100 is CURRENT, but FTSE 250 is
+      entirely missing right now (fetch/validation failed AND no
+      previous FTSE 250 data exists to fall back on — e.g. the very
+      first production run, or every prior attempt also failed). This is
+      its own distinct state, separate from "stale_cache": it is not
+      reusing old data, it genuinely has none.
+    - "stale_cache": today's fetch(es) failed, but a previous
+      known-good cache (of whatever quality it was) is being reused.
+    - "unavailable": total failure and no cache of any kind exists;
+      screener filtering is skipped entirely this run (whole-LSE,
+      unrestricted).
+    - "not_checked": SKIP_MARKET_WIDE runs (the hourly FTSE350 job)
+      never touch FTSE universe status at all — distinct from all of
+      the above, not an error state.
+    """
+    if source == "not_checked":
+        return "not_checked"
+    if source == "unavailable":
+        return "unavailable"
+    if source.endswith("_stale"):
+        return "stale_cache"
+    if source == "ftse100_only":
+        return "degraded_ftse100_only"
+    if source == "ftse100+ftse250":
+        return "healthy"
+    return "unknown"
 
 
 def now_stamp():
@@ -1235,6 +1594,9 @@ def render_dashboard(data, watchlist):
     big_movers = data.get("bigMovers", [])
     market_wide = data.get("marketWide", [])
     market_research = data.get("marketResearch", {})
+    ftse_universe_status = data.get("ftseUniverseStatus", "not_checked")
+    ftse_universe_source = data.get("ftseUniverseSource", "not_checked")
+    ftse_universe_count = data.get("ftseUniverseCount", 0)
     last_poll_raw = data.get("lastPoll")
     if last_poll_raw:
         try:
@@ -1482,6 +1844,20 @@ def render_dashboard(data, watchlist):
     heatmap_pool.sort(key=lambda q: abs(q.get("changePct") or 0), reverse=True)
     heatmap_cells = "".join(heatmap_cell(q) for q in heatmap_pool[:20])
 
+    # Explicit, visible universe/source status — never let a drop from full FTSE
+    # 100+250 coverage down to FTSE-100-only, a stale cache, or fully unrestricted
+    # scoring stay invisible on the actual page just because the workflow log said so.
+    _universe_status_html = {
+        "healthy": ('status-ok', f'✅ Universe: FTSE 100 + FTSE 250 ({ftse_universe_count} constituents)'),
+        "degraded_ftse100_only": ('status-warn', f'⚠️ Universe: FTSE 100 ONLY — FTSE 250 source unavailable, no fallback data exists yet ({ftse_universe_count} constituents, screener coverage reduced)'),
+        "stale_cache": ('status-warn', f'⚠️ Universe: using last known-good cached list (source={esc_safe(ftse_universe_source)}, {ftse_universe_count} constituents) — today\'s refresh failed'),
+        "unavailable": ('status-bad', '🛑 Universe: UNAVAILABLE — screener showing the whole unrestricted LSE, no FTSE 100/250 filtering applied this run'),
+        "not_checked": ('status-warn', 'ℹ️ Universe: not checked this run (hourly-only cycle)'),
+        "unknown": ('status-warn', f'⚠️ Universe: unrecognized status (source={esc_safe(ftse_universe_source)})'),
+    }
+    _status_class, _status_text = _universe_status_html.get(ftse_universe_status, _universe_status_html["unknown"])
+    universe_status_line = f'<p class="{_status_class}">{_status_text}</p>'
+
     def research_card(stock):
         ticker, name = stock["ticker"], stock["name"]
         entry = market_research.get(ticker)
@@ -1559,6 +1935,9 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 .item a{{color:#e8eaed;text-decoration:none;font-size:17px;font-weight:600}}
 .item a:hover{{text-decoration:underline}}
 .meta{{color:#9aa0a6;font-size:15px;line-height:2.0}}
+.status-ok{{color:#50dc96;font-size:15px;font-weight:600}}
+.status-warn{{color:#f0b429;font-size:15px;font-weight:700}}
+.status-bad{{color:#ff6b6b;font-size:15px;font-weight:700}}
 .val{{color:#e8eaed;font-weight:700}}
 .badge{{border-radius:4px;padding:2px 8px;font-size:12px;font-weight:700;margin-right:4px}}
 .badge.upgrade{{background:#163a2a;color:#50dc96}}
@@ -1598,6 +1977,7 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 <div class="heatmap-grid">{heatmap_cells or '<span class="meta">No data yet</span>'}</div>
 
 <h2 id="screener">📊 LSE Screener (Volume / Gainers / Losers)</h2>
+{universe_status_line}
 <div class="screener-grid">
   <div><h3>Top Volume</h3><table><tr><th>#</th><th>Symbol</th><th>Volume</th></tr>{vol_rows}</table></div>
   <div><h3>Top Gainers</h3><table><tr><th>#</th><th>Symbol</th><th>Chg%</th></tr>{gain_rows}</table></div>
@@ -1983,12 +2363,56 @@ def main():
     screener_news = {}
     uptrend_stocks = []
     screener_targets = {}
+    ftse_universe_names = None
+    ftse_universe_source = "not_checked"  # SKIP_MARKET_WIDE runs never touch FTSE universe status at all
+    ftse_universe_status = "not_checked"
     ftse100 = fetch_ftse100()
 
     if not SKIP_MARKET_WIDE:
         ratings_items, _ = fetch_feed(ANALYST_RATINGS_FEED_URL)
         market_wide_items, _ = fetch_feed(market_wide_broker_news_url())
-        screener = fetch_lse_screener()
+
+        # Restrict the screener to genuine FTSE 100/250 constituents — Yahoo's raw LSE
+        # screener includes the whole market (AIM micro-caps and all), which is why
+        # names like "Forgent", "Tower Resources", "Premier African Minerals" were
+        # showing up under a section that's supposed to represent significant, broadly
+        # tracked UK stocks. ftse_universe_names is None only when BOTH sources failed
+        # AND no cache exists at all — in that specific case only, screener is left
+        # unrestricted rather than incorrectly filtering out everything.
+        #
+        # raw_count=60: micro-caps often dominate a RAW top-10-by-volume/change ranking
+        # (a penny stock's tiny price makes its share COUNT huge for a small pound
+        # value) — fetching only 10 candidates and then FTSE-filtering them could
+        # easily leave zero genuine FTSE 350 names. Over-fetching a larger pool first,
+        # THEN filtering, THEN trimming to the final display count of 10 mirrors the
+        # exact same over-fetch-then-filter pattern fetch_gb_screener already uses
+        # internally for its own liquidity filter.
+        ftse_universe_names, ftse_universe_source = load_ftse_universe()
+        ftse_universe_status = ftse_universe_status_label(ftse_universe_source)
+        screener = fetch_lse_screener(raw_count=60 if ftse_universe_names is not None else 10)
+        if ftse_universe_names is not None:
+            counts_before = {k: len(v) for k, v in screener.items()}
+            for section in ("volume", "gainers", "losers"):
+                filtered = [
+                    row for row in screener.get(section, [])
+                    if clean_company_name(row.get("name", "")).lower() in ftse_universe_names
+                ]
+                screener[section] = filtered[:10]
+            counts_after = {k: len(v) for k, v in screener.items()}
+            # The degraded (FTSE 100 only, no FTSE 250 at all) and stale-cache states are
+            # deliberately loud here — this is exactly the "silently appears healthy while
+            # coverage has quietly dropped" failure mode being guarded against. A plain
+            # "healthy" status logs at the normal level; anything else gets an unmistakable
+            # "!!!" marker so it can't blend into routine per-run output.
+            marker = "" if ftse_universe_status == "healthy" else "!!! "
+            print(f"{marker}FTSE universe filter (status={ftse_universe_status}, source={ftse_universe_source}, "
+                  f"{len(ftse_universe_names)} names): "
+                  f"volume {counts_before['volume']}->{counts_after['volume']}, "
+                  f"gainers {counts_before['gainers']}->{counts_after['gainers']}, "
+                  f"losers {counts_before['losers']}->{counts_after['losers']}")
+        else:
+            print(f"!!! FTSE universe UNAVAILABLE this run (status={ftse_universe_status}) — "
+                  f"screener left completely unrestricted (whole LSE, no FTSE filtering applied)", file=sys.stderr)
 
         # News for every stock ranked in Volume/Gainers/Losers, not just the watchlist —
         # deduped by symbol (a stock can appear in more than one list), one query each,
@@ -2255,7 +2679,14 @@ def main():
         for it in analyst_items:
             enriched.append({**it, "ticker": ticker, "company": name, "detectedAt": now_iso})
 
-        existing = items_by_ticker.get(ticker, [])
+        # Re-validate PERSISTED items against today's filter too, not just freshly
+        # fetched ones — an item that passed is_today_in_london() when it was first
+        # added stays in this list on every subsequent run otherwise, since it's
+        # never re-checked against the (now different) current day. Confirmed live:
+        # items from a previous day were still showing a full day later despite
+        # NEWS_SAME_LONDON_DAY_ONLY=True, because only "enriched" (this run's fresh
+        # items) went through passes_news_filters — "existing" never did.
+        existing = [it for it in items_by_ticker.get(ticker, []) if passes_news_filters(it.get("pubDate"))]
         merged = enriched + existing
         seen_links = set()
         deduped = []
@@ -2284,7 +2715,9 @@ def main():
 
     # Merge this run's market-wide items with previously stored ones (same pattern as
     # the per-ticker feed) so the dashboard shows recent history, not just this cycle.
-    existing_market_wide = data.get("marketWide", [])
+    # Existing/persisted items are re-validated against TODAY's filter too — same fix
+    # and same reasoning as the per-ticker merge above (see its comment).
+    existing_market_wide = [it for it in data.get("marketWide", []) if passes_news_filters(it.get("pubDate"))]
     merged_market_wide = market_wide_enriched + existing_market_wide
     seen_links_mw = set()
     deduped_market_wide = []
@@ -2312,6 +2745,13 @@ def main():
         "marketWide": deduped_market_wide,
         "marketResearch": market_research,
         "lastPoll": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+        # Explicit, persisted universe/source status — surfaced on the dashboard itself
+        # (not just in the workflow log) specifically so a drop from full FTSE 100+250
+        # coverage down to FTSE-100-only, a stale cache, or fully unrestricted can never
+        # be silently invisible to someone just looking at the live page.
+        "ftseUniverseStatus": ftse_universe_status,
+        "ftseUniverseSource": ftse_universe_source,
+        "ftseUniverseCount": len(ftse_universe_names) if ftse_universe_names is not None else 0,
     }
     save_json(DATA_FILE, data)
     render_dashboard(data, watchlist)
