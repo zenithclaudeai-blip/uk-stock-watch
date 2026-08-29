@@ -2147,6 +2147,25 @@ def main():
     save_json(DATA_FILE, data)
     render_dashboard(data, watchlist)
 
+    # --- Broker-events pipeline (additive, isolated, separate from state/
+    # data.json above) -------------------------------------------------
+    # Wrapped so ANY failure here — Yahoo down, Investing.com down, a
+    # parsing bug, a corrupt state/events.json — can NEVER stop the rest
+    # of this poll cycle. Everything below (screener messages, alerts,
+    # heartbeat, digest) still runs exactly as before regardless of what
+    # happens in this block. state/events.json is created automatically
+    # on first run if it doesn't exist yet; on later runs, existing
+    # events are enriched or added to, never duplicated or wiped.
+    try:
+        events_result = collect_and_persist_broker_events(
+            watchlist,
+            screener_rows=screener.get("volume", []) + screener.get("gainers", []) + screener.get("losers", []),
+        )
+        if not events_result.get("written"):
+            print(f"Broker events: not written this run (reason={events_result.get('reason')})")
+    except Exception as e:
+        print(f"  ! Broker events collection failed entirely — state/events.json left untouched: {e}", file=sys.stderr)
+
     screener_last_sent = seen_state.get("lastScreenerMessage", 0)
     screener_interval = SCREENER_MESSAGE_INTERVAL_SECONDS if _current_template() == "callmebot" else 0
     if time.time() - screener_last_sent >= screener_interval:
@@ -2395,26 +2414,45 @@ def make_source_event_id(source, **fields):
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
 
-def make_canonical_key(ticker, broker_canonical, date_str, old_rating, new_rating, old_target, new_target):
+def make_canonical_key(ticker, broker_canonical, date_str):
     """
-    Cross-source canonical key — deliberately excludes the source name,
-    since its purpose is letting independently-observed records of the
-    SAME real-world event collide and merge. Ticker is mandatory: without
-    it, two events can't be safely confirmed as the same company, so no
-    canonical key is produced.
+    Cross-source canonical key — identifies the underlying broker EVENT
+    (this broker, this company, this day), never the amount of
+    information currently known about it. Deliberately excludes rating
+    and target values entirely: those are DATA on the event, discovered
+    incrementally as sources report them, not part of the event's
+    identity. An event first seen via Yahoo (rating only) and later
+    enriched with a target from Investing.com must keep the exact same
+    ID throughout — baking rating/target into the key would make that
+    impossible, which was the bug in the original design.
 
-    Target values are represented as integer pence in the key (not the
-    float pounds stored in the event itself) to avoid floating-point
-    representation differences producing different keys for the same
-    real value.
+    Ticker is mandatory: without it, two events can't be safely confirmed
+    as the same company, so no canonical key is produced.
     """
     if not ticker:
+        return None
+    return f"LSE|{ticker.upper()}|{broker_canonical.upper()}|{date_str}"
+
+
+def make_conflict_key(ticker, broker_canonical, date_str, old_rating, new_rating, old_target, new_target):
+    """
+    Used ONLY to disambiguate a fragment that actively CONFLICTS with
+    whatever is already recorded under the canonical (ticker|broker|date)
+    key for that slot. A conflicting fragment must never collide with —
+    and must never overwrite — the canonical "confirmed" record, so it
+    gets its own distinct, deterministic ID built from the specific
+    rating/target values that make it different. Two runs reporting the
+    exact same conflicting fragment produce the same conflict key, so
+    repeats are still idempotent even in the conflict case.
+    """
+    base = make_canonical_key(ticker, broker_canonical, date_str)
+    if base is None:
         return None
     old_r = (old_rating or "NA").strip().upper()
     new_r = (new_rating or "NA").strip().upper()
     old_t = str(round(old_target * 100)) if old_target is not None else "NA"
     new_t = str(round(new_target * 100)) if new_target is not None else "NA"
-    return f"LSE|{ticker.upper()}|{broker_canonical.upper()}|{date_str}|{old_r}>{new_r}|{old_t}>{new_t}"
+    return f"{base}|CONFLICT|{old_r}>{new_r}|{old_t}>{new_t}"
 
 
 def _canonical_broker(name):
@@ -2505,6 +2543,48 @@ def normalize_investing_event(title, link, pub_date, ticker_lookup):
     }
 
 
+# Actions that structurally imply pre-existing broker coverage (the source
+# data explicitly stated an old rating, or the action is a change from one).
+# INITIATION structurally means the OPPOSITE: no prior coverage existed.
+# The two stories are semantically contradictory for the same broker/
+# company/day even when the specific rating TEXT doesn't happen to overlap
+# (e.g. an initiation fragment with no target vs an upgrade fragment with
+# no target — same-day fields never literally disagree, but the underlying
+# claims still can't both be true).
+_PRIOR_COVERAGE_ACTIONS = {"UPGRADE", "DOWNGRADE", "REITERATION", "RATING_CHANGE"}
+
+
+def _action_types_conflict(action1, action2):
+    """True if the two actions tell mutually exclusive stories about
+    whether prior coverage existed, regardless of what the rating/target
+    fields themselves say."""
+    if action1 == "INITIATION" and action2 in _PRIOR_COVERAGE_ACTIONS:
+        return True
+    if action2 == "INITIATION" and action1 in _PRIOR_COVERAGE_ACTIONS:
+        return True
+    return False
+
+
+def compute_evidence_fingerprint(e):
+    """
+    PURELY DESCRIPTIVE metadata — a snapshot of what's currently known
+    about an event, stored on the record for human/debugging visibility
+    only. Deliberately NEVER used for identity (event_id) or for deciding
+    whether two fragments should merge — a literal fingerprint-equality
+    matching rule was considered and rejected, since two genuinely
+    complementary fragments of the SAME real event (e.g. Yahoo's
+    rating-only report and Investing.com's target-only report) produce
+    different fingerprints by design, and requiring equality would have
+    prevented exactly the enrichment this pipeline exists to do.
+    """
+    action = e.get("action") or "NA"
+    old_r = (e.get("old_rating") or "NA").upper()
+    new_r = (e.get("new_rating") or "NA").upper()
+    old_t = f"{e['old_target']:.2f}" if e.get("old_target") is not None else "NA"
+    new_t = f"{e['new_target']:.2f}" if e.get("new_target") is not None else "NA"
+    return f"{action}|{old_r}>{new_r}|{old_t}>{new_t}"
+
+
 def _events_conflict(e1, e2):
     """
     True if two same-ticker/same-broker/same-day events actively
@@ -2512,8 +2592,13 @@ def _events_conflict(e1, e2):
     one side has no rating info and the other does (a target-only fragment
     naturally complementing a rating-only fragment); one has no target and
     the other does. Conflicting: both state a rating transition and they
-    differ; both state a target value and it differs.
+    differ; both state a target value and it differs; OR the two actions
+    structurally imply mutually exclusive stories (initiation vs. a
+    change to pre-existing coverage) even when the rating/target fields
+    themselves don't literally overlap — see _action_types_conflict.
     """
+    if _action_types_conflict(e1.get("action"), e2.get("action")):
+        return True
     if e1["new_rating"] and e2["new_rating"]:
         if (e1.get("old_rating") or "").lower() != (e2.get("old_rating") or "").lower():
             return True
@@ -2561,26 +2646,104 @@ def _merge_pair(e1, e2, canonical_key):
         # Only one side contributed target data — genuinely a partial
         # merge, not the strong two-source agreement MERGED_HIGH implies.
         merged["confidence"] = CONFIDENCE_MERGED_PARTIAL
+    merged["evidence_fingerprint"] = compute_evidence_fingerprint(merged)  # descriptive only, see docstring
     return merged
 
 
-def finalize_unmatched_event(e):
-    """Gives an unmatched (single-source) normalized event its own
-    deterministic event_id — canonical key when ticker/broker/date are all
-    known, otherwise the source-specific ID (never invented, never guessed)."""
+def finalize_unmatched_event(e, is_conflict_side=False):
+    """
+    Gives a normalized event its own deterministic event_id.
+
+    is_conflict_side=False (the default — a genuinely standalone
+    single-source event, no conflicting sibling encountered): uses the
+    clean canonical key (ticker|broker|date) when all three are known, so
+    a later compatible fragment from another source can find and enrich
+    this exact record. Falls back to the source-specific ID when ticker/
+    broker/date aren't all known (never invented, never guessed).
+
+    is_conflict_side=True (this event actively conflicts with another
+    fragment sharing the same ticker/broker/day): uses make_conflict_key
+    instead — deliberately NOT the clean canonical key, so a disputed
+    fragment can never collide with or silently overwrite the confirmed
+    canonical record for that slot.
+    """
     canonical = None
     if e.get("ticker") and e.get("broker") and e.get("date"):
-        canonical = make_canonical_key(
-            e["ticker"], e["broker"], e["date"],
-            e.get("old_rating"), e.get("new_rating"),
-            e.get("old_target"), e.get("new_target"),
-        )
+        if is_conflict_side:
+            canonical = make_conflict_key(
+                e["ticker"], e["broker"], e["date"],
+                e.get("old_rating"), e.get("new_rating"),
+                e.get("old_target"), e.get("new_target"),
+            )
+        else:
+            canonical = make_canonical_key(e["ticker"], e["broker"], e["date"])
     out = dict(e)
     out["event_id"] = canonical or e["source_event_id"]
     out["source"] = [e["source"]]
     out["source_url"] = [e["source_url"]]
     out["source_event_ids"] = [e["source_event_id"]]
+    out["evidence_fingerprint"] = compute_evidence_fingerprint(out)  # descriptive only, see docstring
     return out
+
+
+def _fold_compatible_fragment(acc, fragment):
+    """
+    Folds a raw normalized fragment into an accumulator that may itself be
+    either a raw fragment (first fold in a cluster) or an already-folded
+    (list-shaped source/source_url/source_event_ids) partial result from
+    earlier folds. Used ONLY inside deduplicate_and_merge's WITHIN-A-SINGLE-
+    RUN clustering — never for cross-run store reconciliation, which is
+    enrich_stored_event's job. Caller guarantees `fragment` is compatible
+    with `acc` (i.e. _events_conflict already checked) before calling this.
+    Returns the updated accumulator, always in finalized (list-shaped)
+    form, ready for another fold or final output.
+    """
+    def pick(a, b):
+        return a if a is not None else b
+
+    acc_source = acc.get("source")
+    acc_is_finalized = isinstance(acc_source, list)
+    acc_sources = list(acc_source) if acc_is_finalized else [acc_source]
+    acc_source_urls = list(acc.get("source_url")) if acc_is_finalized else [acc.get("source_url")]
+    acc_source_ids = list(acc.get("source_event_ids")) if acc_is_finalized else [acc.get("source_event_id")]
+    acc_had_own_target = acc.get("new_target") is not None  # BEFORE this fold — needed for the confidence rule below
+
+    merged = dict(acc)
+    merged["old_rating"] = pick(acc.get("old_rating"), fragment.get("old_rating"))
+    merged["new_rating"] = pick(acc.get("new_rating"), fragment.get("new_rating"))
+    merged["old_rating_bucket"] = pick(acc.get("old_rating_bucket"), fragment.get("old_rating_bucket"))
+    merged["new_rating_bucket"] = pick(acc.get("new_rating_bucket"), fragment.get("new_rating_bucket"))
+    merged["old_target"] = pick(acc.get("old_target"), fragment.get("old_target"))
+    merged["new_target"] = pick(acc.get("new_target"), fragment.get("new_target"))
+    merged["target_currency"] = pick(acc.get("target_currency"), fragment.get("target_currency"))
+    merged["target_change_pct"] = compute_target_change_pct(merged["old_target"], merged["new_target"])
+    merged["ticker"] = acc.get("ticker") or fragment.get("ticker")
+    merged["broker"] = acc.get("broker") or fragment.get("broker")
+    merged["date"] = acc.get("date") or fragment.get("date")
+    merged["company"] = pick(acc.get("company"), fragment.get("company"))
+    if not merged.get("action") or merged.get("action") == "NO_CHANGE":
+        merged["action"] = fragment.get("action")
+
+    if fragment["source"] not in acc_sources:
+        acc_sources.append(fragment["source"])
+    merged["source"] = sorted(set(acc_sources))
+    merged["source_url"] = acc_source_urls + [fragment["source_url"]]
+    merged["source_event_ids"] = acc_source_ids + [fragment["source_event_id"]]
+
+    # MERGED_HIGH requires genuine independent agreement — the accumulator
+    # already had its OWN target before this fold, AND this fragment
+    # brings its own target too (they must have agreed, since a conflict
+    # would already have excluded this fragment from the cluster). If only
+    # one side ever contributed a target, it's MERGED_PARTIAL — filled a
+    # gap, not independently corroborated. Same distinction enrich_stored_event
+    # uses, kept consistent deliberately.
+    fragment_had_own_target = fragment.get("new_target") is not None
+    if len(merged["source"]) > 1:
+        merged["confidence"] = CONFIDENCE_MERGED_HIGH if (acc_had_own_target and fragment_had_own_target) else CONFIDENCE_MERGED_PARTIAL
+
+    timestamps = [t for t in (acc.get("timestamp"), fragment.get("timestamp")) if t]
+    merged["timestamp"] = min(timestamps) if timestamps else None
+    return merged
 
 
 def deduplicate_and_merge(normalized_events):
@@ -2593,11 +2756,25 @@ def deduplicate_and_merge(normalized_events):
     Matching evidence, exactly as specified: ticker + canonical broker +
     calendar day are REQUIRED to even consider two events a candidate
     match — same ticker+broker+day alone is NOT assumed to mean the same
-    event; the actual rating/target transitions are then checked for
-    compatibility (_events_conflict) before merging. A broker making two
-    genuinely distinct actions on the same stock on the same day is
-    handled by evaluating every pair independently within a group, rather
-    than assuming the whole group is one event.
+    event; the actual rating/target/action transitions are then checked
+    for compatibility (_events_conflict) before merging.
+
+    CLUSTERING IS ORDER-INDEPENDENT BY DESIGN. An earlier version merged
+    fragments greedily in arrival order (first compatible pair found), which
+    was proven — by direct test — to produce DIFFERENT results depending on
+    the input list's order when 3+ fragments share a slot and compatibility
+    isn't transitive (fragment X compatible with Y, Y compatible with Z, but
+    X actively conflicts with Z — entirely possible when X/Z each state a
+    DIFFERENT rating and Y states none). In one observed ordering, greedy
+    pairing even produced two DIFFERENT merged records under the IDENTICAL
+    event_id — a genuine collision. Fixed here by computing the FULL
+    pairwise compatibility matrix for the group first: a fragment only
+    joins the shared "confirmed" cluster if it's compatible with EVERY
+    other fragment in that cluster, not just its first-encountered match.
+    Any fragment that conflicts with at least one other group member is
+    excluded from the cluster entirely and recorded as its own separate
+    conflict-side record instead — this is deterministic given the same
+    input SET, regardless of the order that set is provided in.
     """
     groups = {}
     unmatched = []
@@ -2611,37 +2788,53 @@ def deduplicate_and_merge(normalized_events):
     merged_events = []
     conflicts = []
     for key, group in groups.items():
-        if len(group) == 1:
+        n = len(group)
+        if n == 1:
             unmatched.append(finalize_unmatched_event(group[0]))
             continue
-        merged_indices = set()
-        for i in range(len(group)):
-            if i in merged_indices:
-                continue
-            for j in range(i + 1, len(group)):
-                if j in merged_indices:
-                    continue
-                e1, e2 = group[i], group[j]
-                if _events_conflict(e1, e2):
+
+        # Full pairwise compatibility matrix — computed once, independent
+        # of any arrival order, since it only depends on the SET of
+        # fragments present in this group.
+        conflicted_indices = set()
+        for i in range(n):
+            for j in range(i + 1, n):
+                if _events_conflict(group[i], group[j]):
                     conflicts.append({
                         "reason": "rating_or_target_mismatch",
                         "ticker": key[0], "broker": key[1], "date": key[2],
-                        "events": [e1, e2],
+                        "events": [group[i], group[j]],
                     })
-                    continue
-                canonical_key = make_canonical_key(
-                    e1["ticker"], e1["broker"], e1["date"],
-                    e1.get("old_rating") or e2.get("old_rating"),
-                    e1.get("new_rating") or e2.get("new_rating"),
-                    e1.get("old_target") if e1.get("old_target") is not None else e2.get("old_target"),
-                    e1.get("new_target") if e1.get("new_target") is not None else e2.get("new_target"),
-                )
-                merged_events.append(_merge_pair(e1, e2, canonical_key))
-                merged_indices.add(i)
-                merged_indices.add(j)
-        for i in range(len(group)):
-            if i not in merged_indices:
-                unmatched.append(finalize_unmatched_event(group[i]))
+                    conflicted_indices.add(i)
+                    conflicted_indices.add(j)
+
+        # A fragment qualifies for the ONE shared "confirmed" cluster only
+        # if it never conflicted with ANY other group member — not merely
+        # its first-encountered pairing. This is what makes the result
+        # independent of input order: the qualifying set is the same
+        # regardless of which order fragments were compared in.
+        cluster_indices = [i for i in range(n) if i not in conflicted_indices]
+
+        if len(cluster_indices) >= 2:
+            acc = group[cluster_indices[0]]
+            for idx in cluster_indices[1:]:
+                acc = _fold_compatible_fragment(acc, group[idx])
+            canonical_key = make_canonical_key(acc["ticker"], acc["broker"], acc["date"])
+            acc = dict(acc)
+            acc["event_id"] = canonical_key
+            acc["evidence_fingerprint"] = compute_evidence_fingerprint(acc)
+            merged_events.append(acc)
+        elif len(cluster_indices) == 1:
+            unmatched.append(finalize_unmatched_event(group[cluster_indices[0]]))
+        # else (0 qualify): every fragment in this group conflicted with at
+        # least one other — nothing to merge; all fall through to the
+        # conflict-side finalization below.
+
+        # Every fragment that conflicted with at least one other group
+        # member is finalized individually (conflict-suffixed ID) — once
+        # each, even if it was part of MULTIPLE conflicting pairs.
+        for i in conflicted_indices:
+            unmatched.append(finalize_unmatched_event(group[i], is_conflict_side=True))
 
     return merged_events, conflicts, unmatched
 
@@ -2738,22 +2931,20 @@ def atomic_write_json(path, data):
 def merge_events_into_store(store, new_events):
     """
     Append-only, idempotent merge. An event whose event_id is already
-    present is left COMPLETELY untouched — "if the same event is
-    encountered again, do nothing" is implemented literally, including
-    not enriching an existing single-source record even if this run's
-    merge could now add a second source to it. This is the simplest rule
-    that can never corrupt or silently rewrite something already stored;
-    a known, accepted limitation (not a bug) is that a previously-stored
-    single-source event won't retroactively gain a second source later —
-    documented here rather than hidden.
+    present is left COMPLETELY untouched — the SIMPLE variant, kept for
+    cases where pure append-only behavior is genuinely what's wanted.
+
+    Superseded as the entry point used by collect_and_persist_broker_events
+    by reconcile_events_with_store() below, which additionally allows an
+    existing record to be ENRICHED by a later-arriving compatible source —
+    see that function's docstring for why the plain append-only version
+    couldn't do this (event_id previously encoded rating/target, which is
+    now fixed at the make_canonical_key() level, but this function's own
+    "never touch an existing entry" behavior is still exactly right for
+    contexts where enrichment isn't wanted).
 
     Returns (updated_store, added_count). added_count == 0 on a repeated/
     duplicate run is the CORRECT outcome, not a failure.
-
-    Events are kept sorted by event_id after every merge — this makes the
-    file's byte content (not just its logical content) identical across
-    runs that produce the same event set, so idempotency can be verified
-    at the file level directly, not just by re-parsing and comparing.
     """
     existing_ids = {e["event_id"] for e in store["events"]}
     added = 0
@@ -2765,6 +2956,189 @@ def merge_events_into_store(store, new_events):
         added += 1
     store["events"].sort(key=lambda e: e["event_id"])
     return store, added
+
+
+def _event_conflicts_with_stored(candidate, stored):
+    """
+    Same compatibility test as _events_conflict, but comparing a freshly
+    normalized candidate fragment against an existing STORED event's
+    CURRENT fields (which may already reflect earlier enrichment from a
+    previous run, not just its original raw values). Includes the same
+    action-type contradiction check (see _action_types_conflict) — an
+    initiation reported on a later run against an already-stored
+    upgrade/downgrade/reiteration for the same slot is a genuine conflict
+    even if no rating/target field literally overlaps.
+    """
+    if _action_types_conflict(candidate.get("action"), stored.get("action")):
+        return True
+    if candidate.get("new_rating") and stored.get("new_rating"):
+        if (candidate.get("old_rating") or "").lower() != (stored.get("old_rating") or "").lower():
+            return True
+        if candidate["new_rating"].lower() != stored["new_rating"].lower():
+            return True
+    if candidate.get("new_target") is not None and stored.get("new_target") is not None:
+        if round(candidate["new_target"], 2) != round(stored["new_target"], 2):
+            return True
+    if candidate.get("old_target") is not None and stored.get("old_target") is not None:
+        if round(candidate["old_target"], 2) != round(stored["old_target"], 2):
+            return True
+    return False
+
+
+def enrich_stored_event(stored, candidate, now_iso):
+    """
+    Fills gaps in an existing stored event using a compatible candidate
+    fragment. Returns (new_event_dict, changed_bool) — never mutates the
+    original `stored` dict in place.
+
+    `candidate` here is always an already-FINALIZED event (from
+    finalize_unmatched_event or _merge_pair), meaning its "source",
+    "source_url", and "source_event_ids" fields are already lists (one
+    element for a single-fragment candidate, two for a same-run merge) —
+    NOT the raw normalized event's plain-string "source" field. Every
+    list field here is combined by concatenation/union, never by
+    wrapping an already-list value in another list.
+
+    If ALL of the candidate's source_event_ids are already present in the
+    stored event's source_event_ids (a pure repeat of previously-seen
+    evidence, e.g. re-polling the same day again), this is a genuine
+    no-op: the returned dict is the ORIGINAL stored dict, completely
+    unchanged — including last_seen, which must NOT bump on a repeat,
+    only on genuinely new evidence.
+
+    Otherwise: rating/target/currency fields are filled ONLY where
+    currently null (never overwrites a real value with a different one —
+    callers must have already confirmed compatibility via
+    _event_conflicts_with_stored before calling this), source/source_url/
+    source_event_ids are unioned (never replaced), confidence is
+    recalculated from the resulting source count and target completeness,
+    last_seen is bumped to now, and first_seen/event_id are always
+    preserved exactly as they were.
+    """
+    candidate_source_ids = candidate.get("source_event_ids") or [candidate.get("source_event_id")]
+    stored_source_ids = stored.get("source_event_ids", [])
+    if all(sid in stored_source_ids for sid in candidate_source_ids):
+        return stored, False  # pure repeat — nothing changes, not even last_seen
+
+    def pick(a, b):
+        return a if a is not None else b
+
+    enriched = dict(stored)
+    enriched["old_rating"] = pick(stored.get("old_rating"), candidate.get("old_rating"))
+    enriched["new_rating"] = pick(stored.get("new_rating"), candidate.get("new_rating"))
+    enriched["old_rating_bucket"] = pick(stored.get("old_rating_bucket"), candidate.get("old_rating_bucket"))
+    enriched["new_rating_bucket"] = pick(stored.get("new_rating_bucket"), candidate.get("new_rating_bucket"))
+    enriched["old_target"] = pick(stored.get("old_target"), candidate.get("old_target"))
+    enriched["new_target"] = pick(stored.get("new_target"), candidate.get("new_target"))
+    enriched["target_currency"] = pick(stored.get("target_currency"), candidate.get("target_currency"))
+    enriched["target_change_pct"] = compute_target_change_pct(enriched["old_target"], enriched["new_target"])
+    if enriched.get("company") is None:
+        enriched["company"] = candidate.get("company")
+    if not enriched.get("action") or enriched.get("action") == "NO_CHANGE":
+        enriched["action"] = candidate.get("action")
+
+    sources = list(stored.get("source", []))
+    for s in candidate.get("source", []):
+        if s not in sources:
+            sources.append(s)
+    enriched["source"] = sorted(set(sources))
+    enriched["source_url"] = list(stored.get("source_url", [])) + list(candidate.get("source_url", []))
+    enriched["source_event_ids"] = list(stored_source_ids) + [sid for sid in candidate_source_ids if sid not in stored_source_ids]
+
+    # MERGED_HIGH requires genuine independent agreement: the incoming
+    # candidate AND the already-stored record must EACH have reported
+    # their own target value (if they disagreed, _event_conflicts_with_stored
+    # would already have routed this to the conflict path, never reaching
+    # here) — that's a real second confirmation, not just a gap being
+    # filled. If only one side ever had target data at all, it's a
+    # MERGED_PARTIAL: useful combined information, but not independently
+    # corroborated by two sources. This mirrors the exact same distinction
+    # _merge_pair uses for a same-run merge — kept consistent deliberately.
+    candidate_had_target = candidate.get("new_target") is not None
+    stored_had_target_before = stored.get("new_target") is not None
+    if len(enriched["source"]) > 1:
+        if candidate_had_target and stored_had_target_before:
+            enriched["confidence"] = CONFIDENCE_MERGED_HIGH
+        else:
+            enriched["confidence"] = CONFIDENCE_MERGED_PARTIAL
+    # else: still single-source overall (shouldn't normally happen here, since
+    # reaching this function means a second source WAS just added) — left as-is
+    # defensively rather than asserted, since confidence display should never
+    # crash the pipeline over an edge case.
+
+    enriched["first_seen"] = stored.get("first_seen", now_iso)  # explicitly preserved, never changed
+    enriched["last_seen"] = now_iso
+    enriched["evidence_fingerprint"] = compute_evidence_fingerprint(enriched)  # recomputed to reflect new fields
+    return enriched, True
+
+
+def reconcile_events_with_store(store, candidate_events, now_iso=None):
+    """
+    The enrichment-aware entry point used by collect_and_persist_broker_events.
+    For each candidate event from THIS run (already carrying its event_id
+    from the normalize/merge stage):
+
+      - event_id not yet in the store -> appended as a brand-new record
+        (first_seen = last_seen = now).
+      - event_id already in the store, and the candidate is COMPATIBLE
+        with what's stored -> enriched in place (gaps filled, sources
+        unioned, confidence recalculated, last_seen bumped) via
+        enrich_stored_event() — unless it's a pure repeat of already-seen
+        evidence, which is a true no-op (see enrich_stored_event).
+      - event_id already in the store, but the candidate ACTIVELY
+        CONFLICTS with what's stored -> the stored record is NEVER
+        touched. The candidate is re-keyed via make_conflict_key() and
+        appended as its OWN separate record instead (or matched against
+        an existing conflict-side record with that same disambiguated
+        key, if this exact conflict was already seen before — so repeats
+        of a conflicting fragment are still idempotent, not re-appended).
+
+    Returns (updated_store, stats) where stats = {"added", "enriched",
+    "conflicts_recorded"}.
+    """
+    now_iso = now_iso or datetime.now(timezone.utc).isoformat()
+    events_by_id = {e["event_id"]: e for e in store["events"]}
+    added = 0
+    enriched_count = 0
+    conflicts_recorded = 0
+
+    for cand in candidate_events:
+        eid = cand["event_id"]
+        if eid not in events_by_id:
+            new_record = dict(cand)
+            new_record.setdefault("first_seen", now_iso)
+            new_record["last_seen"] = now_iso
+            events_by_id[eid] = new_record
+            added += 1
+            continue
+
+        stored = events_by_id[eid]
+        if _event_conflicts_with_stored(cand, stored):
+            conflict_key = make_conflict_key(
+                cand.get("ticker"), cand.get("broker"), cand.get("date"),
+                cand.get("old_rating"), cand.get("new_rating"),
+                cand.get("old_target"), cand.get("new_target"),
+            )
+            if conflict_key and conflict_key not in events_by_id:
+                new_record = dict(cand)
+                new_record["event_id"] = conflict_key
+                new_record.setdefault("first_seen", now_iso)
+                new_record["last_seen"] = now_iso
+                events_by_id[conflict_key] = new_record
+                added += 1
+                conflicts_recorded += 1
+            # else: this exact conflicting fragment was already recorded
+            # under its own conflict key — genuine no-op, still idempotent.
+            continue
+
+        new_stored, changed = enrich_stored_event(stored, cand, now_iso)
+        events_by_id[eid] = new_stored
+        if changed:
+            enriched_count += 1
+
+    updated_events = sorted(events_by_id.values(), key=lambda e: e["event_id"])
+    store["events"] = updated_events
+    return store, {"added": added, "enriched": enriched_count, "conflicts_recorded": conflicts_recorded}
 
 
 def fetch_yahoo_broker_events(watchlist):
@@ -2824,31 +3198,32 @@ def fetch_investing_broker_events(ticker_lookup):
 def collect_and_persist_broker_events(watchlist, screener_rows=None, dry_run=False, path=None):
     """
     ONE full poll-cycle pass: fetch both sources -> normalize -> dedupe/
-    merge -> load existing store -> add genuinely new events -> write
-    atomically. This is the single function a future main() would call;
-    it is NOT called from main() yet (see the module-load check in the
-    test suite).
+    merge (within this run) -> load existing store -> RECONCILE against
+    history (new records appended, compatible existing records enriched,
+    conflicting fragments kept separate) -> write atomically. Called from
+    main() as an additive, isolated step, wrapped so any failure here can
+    never stop the rest of the poll cycle — see main()'s own try/except
+    around this call.
 
     Failure handling, exactly as specified:
     - Yahoo fails -> proceeds using Investing.com's events only.
     - Investing.com fails -> proceeds using Yahoo's events only.
     - Both fail -> new_events is empty; the existing store is loaded and
-      re-saved (0 added) rather than skipped — safe because
-      merge_events_into_store only ever appends, so re-saving unchanged
-      content can never truncate or lose data.
+      re-saved (0 added, 0 enriched) rather than skipped — safe because
+      reconcile_events_with_store only ever appends or fills gaps, so
+      re-saving unchanged content can never truncate or lose data.
     - Existing store is CORRUPT -> persistence is skipped entirely this
       cycle; the corrupt file is left exactly as-is, loudly logged.
     - Write itself fails (disk full, permissions, etc) -> reported, the
       PREVIOUS file on disk is untouched (atomic_write_json guarantees
       this structurally, not just by convention).
 
-    Conflicting pairs (from deduplicate_and_merge) are never merged into
-    one event, but neither underlying single-source record is discarded —
-    both are individually persisted (each keeping its own original
-    confidence and event_id) via finalize_unmatched_event, exactly as
-    "conflicting events remain separate" requires. The conflict itself
-    (the fact that two records disagreed) is returned in the result dict
-    for logging/inspection, not stored as its own event-shaped record.
+    Conflicting pairs discovered WITHIN this run (from deduplicate_and_merge)
+    are finalized as individually conflict-keyed records before reaching
+    the store — never merged into one, never discarded. A candidate that
+    conflicts with something ALREADY IN THE STORE (discovered across runs,
+    e.g. a later day's report disagreeing with an earlier one) is handled
+    by reconcile_events_with_store itself, the same way.
 
     dry_run=True runs the full pipeline and returns the result WITHOUT
     writing anything to disk.
@@ -2856,17 +3231,23 @@ def collect_and_persist_broker_events(watchlist, screener_rows=None, dry_run=Fal
     path = path or EVENTS_STATE_FILE
     screener_rows = screener_rows or []
 
+    print("Broker events: collection started")
     yahoo_events = fetch_yahoo_broker_events(watchlist)
+    print(f"Broker events: Yahoo returned {len(yahoo_events)} event(s)")
     ticker_lookup = build_name_ticker_lookup(watchlist, screener_rows)
     investing_events = fetch_investing_broker_events(ticker_lookup)
+    print(f"Broker events: Investing.com returned {len(investing_events)} event(s)")
 
     all_normalized = yahoo_events + investing_events
+    print(f"Broker events: {len(all_normalized)} normalized candidate(s) before dedup/merge")
     merged, conflicts, unmatched = deduplicate_and_merge(all_normalized)
 
+    # `unmatched` already contains every conflict-side fragment, correctly
+    # finalized with is_conflict_side=True and deduplicated (deduplicate_and_merge
+    # handles this internally now — see its docstring). `conflicts` itself
+    # is kept only as pair-level diagnostic/logging info, not re-finalized
+    # here — doing so used to create duplicate conflict records.
     new_events = merged + unmatched
-    for c in conflicts:
-        for e in c["events"]:
-            new_events.append(finalize_unmatched_event(e))
 
     try:
         store = load_events_store(path)
@@ -2874,16 +3255,17 @@ def collect_and_persist_broker_events(watchlist, screener_rows=None, dry_run=Fal
         print(f"  ! events store CORRUPT — skipping persistence this cycle to avoid data loss: {e}", file=sys.stderr)
         return {
             "written": False, "reason": "existing_store_corrupt",
-            "new_events_found": len(new_events), "added": 0,
+            "new_events_found": len(new_events), "added": 0, "enriched": 0,
             "conflicts": conflicts, "store": None,
         }
 
-    updated_store, added = merge_events_into_store(store, new_events)
+    updated_store, stats = reconcile_events_with_store(store, new_events)
+    added, enriched_count = stats["added"], stats["enriched"]
 
     if dry_run:
         return {
             "written": False, "reason": "dry_run",
-            "new_events_found": len(new_events), "added": added,
+            "new_events_found": len(new_events), "added": added, "enriched": enriched_count,
             "conflicts": conflicts, "store": updated_store,
         }
 
@@ -2893,13 +3275,17 @@ def collect_and_persist_broker_events(watchlist, screener_rows=None, dry_run=Fal
         print(f"  ! events store write FAILED — previous file left untouched: {e}", file=sys.stderr)
         return {
             "written": False, "reason": "write_failed",
-            "new_events_found": len(new_events), "added": 0,
+            "new_events_found": len(new_events), "added": 0, "enriched": 0,
             "conflicts": conflicts, "store": None,
         }
 
+    print(
+        f"Broker events: added={added} enriched={enriched_count} conflicts={len(conflicts)} "
+        f"total_in_store={len(updated_store['events'])}"
+    )
     return {
         "written": True, "reason": "ok",
-        "new_events_found": len(new_events), "added": added,
+        "new_events_found": len(new_events), "added": added, "enriched": enriched_count,
         "conflicts": conflicts, "store": updated_store,
     }
 
