@@ -401,9 +401,9 @@
       "broker": "UBS",
       "action": "UPGRADE",
       "old_rating": null,
-      "new_rating": null,
+      "new_rating": "Neutral",
       "old_rating_bucket": null,
-      "new_rating_bucket": null,
+      "new_rating_bucket": "NEUTRAL",
       "old_target": null,
       "new_target": null,
       "target_currency": null,
@@ -413,9 +413,15 @@
       "source_event_ids": [
         "f19b21d86c9e39a5"
       ],
-      "evidence_fingerprint": "UPGRADE|NA>NA|NA>NA",
+      "evidence_fingerprint": "UPGRADE|NA>NEUTRAL|NA>NA",
       "first_seen": "2026-08-29T16:09:16.155864+00:00",
-      "last_seen": "2026-08-29T16:09:16.155864+00:00"
+      "last_seen": "2026-08-29T17:36:33.008109+00:00",
+      "source_refs": [
+        {
+          "source": "investing_com",
+          "source_event_id": "f19b21d86c9e39a5"
+        }
+      ]
     }
   ]
 }
