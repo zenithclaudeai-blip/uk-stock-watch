@@ -2161,6 +2161,47 @@ def compute_volume_ratio(volume, average_volume):
 HIGH_VOLUME_RATIO_THRESHOLD = 1.5  # today's volume at least 1.5x the published average
 OVEREXTENDED_RSI_THRESHOLD = 70    # standard RSI "overbought" reference level
 
+# DON'T CHASE warning thresholds — deliberately separate from
+# UPTREND_5DAY_THRESHOLD_PCT (5.0%, used for the "5-Day Uptrend" listing,
+# which just flags "notable"). This warning is about genuine chasing
+# risk, so it needs a materially higher bar for the move itself, PLUS at
+# least one other sign of being technically extended — reuses the
+# EXISTING OVEREXTENDED_RSI_THRESHOLD/HIGH_VOLUME_RATIO_THRESHOLD above
+# rather than inventing new ones. All three constants are grouped here
+# specifically so they're easy to find and adjust together later.
+DONT_CHASE_5DAY_MOVE_THRESHOLD_PCT = 15.0
+
+
+def compute_dont_chase_warning(change_pct_5d, rsi14, volume_ratio):
+    """
+    Returns None, or {"reasons": [str, ...]} — a purely factual pattern
+    match over data ALREADY computed elsewhere (5-day price change, RSI,
+    volume ratio), never a new score and never a buy/sell instruction.
+    Fires only when the 5-day move itself clears
+    DONT_CHASE_5DAY_MOVE_THRESHOLD_PCT AND at least one of RSI/volume
+    also independently clears its own existing threshold — a big move
+    alone, with no other sign of being stretched, is not flagged; that's
+    just what a normal healthy trend looks like. Every reason shown is
+    a specific number from real fetched/calculated data, not a generic
+    label. Missing data (any input None) is handled safely: that
+    specific factor simply can't contribute, and if the move itself is
+    unknown, no warning is produced at all — absence of data is never
+    treated as a signal, exactly as elsewhere in this codebase.
+    """
+    if change_pct_5d is None or abs(change_pct_5d) < DONT_CHASE_5DAY_MOVE_THRESHOLD_PCT:
+        return None
+    reasons = [f"{'+' if change_pct_5d >= 0 else ''}{change_pct_5d:.1f}% over 5 days"]
+    extended = False
+    if rsi14 is not None and rsi14 >= OVEREXTENDED_RSI_THRESHOLD:
+        reasons.append(f"RSI {rsi14:.0f}")
+        extended = True
+    if volume_ratio is not None and volume_ratio >= HIGH_VOLUME_RATIO_THRESHOLD:
+        reasons.append(f"Volume {volume_ratio:.1f}× average")
+        extended = True
+    if not extended:
+        return None  # a large move alone, with no overextension signal, isn't flagged
+    return {"reasons": reasons}
+
 
 def compute_opportunity_flags(changePct, volume_ratio, above_ma20, rsi14, has_news):
     """
@@ -2465,6 +2506,87 @@ def format_epoch_date(epoch_seconds):
         return dt.strftime("%d %b %Y")
     except Exception:
         return None
+
+
+# Urgency thresholds for the Upcoming Catalysts section — grouped here,
+# easy to find and adjust. Deliberately icon-based, not color-only.
+CATALYST_URGENT_DAYS = 2   # 🔴 today/in the next couple of days
+CATALYST_SOON_DAYS = 7     # 🟡 this week
+CATALYST_URGENCY_LABELS = {
+    "urgent": "🔴 Imminent",
+    "soon": "🟡 This week",
+    "upcoming": "⚪ Upcoming",
+}
+
+
+def collect_catalyst_events(quotes, screener, watchlist):
+    """
+    Pulls together every known upcoming earnings/ex-dividend date across
+    BOTH the watchlist and screener-ranked pools — same combined-pool,
+    dedupe-by-bare-ticker pattern already established (see the GLEN
+    merge-lookup fix and bare_ticker's own docstring), reused here rather
+    than building a new aggregation approach. A stock present in both
+    pools contributes each event only once.
+
+    Purely calendar/scheduling data — never affected by whether the
+    market is currently open, so this section is not wrapped in any of
+    the market-hours-aware empty-state logic used for live price data
+    elsewhere; a genuinely empty result here just means no known dates,
+    regardless of what time it is.
+
+    Stale/past dates are excluded (reuses the exact same "past = not
+    genuinely upcoming" rule as format_epoch_date, applied independently
+    here since this also needs the numeric days-until, not just a
+    display string). Missing dates are simply absent, never fabricated.
+
+    Returns a list of {"ticker", "name", "eventType" ("earnings" or
+    "ex_dividend"), "date", "daysUntil", "urgency"}, sorted soonest-first.
+    """
+    def _event_or_none(epoch_seconds, event_type, ticker, name):
+        if not epoch_seconds:
+            return None
+        try:
+            dt_london = datetime.fromtimestamp(epoch_seconds, tz=timezone.utc).astimezone(LONDON_TZ)
+        except (ValueError, OSError, OverflowError, TypeError):
+            return None  # a malformed epoch never breaks the whole section
+        today_london = datetime.now(timezone.utc).astimezone(LONDON_TZ).date()
+        if dt_london.date() < today_london:
+            return None  # stale/past — never shown as "upcoming"
+        days_until = (dt_london.date() - today_london).days
+        if days_until <= CATALYST_URGENT_DAYS:
+            urgency = "urgent"
+        elif days_until <= CATALYST_SOON_DAYS:
+            urgency = "soon"
+        else:
+            urgency = "upcoming"
+        return {
+            "ticker": ticker, "name": name, "eventType": event_type,
+            "date": dt_london.strftime("%d %b %Y"), "daysUntil": days_until, "urgency": urgency,
+        }
+
+    pool = {}  # bare ticker -> (display_ticker, name, data_dict) — first pool wins, matching the existing Broker Target Prices pattern
+    for q in screener.get("volume", []) + screener.get("gainers", []) + screener.get("losers", []):
+        symbol = q.get("symbol", "")
+        if not symbol:
+            continue
+        bare = bare_ticker(symbol)
+        if bare not in pool:
+            pool[bare] = (symbol, q.get("name") or symbol, q)
+    for stock in watchlist:
+        ticker = stock["ticker"]
+        bare = bare_ticker(ticker)
+        if bare not in pool:
+            pool[bare] = (ticker, stock["name"], quotes.get(ticker, {}))
+
+    events = []
+    for bare, (ticker, name, q) in pool.items():
+        for epoch_key, event_type in (("nextEarningsDate", "earnings"), ("exDividendDate", "ex_dividend")):
+            evt = _event_or_none(q.get(epoch_key), event_type, ticker, name)
+            if evt:
+                events.append(evt)
+
+    events.sort(key=lambda e: e["daysUntil"])
+    return events
 
 
 EVIDENCE_LABEL_TEXT = {
@@ -3091,8 +3213,17 @@ def render_stock_research_html(
             f'{chg_arrow}{abs(change_pct or 0):.2f}%</span>'
         )
 
-    # --- CORE: Volume × average (always visible) ---------------------------------------------
+    # --- CORE: DON'T CHASE warning (always visible, shown first when present) ---------------------------------------------
     core_lines = []
+    dont_chase = compute_dont_chase_warning(change_pct_5d, rsi14, vol_ratio)
+    if dont_chase:
+        core_lines.append(
+            f'<div class="meta" style="color:#f0997b;font-weight:700;">🔥 DON\'T CHASE</div>'
+            f'<div class="meta" style="font-size:13px;">{esc(" · ".join(dont_chase["reasons"]))}</div>'
+            f'<div class="meta" style="font-size:12px;opacity:0.85;">Reason: an unusually large 5-day move combined with a sign of being technically extended — not a buy/sell instruction, a factual pattern worth being aware of before acting on the move itself.</div>'
+        )
+
+    # --- CORE: Volume × average (always visible) ---------------------------------------------
     if volume is not None:
         ratio_str = f' (<span class="val">{vol_ratio:.1f}×</span> average)' if vol_ratio is not None else ""
         core_lines.append(f'<div class="meta">📊 volume: <span class="val">{volume:,}</span>{ratio_str}</div>')
@@ -3782,6 +3913,22 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
             f'🎯 target {target:.2f}{rec_html}</div>'
         )
 
+    # Upcoming Catalysts — same combined-pool source as Broker Target
+    # Prices just above (quotes + screener), computed via the dedicated
+    # collect_catalyst_events() so this rendering code stays purely
+    # presentational, matching how every other section here separates
+    # data-gathering from display.
+    catalyst_events = collect_catalyst_events(quotes, screener, watchlist)
+    EVENT_TYPE_LABELS = {"earnings": "📊 Earnings", "ex_dividend": "💰 Ex-dividend"}
+    catalyst_rows = "".join(
+        f'<tr><td><b>{esc(e["ticker"])}</b> ({esc(e["name"])})</td>'
+        f'<td>{esc(EVENT_TYPE_LABELS.get(e["eventType"], e["eventType"]))}</td>'
+        f'<td>{esc(e["date"])}</td>'
+        f'<td>{e["daysUntil"]} day{"s" if e["daysUntil"] != 1 else ""}</td>'
+        f'<td>{esc(CATALYST_URGENCY_LABELS.get(e["urgency"], ""))}</td></tr>'
+        for e in catalyst_events
+    )
+
     def heatmap_cell(q):
         chg = q.get("changePct") or 0
         raw_symbol = q.get("symbol", "")
@@ -4122,6 +4269,7 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 <a href="#mover-news" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📰 Mover News</a>
 <a href="#uptrend" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📈 5-Day Uptrend</a>
 <a href="#targets" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🎯 Target Prices</a>
+<a href="#catalysts" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🗓️ Catalysts</a>
 <a href="#movers-today" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🔥 Moving Today</a>
 <a href="#watchlist" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">👀 Watchlist</a>
 <a href="#market-research" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🔎 Market Research</a>
@@ -4152,6 +4300,10 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 <h2 id="targets">🎯 Broker Target Prices</h2>
 <p class="meta">Real, already-published broker consensus targets from Yahoo's aggregation — not generated by this tool. Covers both your watchlist and today's screener-ranked stocks (Volume/Gainers/Losers).</p>
 <div class="quotes">{target_price_rows or '<span class="meta">No target price data available yet.</span>'}</div>
+
+<h2 id="catalysts">🗓️ Upcoming Catalysts</h2>
+<p class="meta">Real, already-published earnings and ex-dividend dates from Yahoo's calendar data — informational only, not a suggestion to act around any of these dates. Covers both your watchlist and today's screener-ranked stocks.</p>
+<table><tr><th>Stock</th><th>Event</th><th>Date</th><th>Days until</th><th>Urgency</th></tr>{catalyst_rows or '<tr><td colspan="5" class="meta">No known upcoming earnings or ex-dividend dates right now.</td></tr>'}</table>
 
 <h2 id="movers-today">🔥 Already Moving Today (watchlist, ±{BIG_MOVER_THRESHOLD_PCT:.0f}%+)</h2>
 <p class="meta">A fact about what already happened today — not a forecast of what happens next.</p>
