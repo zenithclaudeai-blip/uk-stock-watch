@@ -1450,18 +1450,31 @@ def fetch_gb_screener(sort_field, sort_type="DESC", count=10):
             })
             if len(out) >= count:
                 break
-        return out
+        return out, "ok"
     except Exception as e:
         print(f"  ! screener failed (sortField={sort_field}): {e}", file=sys.stderr)
-        return []
+        return [], "failed"
 
 
 def fetch_lse_screener(raw_count=10):
-    return {
-        "volume": fetch_gb_screener("dayvolume", "DESC", raw_count),
-        "gainers": fetch_gb_screener("percentchange", "DESC", raw_count),
-        "losers": fetch_gb_screener("percentchange", "ASC", raw_count),
-    }
+    """
+    Returns (screener_dict, status_dict) — deliberately SEPARATE from each
+    other. Before this, fetch_gb_screener returned an empty list for BOTH
+    "the fetch worked and genuinely found nothing" and "the fetch broke
+    entirely" — indistinguishable to any caller, and the only trace of a
+    real failure was a line in the server log nobody looking at the
+    dashboard would ever see. status_dict lets the rendered page show a
+    real fetch failure as a real fetch failure, distinct from "nothing to
+    show right now" — the person using this dashboard should never have
+    to guess which one they're looking at.
+    """
+    volume_rows, volume_status = fetch_gb_screener("dayvolume", "DESC", raw_count)
+    gainers_rows, gainers_status = fetch_gb_screener("percentchange", "DESC", raw_count)
+    losers_rows, losers_status = fetch_gb_screener("percentchange", "ASC", raw_count)
+    return (
+        {"volume": volume_rows, "gainers": gainers_rows, "losers": losers_rows},
+        {"volume": volume_status, "gainers": gainers_status, "losers": losers_status},
+    )
 
 
 # =========================================================================
@@ -3254,6 +3267,43 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
     else:
         last_poll = "never"
         last_poll_iso_z = ""
+
+    # Was THIS run's data actually fetched during UK market hours? Reuses the
+    # exact same _is_uk_market_hours() already used for pipeline health —
+    # not a separate calculation. None (unknown) when last_poll couldn't be
+    # parsed; treated as "don't assert either way" rather than guessing.
+    market_hours_at_generation = None
+    if last_poll_raw:
+        try:
+            market_hours_at_generation = _is_uk_market_hours(_last_poll_dt)
+        except Exception:
+            market_hours_at_generation = None
+
+    screener_status = data.get("screenerStatus", {})
+
+    def screener_empty_state_html(section_key):
+        """
+        Distinguishes the three genuinely different reasons a section can
+        show zero rows — previously all three collapsed into the same
+        generic "No data yet" text, making a real fetch failure
+        indistinguishable from a quiet, fully-working day. Never invents a
+        reason: when market-hours context itself couldn't be determined,
+        it says so rather than guessing.
+        """
+        status = screener_status.get(section_key, "not_checked")
+        if status == "failed":
+            return '<tr><td colspan="3" class="meta" style="color:#f0997b;">⚠️ Fetch failed this run — this section could not be retrieved. Check again next cycle; if it persists, something needs investigating.</td></tr>'
+        if status == "not_checked":
+            return '<tr><td colspan="3" class="meta">Not checked this run.</td></tr>'
+        # status == "ok": the fetch genuinely worked, it just found nothing —
+        # note market-closed context when we can actually confirm it, rather
+        # than assuming every empty result is because of that.
+        if market_hours_at_generation is False:
+            return '<tr><td colspan="3" class="meta">⚪ No qualifying movers this run — markets were closed at the time of this update, so this is expected.</td></tr>'
+        if market_hours_at_generation is True:
+            return '<tr><td colspan="3" class="meta">No qualifying movers found this run (checked successfully, markets were open).</td></tr>'
+        return '<tr><td colspan="3" class="meta">No qualifying movers found this run (checked successfully).</td></tr>'
+
     all_items = []
     for ticker, its in items_by_ticker.items():
         all_items.extend(its)
@@ -3331,7 +3381,7 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
     item_rows = "".join(item_div(it) for it in all_items[:150])
     market_wide_rows = "".join(item_div(it) for it in market_wide[:60])
 
-    def screener_table(rows, show_pct=True):
+    def screener_table(rows, show_pct=True, section_key=None):
         def row(i, q):
             vol = q.get("volume")
             vol_str = f"{vol:,}" if isinstance(vol, (int, float)) else "?"
@@ -3426,11 +3476,11 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
                 f'<tr><td>{i+1}</td><td><b style="font-size:14px;">{symbol_html}</b><br/>'
                 f'<span class="meta">{name}</span>{calendar_html}{research_html}</td><td{last_cls}>{last_col}</td></tr>'
             )
-        return "".join(row(i, q) for i, q in enumerate(rows)) or '<tr><td colspan="3" class="meta">No data yet</td></tr>'
+        return "".join(row(i, q) for i, q in enumerate(rows)) or screener_empty_state_html(section_key)
 
-    vol_rows = screener_table(screener.get("volume", []), show_pct=False)
-    gain_rows = screener_table(screener.get("gainers", []))
-    lose_rows = screener_table(screener.get("losers", []))
+    vol_rows = screener_table(screener.get("volume", []), show_pct=False, section_key="volume")
+    gain_rows = screener_table(screener.get("gainers", []), section_key="gainers")
+    lose_rows = screener_table(screener.get("losers", []), section_key="losers")
 
     def screener_news_item(symbol, it):
         broker_html = f'<span class="broker">{esc(it["broker"])}</span>' if it.get("broker") and it.get("category") in ("upgrade", "downgrade", "target", "target_raise", "target_cut", "initiation", "reiteration") else ""
@@ -3578,6 +3628,27 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
         )
         heatmap_cell_parts.extend(heatmap_cell(q) for q in stocks_in_sector)
     heatmap_cells = "".join(heatmap_cell_parts)
+
+    def heatmap_empty_state_html():
+        """
+        Heat Map draws from the SAME gainers+losers fetch as the Screener —
+        same status source, same three-way distinction, not a separate
+        calculation. Both failed -> failure message; either genuinely
+        working -> the normal "nothing to show" framing (a real move
+        showing up in gainers or losers alone is enough to populate this,
+        so this branch only fires when both are actually empty).
+        """
+        gainers_status = screener_status.get("gainers", "not_checked")
+        losers_status = screener_status.get("losers", "not_checked")
+        if gainers_status == "failed" and losers_status == "failed":
+            return '<span class="meta" style="color:#f0997b;">⚠️ Fetch failed this run — the heat map could not be retrieved. Check again next cycle.</span>'
+        if gainers_status == "not_checked" and losers_status == "not_checked":
+            return '<span class="meta">Not checked this run.</span>'
+        if market_hours_at_generation is False:
+            return '<span class="meta">⚪ No significant movers this run — markets were closed at the time of this update, so this is expected.</span>'
+        if market_hours_at_generation is True:
+            return '<span class="meta">No significant movers found this run (checked successfully, markets were open).</span>'
+        return '<span class="meta">No significant movers found this run (checked successfully).</span>'
 
     # Explicit, visible universe/source status — never let a drop from full FTSE
     # 100+250 coverage down to FTSE-100-only, a stale cache, or fully unrestricted
@@ -3815,7 +3886,7 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 </nav>
 
 <h2 id="heatmap">🗺️ Heat Map (top movers, by size of move)</h2>
-<div class="heatmap-grid">{heatmap_cells or '<span class="meta">No data yet</span>'}</div>
+<div class="heatmap-grid">{heatmap_cells or heatmap_empty_state_html()}</div>
 
 <h2 id="screener">📊 LSE Screener (Volume / Gainers / Losers)</h2>
 {universe_status_line}
@@ -4200,6 +4271,7 @@ def main():
     big_movers = []
     market_wide_enriched = []
     screener = {}
+    screener_status = {"volume": "not_checked", "gainers": "not_checked", "losers": "not_checked"}
     ratings_items = []
     screener_news = {}
     uptrend_stocks = []
@@ -4230,7 +4302,7 @@ def main():
         # internally for its own liquidity filter.
         ftse_universe_names, ftse_universe_source = load_ftse_universe()
         ftse_universe_status = ftse_universe_status_label(ftse_universe_source)
-        screener = fetch_lse_screener(raw_count=60 if ftse_universe_names is not None else 10)
+        screener, screener_status = fetch_lse_screener(raw_count=60 if ftse_universe_names is not None else 10)
         if ftse_universe_names is not None:
             counts_before = {k: len(v) for k, v in screener.items()}
             for section in ("volume", "gainers", "losers"):
@@ -4654,6 +4726,7 @@ def main():
         "items": items_by_ticker,
         "quotes": quotes,
         "screener": screener,
+        "screenerStatus": screener_status,
         "ftse100": ftse100,
         "screenerNews": screener_news,
         "uptrendStocks": uptrend_stocks,
