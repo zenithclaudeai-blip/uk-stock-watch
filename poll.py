@@ -4277,7 +4277,7 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
         detailed card underneath remains the actual investigation.
         """
         ticker, name = disco["ticker"], disco["name"]
-        header = f'<b>{esc(ticker)}</b>{f" — {esc(name)}" if name else ""}'
+        header = f'<span id="radar-summary-{esc(key)}"><b>{esc(ticker)}</b>{f" — {esc(name)}" if name else ""}</span>'
 
         if lifecycle_entry:
             try:
@@ -4411,6 +4411,49 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
     radar_stocks_html = "".join(e[2] for e in radar_entries) or '<span class="meta">Nothing on the radar right now.</span>'
     radar_summary_cards.sort(key=lambda e: (e[0], e[1]))
     radar_summary_html = "".join(e[2] for e in radar_summary_cards) or '<span class="meta">Nothing on the radar right now.</span>'
+
+    # "At a Glance" — pure aggregation over radar_discovery (this run's
+    # LIVE discoveries only, never a CLEARED/historical entry — matching
+    # the same "stale info never shown as current" principle already
+    # established elsewhere) and radar_lifecycle (computed once already,
+    # never recomputed here). No new scoring — just counting existing,
+    # already-computed statuses.
+    _radar_status_counts = {"NEW": 0, "ACTIVE": 0, "AGING": 0, "STALE": 0}
+    _radar_multi_source_count = 0
+    for _key in radar_discovery:
+        _entry = radar_lifecycle.get(_key) if radar_lifecycle else None
+        if _entry:
+            _status = _entry.get("status")
+            if _status in _radar_status_counts:
+                _radar_status_counts[_status] += 1
+            if len(_entry.get("sourcesEverSeen", [])) >= 2:
+                _radar_multi_source_count += 1
+    _radar_total_count = len(radar_discovery)
+
+    if _radar_total_count == 0:
+        at_a_glance_html = '<span class="meta">Nothing on the radar right now.</span>'
+    else:
+        counts_line = (
+            f'<div class="meta"><b>{_radar_total_count}</b> stock(s) detected · '
+            f'<b>{_radar_status_counts["NEW"]}</b> NEW · <b>{_radar_status_counts["ACTIVE"]}</b> ACTIVE · '
+            f'<b>{_radar_status_counts["AGING"]}</b> AGING · <b>{_radar_status_counts["STALE"]}</b> STALE · '
+            f'<b>{_radar_multi_source_count}</b> multi-source</div>'
+        )
+        # Top 5 by the SAME existing sort (Signal Quality/Confidence-based,
+        # already computed above for radar_summary_cards) — a one-line
+        # jump-link list, not a new ranking.
+        top_lines = []
+        for _sort_key, _key, _card_html in radar_summary_cards[:5]:
+            _disco = radar_discovery.get(_key, {})
+            top_lines.append(
+                f'<div class="meta" style="font-size:12px;">'
+                f'<a href="#radar-summary-{esc(_key)}" style="color:#7fb3ff;text-decoration:none;">'
+                f'<b>{esc(_disco.get("ticker", _key))}</b></a></div>'
+            )
+        at_a_glance_html = counts_line + (
+            f'<div class="meta" style="margin-top:6px;font-size:12px;color:#9aa0a6;">Top current Radar stocks:</div>'
+            + "".join(top_lines) if top_lines else ""
+        )
 
     def quote_div(t, q):
         name = watchlist_name_by_ticker.get(t, "")
@@ -4934,6 +4977,42 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
 
     mover_rows = "".join(mover_div(m) for m in big_movers)
 
+    # --- ⚠️ Warnings / Contradictions — pure aggregation over scorecard_summaries
+    # (ALREADY populated above by quote_div/screener_table's own render_stock_
+    # research_html calls) — never a new computation, never a second pass over
+    # any stock's evidence. Only stocks with a genuine warning/contradiction or
+    # a firing DON'T CHASE are listed; nothing here is invented.
+    _warning_rows = []
+    for _s in scorecard_summaries:
+        _parts = []
+        if _s.get("mainWarning"):
+            _parts.append(f'⚠ {esc(_s["mainWarning"])}')
+        if _s.get("dontChase"):
+            _parts.append(f'⏳ DON\'T CHASE: {esc("; ".join(_s.get("dontChaseReasons", [])))}')
+        if _parts:
+            _warning_rows.append(
+                f'<div class="quote-row"><a href="#radar-summary-{esc(_s["ticker"])}" style="color:#e8eaed;text-decoration:none;">'
+                f'<b>{esc(_s["ticker"])}</b></a> — {" · ".join(_parts)}</div>'
+            )
+    warnings_html = "".join(_warning_rows) or '<span class="meta">No warnings or contradictions flagged right now.</span>'
+
+    # --- ℹ️ Data / Freshness — pure aggregation over status values ALREADY
+    # computed above (universe status, news/mover-news fetch status,
+    # market-wide alerts status, screener status, last poll) — never a new
+    # freshness calculation, just gathering what's already known into one
+    # place for a quick scan.
+    _freshness_rows = [
+        f'<div class="meta">Last successful poll: <b>{esc(str(last_poll))}</b></div>',
+        f'<div class="meta">FTSE universe: <b>{esc(ftse_universe_status)}</b> ({esc(ftse_universe_source)}, {ftse_universe_count} constituents)</div>',
+        f'<div class="meta">Watchlist news fetch: <b>{esc(news_fetch_status)}</b></div>',
+        f'<div class="meta">Mover news fetch: <b>{esc(mover_news_status)}</b></div>',
+        f'<div class="meta">Market-wide broker alerts: <b>{esc(market_wide_alerts_status)}</b></div>',
+        f'<div class="meta">Screener — Volume: <b>{esc(screener_status.get("volume", "not_checked"))}</b> · '
+        f'Gainers: <b>{esc(screener_status.get("gainers", "not_checked"))}</b> · '
+        f'Losers: <b>{esc(screener_status.get("losers", "not_checked"))}</b></div>',
+    ]
+    data_freshness_html = "".join(_freshness_rows)
+
     html = f"""<!DOCTYPE html>
 <html lang="en-GB"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <meta http-equiv="refresh" content="300">
@@ -5074,26 +5153,39 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 {ftse_html}
 <p class="disclaimer">LSE-listed stocks only. Informational only — not investment advice, not a guarantee of any outcome.</p>
 
-<nav aria-label="Section navigation" style="margin:14px 0;padding:12px;background:#161920;border-radius:6px;font-size:16px;line-height:2.4;">
-<b style="color:#9aa0a6;margin-right:8px;">Jump to:</b>
+<nav aria-label="Section navigation" style="margin:14px 0;padding:12px;background:#161920;border-radius:6px;font-size:16px;line-height:2.4;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.4);">
+<b style="color:#9aa0a6;margin-right:8px;">Quick Navigation:</b>
 <a href="#radar-stocks" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📡 Radar Stocks</a>
-<a href="#heatmap" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🗺️ Heat Map</a>
-<a href="#screener" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📊 Screener</a>
-<a href="#mover-news" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📰 Mover News</a>
-<a href="#uptrend" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📈 5-Day Uptrend</a>
-<a href="#targets" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🎯 Target Prices</a>
-<a href="#catalysts" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🗓️ Catalysts</a>
-<a href="#movers-today" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🔥 Moving Today</a>
+<a href="#radar-summary" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📋 Radar Summary</a>
 <a href="#strongest-evidence" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🏆 Strongest Evidence</a>
-<a href="#whats-changed" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📅 What Changed</a>
+<a href="#screener" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📊 Screener</a>
+<a href="#heatmap" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🗺️ Heat Map</a>
+<a href="#gainers" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🟢 Gainers</a>
+<a href="#losers" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🔴 Losers</a>
+<a href="#volume" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📊 Volume</a>
 <a href="#watchlist" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">👀 Watchlist</a>
-<a href="#market-research" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🔎 Market Research</a>
-<a href="#broker-alerts" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">⬆⬇🎯 Broker Alerts</a>
-<a href="#news-feed" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📰 News Feed</a>
-<a href="#backtest" style="color:#7fb3ff;text-decoration:none;">📊 Signal Backtest</a>
+<a href="#news-feed" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📰 News / Evidence</a>
+<a href="#catalysts" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📅 Catalysts</a>
+<a href="#warnings" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">⚠️ Warnings</a>
+<a href="#data-freshness" style="color:#7fb3ff;text-decoration:none;">ℹ️ Data / Freshness</a>
+<div style="margin-top:4px;font-size:13px;line-height:2;">
+<span style="color:#5a6072;margin-right:8px;">More:</span>
+<a href="#mover-news" style="color:#5a80a8;margin-right:12px;text-decoration:none;">Mover News</a>
+<a href="#uptrend" style="color:#5a80a8;margin-right:12px;text-decoration:none;">5-Day Uptrend</a>
+<a href="#targets" style="color:#5a80a8;margin-right:12px;text-decoration:none;">Target Prices</a>
+<a href="#movers-today" style="color:#5a80a8;margin-right:12px;text-decoration:none;">Moving Today</a>
+<a href="#whats-changed" style="color:#5a80a8;margin-right:12px;text-decoration:none;">What Changed</a>
+<a href="#market-research" style="color:#5a80a8;margin-right:12px;text-decoration:none;">Market Research</a>
+<a href="#broker-alerts" style="color:#5a80a8;margin-right:12px;text-decoration:none;">Broker Alerts</a>
+<a href="#backtest" style="color:#5a80a8;text-decoration:none;">Signal Backtest</a>
+</div>
 </nav>
 
 <main>
+<div style="background:#161920;border-radius:6px;padding:12px 14px;margin-bottom:14px;border-left:3px solid #7fb3ff;">
+<b style="color:#7fb3ff;">📡 RADAR NOW</b>
+{at_a_glance_html}
+</div>
 <h2 id="radar-stocks">📡 Radar Stocks</h2>
 <p class="meta">Every stock any existing source has surfaced — Watchlist, Heat Map, and LSE Screener — merged once per stock. A discovery list, not a recommendation: this shows the same evidence already computed elsewhere, ranked by existing Signal Quality so the clearest-agreeing evidence appears first, without ranking, scoring, or calling anything a "buy" or "opportunity."</p>
 <div class="disclaimer" style="margin-bottom:10px;"><b>Discovery sources (find NEW stocks):</b> Watchlist, Heat Map, LSE Screener (Volume/Gainers/Losers), and market-wide Broker Research (rating/target changes across the whole LSE, not just watchlist stocks). <b>Evidence sources (enrich stocks already discovered, but cannot discover a stock on their own):</b> Google/Yahoo/Reuters/Bloomberg/FT news feeds and the existing AI Evidence Review — these are per-ticker lookups, not a whole-market scan, so they can only add evidence to a stock some other source already surfaced. <b>Not available, shown honestly rather than invented:</b> genuine insider buy/sell transaction data (only static insider ownership % exists, which is never presented as trading activity) and any web source beyond the news feeds listed above.</div>
@@ -5111,9 +5203,9 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 <h2 id="screener">📊 LSE Screener (Volume / Gainers / Losers)</h2>
 {universe_status_line}
 <div class="screener-grid">
-  <div><h3>Top Volume</h3><table><tr><th>#</th><th>Symbol</th><th>Volume</th></tr>{vol_rows}</table></div>
-  <div><h3>Top Gainers</h3><table><tr><th>#</th><th>Symbol</th><th>Chg%</th></tr>{gain_rows}</table></div>
-  <div><h3>Top Losers</h3><table><tr><th>#</th><th>Symbol</th><th>Chg%</th></tr>{lose_rows}</table></div>
+  <div><h3 id="volume">Top Volume</h3><table><tr><th>#</th><th>Symbol</th><th>Volume</th></tr>{vol_rows}</table></div>
+  <div><h3 id="gainers">Top Gainers</h3><table><tr><th>#</th><th>Symbol</th><th>Chg%</th></tr>{gain_rows}</table></div>
+  <div><h3 id="losers">Top Losers</h3><table><tr><th>#</th><th>Symbol</th><th>Chg%</th></tr>{lose_rows}</table></div>
 </div>
 
 <h2 id="mover-news">📰 News on Today's Top Movers</h2>
@@ -5161,10 +5253,19 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 <h2 id="news-feed">📰 News &amp; Broker Feed (watchlist)</h2>
 {item_rows or news_empty_state_html(news_fetch_status, all_recent_items, "news")}
 
+<h2 id="warnings">⚠️ Warnings / Contradictions</h2>
+<p class="meta">Every stock currently on Radar with a flagged contradiction or an active DON'T CHASE warning, gathered here from the same evidence shown on each stock's own card — nothing new calculated.</p>
+<div class="quotes">{warnings_html}</div>
+
+<h2 id="data-freshness">ℹ️ Data / Freshness</h2>
+<p class="meta">A quick summary of how current each data source is right now, gathered from the same status checks already shown throughout this page.</p>
+{data_freshness_html}
+
 <h2 id="backtest">📊 Signal Backtest (Technical Signals Only)</h2>
 {backtest_html}
 
 <p class="lastpoll">Last checked: {esc(str(last_poll))}</p>
+<p style="text-align:center;margin-top:10px;"><a href="#radar-stocks" style="color:#7fb3ff;text-decoration:none;font-size:14px;">↑ Back to top</a></p>
 </main>
 </body></html>"""
     os.makedirs(DOCS_DIR, exist_ok=True)
