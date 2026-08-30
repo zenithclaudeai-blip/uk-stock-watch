@@ -3951,6 +3951,12 @@ def render_stock_research_html(
                          "pubDate": _top_news.get("pubDate"), "source": _top_news.get("source")}
                         if _top_news else None),
             "mainPositiveEvidence": ee["entry"]["supporting"][0][0] if ee["entry"]["supporting"] else None,
+            # Top 3 (not just the first) of the SAME already-computed
+            # entry-supporting list — added for the compact Top Radar
+            # card, which shows several evidence points at a glance
+            # rather than just one. Zero new computation: entry["supporting"]
+            # was already fully computed above by compute_entry_exit_evidence.
+            "evidenceForTop": [text for text, _tag in ee["entry"]["supporting"][:3]],
             "mainWarning": contradictions[0]["conflict"] if contradictions else (ee["exit"]["supporting"][0][0] if ee["exit"]["supporting"] else None),
             "aiEvidenceConfidence": ai_evidence_confidence, "aiEvidenceCaveat": ai_evidence_caveat,
         })
@@ -4267,91 +4273,246 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
             f'Status: <b>{status_label}</b></div>'
         )
 
-    def radar_summary_card_html(disco, lifecycle_entry, summary, key):
+    def radar_summary_table_row_html(disco, lifecycle_entry, summary, key):
         """
-        The compact "Radar Summary" row for ONE stock — every field
-        pulled directly from disco (discovery)/lifecycle_entry (Live
-        Radar persistence)/summary (the SAME scorecard_summary_collector
-        entry the detailed card below also uses) — zero new computation,
-        zero new scoring. A quick-glance view; the full, unmodified
-        detailed card underneath remains the actual investigation.
+        ONE table row for the "Radar Summary" table — every field pulled
+        directly from disco (discovery)/lifecycle_entry (Live Radar
+        persistence)/summary (the SAME scorecard_summary_collector entry
+        the detailed card below also uses) — zero new computation, zero
+        new scoring. A quick-glance, at-a-glance table; the full,
+        unmodified detailed card underneath (Full Radar Stocks evidence)
+        remains the actual investigation, and Top Radar (a separate,
+        deliberately compact card view) is untouched by this change.
+
+        Column order (final, approved design): STOCK, SIGNAL, CONFIDENCE,
+        PRICE/TARGET, WHY ON RADAR, EVIDENCE FOR, WARNINGS, NEWS/RESEARCH,
+        FRESHNESS. Signal and Confidence are always separate cells, never
+        merged. DON'T CHASE and any other warning are always BOTH shown
+        together in Warnings — never one hiding the other.
         """
         ticker, name = disco["ticker"], disco["name"]
-        header = f'<span id="radar-summary-{esc(key)}"><b>{esc(ticker)}</b>{f" — {esc(name)}" if name else ""}</span>'
+        price = summary.get("price") if summary else None
+        anchor = f'<span id="radar-summary-{esc(key)}"></span>'
+        ticker_cell = f'{anchor}<b>{esc(ticker)}</b><br/><span style="opacity:0.75;font-size:13px;">{esc(name)}</span>'
 
+        _FRESHNESS_ICON = {"NEW": "🟢", "ACTIVE": "🟢", "AGING": "🟡", "STALE": "🔴", "CLEARED": "⚪"}
         if lifecycle_entry:
             try:
-                found_dt = datetime.fromisoformat(lifecycle_entry["firstSeen"])
-                refreshed_dt = datetime.fromisoformat(lifecycle_entry["lastSeen"])
                 status = lifecycle_entry.get("status", "")
-                status_badge = _STATUS_LABELS.get(status, esc(status))
+                icon = _FRESHNESS_ICON.get(status, "⚪")
                 age = lifecycle_entry.get("age")
-                freshness = (
-                    f'Found {esc(format_london_and_utc(found_dt))} · '
-                    f'Refreshed {esc(format_london_and_utc(refreshed_dt))} · '
-                    f'Age {esc(age) if age else "unavailable"} · Status: {status_badge}'
+                age_text = f"{esc(age)} ago" if age else "just now"
+                refreshed_dt = datetime.fromisoformat(lifecycle_entry["lastSeen"])
+                exact_ts = esc(format_london_and_utc(refreshed_dt))
+                freshness_cell = (
+                    f'{icon} <b>{esc(status)}</b><br/>'
+                    f'<span style="opacity:0.85;font-size:13px;">{age_text}</span><br/>'
+                    f'<span style="opacity:0.55;font-size:11px;">{exact_ts}</span>'
+                )
+                multi_badge = (
+                    ' <span class="radar-multi" style="font-size:10px;">MULTI</span>'
+                    if len(lifecycle_entry.get("sourcesEverSeen", [])) >= 2 else ""
                 )
             except (ValueError, TypeError, KeyError):
-                freshness = "Freshness unavailable"
+                freshness_cell = "Unavailable"
+                multi_badge = ""
         else:
-            freshness = "Freshness unavailable"
+            freshness_cell = "Unavailable"
+            multi_badge = ""
 
         by_label = {}
-        for label, reason in disco["sources"]:
-            by_label.setdefault(label, []).append(reason)
+        for label, _reason in disco["sources"]:
+            by_label.setdefault(label, True)
         ordered_labels = [l for l in _SOURCE_ORDER if l in by_label] + [l for l in by_label if l not in _SOURCE_ORDER]
-        found_via = " · ".join(esc(l) for l in ordered_labels)
-        why_reasons = [r for label in ordered_labels for r in by_label[label] if r]
-        why = esc("; ".join(why_reasons)) if why_reasons else "no specific numeric trigger recorded"
+        found_via_cell = (
+            "".join(f'<span class="source-pill">{esc(l)}</span>' for l in ordered_labels) + multi_badge
+            if ordered_labels else '<span style="opacity:0.6;">Not available</span>'
+        )
 
         if summary is None:
+            price_cell_early = f'{price:.1f}p' if price is not None else "—"
             return (
-                f'<div class="meta" style="border-top:1px solid #262b36;padding-top:8px;margin-top:8px;">{header}</div>'
-                f'<div class="meta" style="font-size:11px;">{freshness}</div>'
-                f'<div class="meta" style="font-size:11px;"><b>Found via:</b> {found_via} · <b>Why:</b> {why}</div>'
-                f'<div class="meta" style="font-size:11px;opacity:0.7;">Evidence unavailable for this stock right now.</div>'
+                f'<tr><td>{ticker_cell}</td>'
+                f'<td colspan="2" style="opacity:0.7;">Evidence unavailable for this stock right now</td>'
+                f'<td>{price_cell_early}<br/><span style="opacity:0.7;">No current broker target available</span></td>'
+                f'<td>{found_via_cell}</td><td>—</td><td>None flagged</td><td>—</td><td>{freshness_cell}</td></tr>'
             )
 
         sq, conf = summary["signalQuality"], summary["confidence"]
+        _SIGNAL_CLASS = {"Strong": "signal-strong", "Mixed": "signal-mixed", "Weak": "signal-weak"}
+        signal_cell = f'<span class="signal {_SIGNAL_CLASS.get(sq, "")}">{esc(sq).upper()}</span>'
+        confidence_cell = f'<span class="confidence">{esc(conf).upper()}</span>'
+
+        target, upside, rec = summary.get("target"), summary.get("upsidePct"), summary.get("recommendation")
+        price_line = f'<b>{price:.1f}p</b>' if price is not None else '<span style="opacity:0.6;">Price unavailable</span>'
+        if target:
+            up_cls = "up" if (upside or 0) >= 0 else "down"
+            rec_display = esc(rec) if (rec and rec.lower() != "none") else "none stated"
+            price_target_cell = (
+                f'{price_line}<br/>'
+                f'<span style="font-weight:700;">{target:.1f}p</span>'
+                + (f' <span class="{up_cls}">({"+" if (upside or 0) >= 0 else ""}{upside:.1f}%)</span>' if upside is not None else '')
+                + f'<br/><span style="opacity:0.6;font-size:12px;">broker opinion: {rec_display}</span>'
+            )
+        else:
+            price_target_cell = f'{price_line}<br/><span style="opacity:0.7;font-size:13px;">No current broker target available</span>'
+
+        evidence_points = summary.get("evidenceForTop") or []
+        evidence_cell = (
+            "<ul class=\"evidence-list\">" + "".join(f"<li>{esc(p)}</li>" for p in evidence_points) + "</ul>"
+            if evidence_points else '<span style="opacity:0.6;">None identified</span>'
+        )
+
+        # DON'T CHASE and any other warning are BOTH shown, always — one
+        # never hides the other.
+        warning_bits = []
+        if summary.get("dontChase"):
+            warning_bits.append(
+                '<span class="dont-chase-badge">DON\'T CHASE</span><br/>'
+                f'<span style="font-size:12px;opacity:0.85;">{esc("; ".join(summary.get("dontChaseReasons", [])))}</span>'
+            )
+        if summary.get("mainWarning"):
+            warning_bits.append(f'<span style="color:#e8918a;">⚠ {esc(summary["mainWarning"])}</span>')
+        warning_cell = "<br/>".join(warning_bits) if warning_bits else "None flagged"
+
+        top_news = summary.get("topNews")
+        news_bits = []
+        if top_news:
+            news_bits.append(
+                f'<a href="{esc(top_news.get("link", "#"))}" target="_blank" style="color:#7fb3ff;">{esc(top_news["title"])}</a>'
+                f'<br/><span style="opacity:0.6;font-size:12px;">{esc(top_news.get("source") or "?")}'
+                f'{" · " + esc(top_news["pubDate"]) if top_news.get("pubDate") else ""}</span>'
+            )
+        else:
+            news_bits.append('<span style="opacity:0.6;">No relevant recent news found</span>')
+        ai_conf, ai_caveat = summary.get("aiEvidenceConfidence"), summary.get("aiEvidenceCaveat")
+        if ai_conf:
+            ai_label = AI_EVIDENCE_CONFIDENCE_LABELS.get(ai_conf, ai_conf)
+            news_bits.append(
+                f'<div style="margin-top:5px;font-size:12px;opacity:0.85;">🤖 <i>AI interpretation</i> '
+                f'(not a source fact): {esc(ai_label)}{" — " + esc(ai_caveat) if ai_caveat else ""}</div>'
+            )
+        else:
+            news_bits.append('<div style="margin-top:5px;font-size:12px;opacity:0.6;">🤖 AI interpretation: not available</div>')
+        news_cell = "".join(news_bits)
+
+        return (
+            f'<tr>'
+            f'<td>{ticker_cell}</td>'
+            f'<td>{signal_cell}</td>'
+            f'<td>{confidence_cell}</td>'
+            f'<td>{price_target_cell}</td>'
+            f'<td>{found_via_cell}</td>'
+            f'<td>{evidence_cell}</td>'
+            f'<td>{warning_cell}</td>'
+            f'<td>{news_cell}</td>'
+            f'<td>{freshness_cell}</td>'
+            f'</tr>'
+        )
+
+    def radar_top_card_html(disco, lifecycle_entry, summary, key):
+        """
+        The GENUINELY compact Top Radar card — deliberately NOT a reuse
+        of radar_summary_card_html's full grid layout. This is the
+        fastest-possible scan: ticker/price/freshness/signal on one
+        line, 3 short labeled blocks (Why On Radar / Evidence For /
+        Warning), Target and News each one line, then a link down to
+        the SAME stock's full card in Radar Summary (never duplicating
+        that detailed content here). Every value still comes from the
+        same summary/disco/lifecycle_entry inputs — zero new
+        computation, zero new scoring, nothing here that isn't already
+        computed and shown, in full, further down the page.
+        """
+        ticker, name = disco["ticker"], disco["name"]
+        price = summary.get("price") if summary else None
+
+        _FRESHNESS_ICON = {"NEW": "🟢", "ACTIVE": "🟢", "AGING": "🟡", "STALE": "🔴", "CLEARED": "⚪"}
+        exact_ts_bit = ""
+        if lifecycle_entry:
+            status = lifecycle_entry.get("status", "")
+            icon = _FRESHNESS_ICON.get(status, "⚪")
+            age = lifecycle_entry.get("age")
+            freshness_bit = f'{icon} {esc(status)} · {esc(age)} ago' if age else f'{icon} {esc(status)}'
+            try:
+                refreshed_dt = datetime.fromisoformat(lifecycle_entry["lastSeen"])
+                exact_ts_bit = (
+                    f'<div class="meta" style="font-size:13px;opacity:0.75;">'
+                    f'{esc(format_london_and_utc(refreshed_dt))}</div>'
+                )
+            except (ValueError, TypeError, KeyError):
+                pass
+        else:
+            freshness_bit = "Freshness unavailable"
+
+        if summary is None:
+            return (
+                f'<div class="radar-compact"><div class="radar-compact-top">'
+                f'<span class="radar-ticker" style="font-size:18px;">{esc(ticker)}</span> '
+                f'<span style="color:#9aa0a6;">{esc(name)}</span></div>'
+                f'<div class="meta" style="font-size:14px;">{freshness_bit}</div>{exact_ts_bit}'
+                f'<div class="meta" style="font-size:14px;opacity:0.7;">Evidence unavailable for this stock right now.</div></div>'
+            )
+
+        sq, conf = summary["signalQuality"], summary["confidence"]
+        top_line = (
+            f'<span class="radar-ticker" style="font-size:18px;">{esc(ticker)}</span> '
+            f'<span style="color:#9aa0a6;">{esc(name)}</span>'
+        )
+        stat_line = (
+            f'<div class="meta" style="font-size:14px;">'
+            + (f'<b>{price}p</b> · ' if price is not None else '')
+            + f'{freshness_bit} · Signal: <b>{esc(sq)}</b> · Confidence: <b>{esc(conf)}</b></div>'
+            + exact_ts_bit
+        )
+
+        by_label = {}
+        for label, _reason in disco["sources"]:
+            by_label.setdefault(label, True)
+        ordered_labels = [l for l in _SOURCE_ORDER if l in by_label] + [l for l in by_label if l not in _SOURCE_ORDER]
+        multi = ' <span class="radar-multi" style="font-size:10px;">MULTI</span>' if len(ordered_labels) >= 2 else ""
+        why_line = f'<div class="meta" style="font-size:14px;"><b>Why:</b> {" / ".join(esc(l) for l in ordered_labels)}{multi}</div>'
+
+        evidence_points = summary.get("evidenceForTop") or []
+        evidence_line = (
+            f'<div class="meta" style="font-size:14px;color:#5dcaa5;">✓ {esc("; ".join(evidence_points))}</div>'
+            if evidence_points else
+            '<div class="meta" style="font-size:14px;opacity:0.6;">No standout evidence identified</div>'
+        )
+
+        warning_bits = []
+        if summary.get("mainWarning"):
+            warning_bits.append(esc(summary["mainWarning"]))
+        if summary.get("dontChase"):
+            warning_bits.append("DON'T CHASE: " + esc("; ".join(summary.get("dontChaseReasons", []))))
+        warning_line = (
+            f'<div class="meta" style="font-size:14px;color:#e8918a;">⚠ {" · ".join(warning_bits)}</div>'
+            if warning_bits else ""
+        )
+
         target, upside, rec = summary.get("target"), summary.get("upsidePct"), summary.get("recommendation")
         if target:
             up_cls = "up" if (upside or 0) >= 0 else "down"
             target_line = (
-                f'target {target} ({esc(rec or "?")}) · '
-                f'<span class="{up_cls}">{"+" if (upside or 0) >= 0 else ""}{upside:.1f}%</span> implied'
-                if upside is not None else f'target {target} ({esc(rec or "?")})'
+                f'<div class="meta" style="font-size:14px;">🎯 <b>{target}p</b>'
+                + (f' <span class="{up_cls}">({"+" if (upside or 0) >= 0 else ""}{upside:.1f}%)</span>' if upside is not None else '')
+                + f' — <span style="opacity:0.7;">broker opinion: {esc(rec or "?")}</span></div>'
             )
         else:
-            target_line = "No current broker target available"
+            target_line = '<div class="meta" style="font-size:14px;">🎯 No current broker target available</div>'
 
         top_news = summary.get("topNews")
         news_line = (
-            f'{esc(top_news["title"])} <span style="opacity:0.6;">'
-            f'({esc(top_news.get("source") or "source unavailable")}'
-            f'{" · " + esc(top_news["pubDate"]) if top_news.get("pubDate") else ""})</span>'
-            if top_news else "No relevant recent news found"
+            f'<div class="meta" style="font-size:14px;">📰 <a href="{esc(top_news.get("link", "#"))}" '
+            f'target="_blank" style="color:#7fb3ff;">{esc(top_news["title"])}</a> '
+            f'<span style="opacity:0.6;">({esc(top_news.get("source") or "?")}'
+            f'{" · " + esc(top_news["pubDate"]) if top_news.get("pubDate") else ""})</span></div>'
+            if top_news else '<div class="meta" style="font-size:14px;">📰 No relevant recent news found</div>'
         )
-
-        dont_chase_line = (
-            f'<div class="meta" style="font-size:11px;color:#e8918a;"><b>⏳ DON\'T CHASE:</b> {esc("; ".join(summary.get("dontChaseReasons", [])))}</div>'
-            if summary.get("dontChase") else ""
-        )
-        positive = summary.get("mainPositiveEvidence")
-        warning = summary.get("mainWarning")
 
         return (
-            f'<div class="meta" style="border-top:1px solid #262b36;padding-top:8px;margin-top:8px;">{header}</div>'
-            f'<div class="meta" style="font-size:11px;">{freshness}</div>'
-            f'<div class="meta" style="font-size:11px;"><b>Found via:</b> {found_via} · <b>Why:</b> {why}</div>'
-            f'<div class="meta" style="font-size:11px;">Signal Quality: <b>{esc(sq)}</b> · Confidence: <b>{esc(conf)}</b> · '
-            f'Technical/Market: <span class="val">{summary["technicalMarket"]:+d}</span> · '
-            f'Research: <span class="val">{summary["researchEvidence"]:+d}</span> · '
-            f'Risk: <span class="val">{summary["risk"]:+d}</span></div>'
-            f'<div class="meta" style="font-size:11px;">🎯 {target_line}</div>'
-            f'<div class="meta" style="font-size:11px;">📰 {news_line}</div>'
-            + (f'<div class="meta" style="font-size:11px;color:#5dcaa5;">✓ {esc(positive)}</div>' if positive else "")
-            + (f'<div class="meta" style="font-size:11px;color:#e8918a;">⚠ {esc(warning)}</div>' if warning else "")
-            + dont_chase_line
+            f'<div class="radar-compact">{top_line}{stat_line}{why_line}{evidence_line}{warning_line}{target_line}{news_line}'
+            f'<div style="margin-top:6px;"><a href="#radar-summary-{esc(key)}" style="color:#7fb3ff;font-size:14px;'
+            f'text-decoration:none;">View full evidence ↓</a></div></div>'
         )
 
     radar_summary_collector = []  # a THROWAWAY collector, used only to sort this
@@ -4361,6 +4522,7 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
     # just because it also appears here.
     radar_entries = []
     radar_summary_cards = []
+    radar_top_cards = []
     for key, disco in radar_discovery.items():
         ticker = disco["ticker"]
         q = radar_quote_for(ticker)
@@ -4392,8 +4554,18 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
         # (e.g. a screener-only stock with genuinely too little data) — such
         # entries sort last, never dropped from the section entirely.
         summary = radar_summary_collector[before_len] if len(radar_summary_collector) > before_len else None
+        _lifecycle_for_sort = radar_lifecycle.get(key) if radar_lifecycle else None
+        # Sort priority exactly as specified: Signal Quality -> Confidence ->
+        # multi-source discovery -> existing dashboard score -> freshness.
+        # Every value reused from what's already computed above; no new
+        # ranking system, just an ordering over existing facts.
         quality_rank = {"Strong": 0, "Mixed": 1, "Weak": 2}.get(summary["signalQuality"], 3) if summary else 3
-        sort_key = (quality_rank, -abs(summary["total"]) if summary else 0)
+        confidence_rank = {"High": 0, "Medium": 1, "Low": 2}.get(summary["confidence"], 3) if summary else 3
+        multi_source_rank = 0 if (_lifecycle_for_sort and len(_lifecycle_for_sort.get("sourcesEverSeen", [])) >= 2) else 1
+        score_rank = -abs(summary["total"]) if summary else 0
+        _status_rank = {"NEW": 0, "ACTIVE": 0, "AGING": 1, "STALE": 2}.get(
+            _lifecycle_for_sort.get("status") if _lifecycle_for_sort else None, 3)
+        sort_key = (quality_rank, confidence_rank, multi_source_rank, score_rank, _status_rank)
         found_via_html = radar_found_via_html(disco["sources"])
         lifecycle_html = radar_lifecycle_html(radar_lifecycle.get(key)) if radar_lifecycle else ""
         # Explicit hierarchy separator: WHY IT APPEARED (found_via_html,
@@ -4405,12 +4577,28 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
         # label is new.
         evidence_divider = '<div class="meta" style="margin-top:4px;font-weight:600;color:#7fb3ff;">Current Evidence:</div>'
         radar_entries.append((sort_key, key, f'{lifecycle_html}{found_via_html}{evidence_divider}{html_block}'))
-        radar_summary_cards.append((sort_key, key, radar_summary_card_html(disco, radar_lifecycle.get(key) if radar_lifecycle else None, summary, key)))
+        _lifecycle_for_this_stock = radar_lifecycle.get(key) if radar_lifecycle else None
+        radar_summary_cards.append((sort_key, key, radar_summary_table_row_html(disco, _lifecycle_for_this_stock, summary, key)))
+        radar_top_cards.append((sort_key, key, radar_top_card_html(disco, _lifecycle_for_this_stock, summary, key)))
 
     radar_entries.sort(key=lambda e: (e[0], e[1]))
     radar_stocks_html = "".join(e[2] for e in radar_entries) or '<span class="meta">Nothing on the radar right now.</span>'
     radar_summary_cards.sort(key=lambda e: (e[0], e[1]))
-    radar_summary_html = "".join(e[2] for e in radar_summary_cards) or '<span class="meta">Nothing on the radar right now.</span>'
+    radar_summary_html = "".join(e[2] for e in radar_summary_cards) or '<tr><td colspan="9" class="meta">Nothing on the radar right now.</td></tr>'
+
+    # 🔥 TOP RADAR — the fastest possible scan, using radar_top_cards'
+    # GENUINELY COMPACT, separately-rendered content (radar_top_card_html,
+    # not a reuse of the full detailed card) — same underlying
+    # disco/lifecycle/summary inputs, same Signal Quality/Confidence
+    # ordering, but a deliberately different, shorter rendering. Full
+    # detail remains exclusively in Radar Summary below via its own
+    # "View full evidence ↓" link on each compact card.
+    TOP_RADAR_COUNT = 8
+    radar_top_cards.sort(key=lambda e: (e[0], e[1]))
+    top_radar_html = (
+        "".join(f'<div class="radar-compact-wrap">{card_html}</div>' for _sk, _k, card_html in radar_top_cards[:TOP_RADAR_COUNT])
+        or '<span class="meta">Nothing on the radar right now.</span>'
+    )
 
     # "At a Glance" — pure aggregation over radar_discovery (this run's
     # LIVE discoveries only, never a CLEARED/historical entry — matching
@@ -5042,8 +5230,44 @@ a:focus-visible,summary:focus-visible,button:focus-visible{{outline:2px solid #7
 .quotes{{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}}
 .q{{background:#171a21;border:1px solid #2a2e37;border-radius:6px;padding:8px 12px;font-size:15px}}
 .up{{color:#50dc96;font-weight:800;font-size:17px}} .down{{color:#ff6b6b;font-weight:800;font-size:17px}}
+.radar-card{{background:#171a21;border:1px solid #2a2e37;border-radius:8px;padding:14px 16px;margin-bottom:14px}}
+.radar-compact-wrap{{margin-bottom:10px}}
+.radar-compact{{background:#141821;border-left:3px solid #ffb454;border-radius:6px;padding:10px 14px}}
+.radar-compact .meta{{line-height:1.7;margin:2px 0}}
+.radar-header{{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin-bottom:6px}}
+.radar-ticker{{font-size:20px;font-weight:800;color:#e8eaed}}
+.radar-freshness{{font-size:13px;padding:2px 8px;border-radius:10px;background:#20242d;display:inline-block}}
+.radar-multi{{font-size:12px;font-weight:700;color:#0f1115;background:#7fb3ff;padding:2px 8px;border-radius:10px;display:inline-block}}
+.radar-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:10px 0}}
+.radar-grid-2{{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:10px 0}}
+.radar-col{{background:#12141a;border:1px solid #22262f;border-radius:6px;padding:10px 12px}}
+.radar-col-label{{font-size:13px;font-weight:800;letter-spacing:0.6px;color:#7fb3ff;margin-bottom:6px;text-transform:uppercase}}
+.radar-col-warn .radar-col-label{{color:#e8918a}}
+.radar-col-target{{border-left:3px solid #7fb3ff}}
+@media (max-width:800px){{
+  .radar-grid, .radar-grid-2{{grid-template-columns:1fr}}
+  .radar-ticker{{font-size:18px}}
+  nav[aria-label="Section navigation"] a{{font-size:14px !important}}
+}}
 table{{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;border-collapse:collapse;margin-bottom:16px;font-size:16px}}
 table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:left}}
+.radar-table-wrap{{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:8px;border:1px solid #2a2e37;margin-bottom:16px}}
+.radar-table{{display:table;border-collapse:collapse;width:100%;min-width:1100px;margin-bottom:0}}
+.radar-table thead th{{background:#171a21;color:#7fb3ff;text-align:left;padding:12px 14px;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;border-bottom:2px solid #2a2e37;white-space:nowrap;position:sticky;top:0;z-index:1}}
+.radar-table tbody td{{padding:14px;border-bottom:1px solid #22262f;font-size:15px;vertical-align:top}}
+.radar-table tbody tr:hover{{background:#161920}}
+.radar-table th:first-child, .radar-table td:first-child{{position:sticky;left:0;background:#0f1115;z-index:2;border-right:1px solid #2a2e37}}
+.radar-table thead th:first-child{{background:#171a21;z-index:3}}
+.source-pill{{display:inline-block;background:#20242d;color:#9aa0a6;font-size:12px;padding:2px 8px;border-radius:10px;margin:1px 3px 1px 0}}
+.signal{{font-weight:800;font-size:15px;letter-spacing:0.3px}}
+.signal-strong{{color:#50dc96}} .signal-mixed{{color:#e0b84a}} .signal-weak{{color:#9aa0a6}}
+.confidence{{font-size:14px;font-weight:700;color:#c7cad1}}
+.evidence-list{{margin:0;padding-left:16px;font-size:13.5px;color:#8fd6b4}}
+.evidence-list li{{margin-bottom:3px}}
+.dont-chase-badge{{display:inline-block;background:#3a1f1f;color:#ff8f87;font-size:11px;font-weight:800;padding:2px 7px;border-radius:4px;letter-spacing:0.4px}}
+@media (max-width:800px){{
+  .radar-table{{font-size:13px}}
+}}
 .item{{background:#171a21;border:1px solid #2a2e37;border-radius:8px;padding:12px;margin-bottom:8px}}
 .item a{{color:#e8eaed;text-decoration:none;font-size:17px;font-weight:600}}
 .item a:hover{{text-decoration:underline}}
@@ -5155,6 +5379,8 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 
 <nav aria-label="Section navigation" style="margin:14px 0;padding:12px;background:#161920;border-radius:6px;font-size:16px;line-height:2.4;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.4);">
 <b style="color:#9aa0a6;margin-right:8px;">Quick Navigation:</b>
+<a href="#top-radar" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🔥 Top Radar</a>
+<a href="#radar-now" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📡 Radar Now</a>
 <a href="#radar-stocks" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📡 Radar Stocks</a>
 <a href="#radar-summary" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📋 Radar Summary</a>
 <a href="#strongest-evidence" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🏆 Strongest Evidence</a>
@@ -5167,9 +5393,10 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 <a href="#news-feed" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📰 News / Evidence</a>
 <a href="#catalysts" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📅 Catalysts</a>
 <a href="#warnings" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">⚠️ Warnings</a>
-<a href="#data-freshness" style="color:#7fb3ff;text-decoration:none;">ℹ️ Data / Freshness</a>
+<a href="#data-freshness" style="color:#7fb3ff;text-decoration:none;white-space:nowrap;">ℹ️ Data&nbsp;/&nbsp;Freshness</a>
+<details class="nav-more" style="margin-top:4px;">
+<summary style="cursor:pointer;color:#5a6072;font-size:13px;list-style:none;">More navigation ▾</summary>
 <div style="margin-top:4px;font-size:13px;line-height:2;">
-<span style="color:#5a6072;margin-right:8px;">More:</span>
 <a href="#mover-news" style="color:#5a80a8;margin-right:12px;text-decoration:none;">Mover News</a>
 <a href="#uptrend" style="color:#5a80a8;margin-right:12px;text-decoration:none;">5-Day Uptrend</a>
 <a href="#targets" style="color:#5a80a8;margin-right:12px;text-decoration:none;">Target Prices</a>
@@ -5179,20 +5406,37 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 <a href="#broker-alerts" style="color:#5a80a8;margin-right:12px;text-decoration:none;">Broker Alerts</a>
 <a href="#backtest" style="color:#5a80a8;text-decoration:none;">Signal Backtest</a>
 </div>
+</details>
 </nav>
 
 <main>
-<div style="background:#161920;border-radius:6px;padding:12px 14px;margin-bottom:14px;border-left:3px solid #7fb3ff;">
+<div id="radar-now" style="background:#161920;border-radius:6px;padding:12px 14px;margin-bottom:14px;border-left:3px solid #7fb3ff;">
 <b style="color:#7fb3ff;">📡 RADAR NOW</b>
 {at_a_glance_html}
 </div>
+
+<h2 id="top-radar">🔥 Top Radar</h2>
+<p class="meta">The strongest current Radar evidence, ranked by the same existing Signal Quality/Confidence ordering used throughout — not a new score, not a recommendation. Click any ticker's evidence below to jump straight to it, or scroll to Radar Summary for every currently detected stock.</p>
+{top_radar_html}
+<p style="text-align:center;margin:6px 0 18px;"><a href="#radar-now" style="color:#7fb3ff;text-decoration:none;font-size:13px;">↑ Back to top</a></p>
+
 <h2 id="radar-stocks">📡 Radar Stocks</h2>
 <p class="meta">Every stock any existing source has surfaced — Watchlist, Heat Map, and LSE Screener — merged once per stock. A discovery list, not a recommendation: this shows the same evidence already computed elsewhere, ranked by existing Signal Quality so the clearest-agreeing evidence appears first, without ranking, scoring, or calling anything a "buy" or "opportunity."</p>
 <div class="disclaimer" style="margin-bottom:10px;"><b>Discovery sources (find NEW stocks):</b> Watchlist, Heat Map, LSE Screener (Volume/Gainers/Losers), and market-wide Broker Research (rating/target changes across the whole LSE, not just watchlist stocks). <b>Evidence sources (enrich stocks already discovered, but cannot discover a stock on their own):</b> Google/Yahoo/Reuters/Bloomberg/FT news feeds and the existing AI Evidence Review — these are per-ticker lookups, not a whole-market scan, so they can only add evidence to a stock some other source already surfaced. <b>Not available, shown honestly rather than invented:</b> genuine insider buy/sell transaction data (only static insider ownership % exists, which is never presented as trading activity) and any web source beyond the news feeds listed above.</div>
 
 <h3 id="radar-summary" style="margin-top:14px;">📋 Radar Summary — all current radar stocks at a glance</h3>
-<p class="meta">Everything below, per stock, in one compact view — same underlying evidence as the full cards further down, nothing new calculated here.</p>
-<div class="quotes">{radar_summary_html}</div>
+<p class="meta">One row per stock — scan Signal, Confidence, target, discovery source, evidence, warnings and freshness in seconds. Technical/Market/Research/Risk sub-scores remain in the full evidence cards below.</p>
+<div class="radar-table-wrap">
+<table class="radar-table">
+<thead><tr>
+<th>Stock</th><th>Signal</th><th>Confidence</th><th>Price / Target</th><th>Why On Radar</th>
+<th>Evidence For</th><th>Warnings</th><th>News / Research</th><th>Freshness</th>
+</tr></thead>
+<tbody>
+{radar_summary_html}
+</tbody>
+</table>
+</div>
 
 <h3 style="margin-top:18px;">🔬 Full Radar Stocks evidence</h3>
 {radar_stocks_html}
@@ -5265,7 +5509,7 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 {backtest_html}
 
 <p class="lastpoll">Last checked: {esc(str(last_poll))}</p>
-<p style="text-align:center;margin-top:10px;"><a href="#radar-stocks" style="color:#7fb3ff;text-decoration:none;font-size:14px;">↑ Back to top</a></p>
+<p style="text-align:center;margin-top:10px;"><a href="#radar-now" style="color:#7fb3ff;text-decoration:none;font-size:14px;">↑ Back to top</a></p>
 </main>
 </body></html>"""
     os.makedirs(DOCS_DIR, exist_ok=True)
