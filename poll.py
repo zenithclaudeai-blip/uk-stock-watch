@@ -2792,6 +2792,50 @@ def compute_research_scorecard(
     return {"dimensions": dims, "total": total, "confidence": confidence}
 
 
+# Scorecard subtotals — purely a presentation-layer regrouping of the
+# SAME 8 already-computed dimension scores above, never a new
+# calculation. Every dimension is assigned to EXACTLY one bucket, so
+# TECHNICAL_MARKET_DIMENSIONS + RESEARCH_EVIDENCE_DIMENSIONS +
+# {"RISK"} together account for all of SCORECARD_DIMENSIONS with no
+# overlap and no omission — the three groups reconcile to the existing
+# total by construction, not by any additional check.
+#
+# "Research Evidence" (not "Fundamental") deliberately — NEWS and BROKER
+# never touch P/E, earnings, revenue, or any actual financial-statement
+# data (nothing in this scorecard does); they measure whether a same-day
+# catalyst exists and which way recent analyst opinion is moving. Calling
+# that "Fundamental" would overclaim what's actually being measured.
+#
+# MARKET sits under Technical/Market Evidence, not Research Evidence —
+# relative-strength-vs-benchmark is a standard technical-analysis
+# concept, and MARKET never draws on news/broker/research inputs at all,
+# only price-vs-FTSE and price-vs-sector comparisons.
+#
+# RISK is deliberately excluded from BOTH subtotals — it's a caution-only
+# dimension (always <=0) that itself draws on inputs from both other
+# groups (RSI from Technical/Market, target-proximity and conflicting-
+# evidence from Research), so folding it into either bucket would
+# misrepresent it. It's shown on its own, separately.
+TECHNICAL_MARKET_DIMENSIONS = ["TREND", "MOMENTUM", "VOLUME", "TECHNICAL", "MARKET"]
+RESEARCH_EVIDENCE_DIMENSIONS = ["NEWS", "BROKER"]
+
+
+def compute_scorecard_subtotals(dimensions):
+    """
+    Returns {"technicalMarket": int, "researchEvidence": int, "risk": int}
+    — pure sums over the ALREADY-COMPUTED per-dimension scores passed in.
+    Never recalculates anything compute_research_scorecard already
+    decided; never called before that function has already run.
+    Mathematically: technicalMarket + researchEvidence + risk always
+    equals the existing scorecard total exactly, since every one of the
+    8 dimensions is counted in precisely one of these three groups.
+    """
+    technical_market = sum(dimensions[d][0] for d in TECHNICAL_MARKET_DIMENSIONS)
+    research_evidence = sum(dimensions[d][0] for d in RESEARCH_EVIDENCE_DIMENSIONS)
+    risk = dimensions["RISK"][0]
+    return {"technicalMarket": technical_market, "researchEvidence": research_evidence, "risk": risk}
+
+
 # Signal Quality — deliberately separate from "confidence" above (data
 # completeness) and never touches it. This is about agreement: given
 # whatever the scorecard actually concluded, do the scored dimensions
@@ -3489,6 +3533,12 @@ def render_stock_research_html(
         upside_pct,
     )
     scorecard_lines = ['<div class="meta" style="margin-top:6px;"><b style="font-size:12px;">📋 RESEARCH SCORECARD</b></div>']
+    subtotals = compute_scorecard_subtotals(scorecard["dimensions"])
+    def _signed(n):
+        return f'{"+" if n > 0 else ""}{n}'
+    scorecard_lines.append(f'<div class="meta" style="font-size:12px;">Technical/Market Evidence: <span class="val">{_signed(subtotals["technicalMarket"])}</span></div>')
+    scorecard_lines.append(f'<div class="meta" style="font-size:12px;">Research Evidence: <span class="val">{_signed(subtotals["researchEvidence"])}</span></div>')
+    scorecard_lines.append(f'<div class="meta" style="font-size:12px;">Risk (caution): <span class="val">{_signed(subtotals["risk"])}</span></div>')
     for dim in SCORECARD_DIMENSIONS:
         score, reasons = scorecard["dimensions"][dim]
         sign = "+" if score > 0 else ""
