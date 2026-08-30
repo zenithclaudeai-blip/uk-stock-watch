@@ -2792,6 +2792,49 @@ def compute_research_scorecard(
     return {"dimensions": dims, "total": total, "confidence": confidence}
 
 
+# Signal Quality — deliberately separate from "confidence" above (data
+# completeness) and never touches it. This is about agreement: given
+# whatever the scorecard actually concluded, do the scored dimensions
+# point the same way? A stock can have High confidence (lots of raw
+# data available) with Mixed signal quality (the data that IS available
+# disagrees), or Low confidence with Strong signal quality (little data,
+# but what little exists agrees) — two genuinely independent facts, not
+# two words for the same thing.
+SIGNAL_QUALITY_MIN_AGREEING_DIMENSIONS = 2  # fewer non-zero dimensions than
+# this can't meaningfully demonstrate "agreement" — a single dimension has
+# nothing else to agree WITH, so it falls to Weak rather than Strong.
+
+
+def compute_signal_quality(dimensions, contradictions):
+    """
+    Returns "Strong", "Mixed", or "Weak" — purely derived from data
+    ALREADY computed by compute_research_scorecard (dimensions) and
+    detect_contradictions (contradictions), never a new score and never
+    a new fetch.
+
+    1. Any specific, already-DETECTED contradiction means Mixed, full
+       stop — a named conflict is a stronger signal than a bare tally of
+       positive vs negative dimensions, so it overrides the count below.
+    2. Otherwise, count dimensions with a genuinely NON-ZERO score (a
+       dimension scoring exactly 0 is silence, not agreement OR
+       disagreement, so it's excluded from this count entirely):
+       - fewer than SIGNAL_QUALITY_MIN_AGREEING_DIMENSIONS non-zero
+         dimensions -> Weak (nothing meaningful to judge agreement from)
+       - all non-zero dimensions share the same sign -> Strong
+       - signs are mixed -> Mixed
+    """
+    if contradictions:
+        return "Mixed"
+    positive = sum(1 for score, _reasons in dimensions.values() if score > 0)
+    negative = sum(1 for score, _reasons in dimensions.values() if score < 0)
+    non_zero = positive + negative
+    if non_zero < SIGNAL_QUALITY_MIN_AGREEING_DIMENSIONS:
+        return "Weak"
+    if positive > 0 and negative > 0:
+        return "Mixed"
+    return "Strong"
+
+
 NEWS_TYPE_KEYWORDS = {
     "earnings": {"earnings", "profit", "revenue", "quarterly", "interim results", "annual results", "trading update", "full-year results", "half-year results"},
     "legal_regulatory": {"regulator", "fine", "lawsuit", "investigation", "fca", "antitrust", "compliance", "breach", "sanction"},
@@ -3220,7 +3263,7 @@ def render_stock_research_html(
         core_lines.append(
             f'<div class="meta" style="color:#f0997b;font-weight:700;">🔥 DON\'T CHASE</div>'
             f'<div class="meta" style="font-size:13px;">{esc(" · ".join(dont_chase["reasons"]))}</div>'
-            f'<div class="meta" style="font-size:12px;opacity:0.85;">Reason: an unusually large 5-day move combined with a sign of being technically extended — not a buy/sell instruction, a factual pattern worth being aware of before acting on the move itself.</div>'
+            f'<div class="meta" style="font-size:12px;opacity:0.85;">Reason: an unusually large 5-day move together with at least one sign of the stock being technically extended (elevated RSI and/or well-above-average volume) — a factual observation about current conditions, not a buy/sell instruction.</div>'
         )
 
     # --- CORE: Volume × average (always visible) ---------------------------------------------
@@ -3452,10 +3495,18 @@ def render_stock_research_html(
         reason_str = f' — {"; ".join(reasons)}' if reasons else ' — no contributing signal'
         scorecard_lines.append(f'<div class="meta" style="font-size:11px;">{dim}: <span class="val">{sign}{score}</span>{esc(reason_str)}</div>')
     total_sign = "+" if scorecard["total"] > 0 else ""
+    signal_quality = compute_signal_quality(scorecard["dimensions"], contradictions)
+    SIGNAL_QUALITY_EXPLANATION = {
+        "Strong": "scored dimensions agree in direction",
+        "Mixed": "scored dimensions point in different directions",
+        "Weak": "too few scored dimensions to judge agreement",
+    }
     scorecard_lines.append(
         f'<div class="meta">TOTAL: <span class="val">{total_sign}{scorecard["total"]}</span> · '
-        f'Confidence/evidence quality: <span class="val">{scorecard["confidence"]}</span> '
-        f'<span style="opacity:0.6;font-size:10px;">(based on data completeness, NOT a probability the stock will rise)</span></div>'
+        f'Confidence: <span class="val">{scorecard["confidence"]}</span> · '
+        f'Signal Quality: <span class="val">{signal_quality}</span> '
+        f'<span style="opacity:0.6;font-size:10px;">— {esc(SIGNAL_QUALITY_EXPLANATION.get(signal_quality, ""))}</span></div>'
+        f'<div class="meta" style="opacity:0.6;font-size:10px;">Neither is a probability or prediction — Confidence reflects data completeness, Signal Quality reflects whether the scored dimensions agree.</div>'
     )
     extended_lines = extended_lines + contradiction_lines + entry_exit_lines + scorecard_lines
 
@@ -4303,7 +4354,7 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 
 <h2 id="catalysts">🗓️ Upcoming Catalysts</h2>
 <p class="meta">Real, already-published earnings and ex-dividend dates from Yahoo's calendar data — informational only, not a suggestion to act around any of these dates. Covers both your watchlist and today's screener-ranked stocks.</p>
-<table><tr><th>Stock</th><th>Event</th><th>Date</th><th>Days until</th><th>Urgency</th></tr>{catalyst_rows or '<tr><td colspan="5" class="meta">No known upcoming earnings or ex-dividend dates right now.</td></tr>'}</table>
+<table><tr><th>Stock</th><th>Event</th><th>Date</th><th>Days until</th><th>Timing</th></tr>{catalyst_rows or '<tr><td colspan="5" class="meta">No known upcoming earnings or ex-dividend dates right now.</td></tr>'}</table>
 
 <h2 id="movers-today">🔥 Already Moving Today (watchlist, ±{BIG_MOVER_THRESHOLD_PCT:.0f}%+)</h2>
 <p class="meta">A fact about what already happened today — not a forecast of what happens next.</p>
