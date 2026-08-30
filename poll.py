@@ -3015,6 +3015,7 @@ def render_stock_research_html(
     ma50=None, ma200=None, atr14=None, support_resistance=None, breakout_status=None,
     show_stock_intelligence_label=False, progressive_disclosure=False,
     suppress_extended_market_cap=False,
+    ai_evidence_confidence=None, ai_evidence_caveat=None,
 ):
     """
     THE single shared rendering function for a stock's full research
@@ -3208,6 +3209,20 @@ def render_stock_research_html(
     # --- CORE: evidence status + key flags (always visible) ---------------------------------------------
     evidence_label, evidence_reason = EVIDENCE_LABEL_TEXT.get(evidence["label"], (evidence["label"], ""))
     core_lines.append(f'<div class="meta">🧭 Evidence: <span class="val">{esc(evidence_label)}</span> — {esc(evidence_reason)}</div>')
+    # AI evidence-quality review — PURELY an additional, visible caveat line
+    # underneath the deterministic Evidence: label above, which is NEVER
+    # altered by this. Only rendered when a genuine, validated AI review
+    # exists (ai_evidence_confidence is None whenever no API key is
+    # configured, the call failed, or the response was rejected as
+    # malformed/advice-shaped — in every one of those cases this block
+    # simply doesn't render, and the page looks exactly as it does without
+    # the feature at all).
+    if ai_evidence_confidence:
+        confidence_display = AI_EVIDENCE_CONFIDENCE_LABELS.get(ai_evidence_confidence, ai_evidence_confidence)
+        caveat_text = f" — {esc(ai_evidence_caveat)}" if ai_evidence_caveat else ""
+        core_lines.append(
+            f'<div class="meta" style="font-size:11px;">🤖 AI evidence check: {esc(confidence_display)}{caveat_text}</div>'
+        )
     # Reuses evidence["hasCatalyst"] rather than re-deriving bool(news_items)
     # separately — evidence is already computed just above and, since the
     # classify_evidence fix, correctly accounts for a same-day broker event
@@ -3530,6 +3545,7 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
             ma50=q.get("ma50"), ma200=q.get("ma200"), atr14=q.get("atr14"),
             support_resistance=q.get("supportResistance"), breakout_status=q.get("breakoutStatus"),
             show_stock_intelligence_label=True,
+            ai_evidence_confidence=q.get("aiEvidenceConfidence"), ai_evidence_caveat=q.get("aiEvidenceCaveat"),
         )
 
     quote_rows = "".join(quote_div(t, q) for t, q in quotes.items())
@@ -4259,6 +4275,134 @@ def generate_ai_digest(context_text):
         return None
     except Exception as e:
         print(f"  ! AI digest generation failed: {e}", file=sys.stderr)
+        return None
+
+
+AI_EVIDENCE_REVIEW_MODEL = AI_DIGEST_MODEL  # same cheap/fast tier — this is a bounded
+# classification task (pick one of 6 labels), not open-ended generation; no reason to
+# use a larger/more expensive model for it.
+
+# The ONLY allowed values — anything else in the AI's response is treated as
+# malformed and the whole response is discarded. Never partially trusted.
+AI_EVIDENCE_CONFIDENCE_VALUES = {"strong", "weak", "irrelevant", "not_same_day", "ambiguous", "opinion_speculation"}
+
+AI_EVIDENCE_CONFIDENCE_LABELS = {
+    "strong": "✅ Confirmed",
+    "weak": "⚠️ Weak/uncertain",
+    "irrelevant": "⚠️ Irrelevant",
+    "not_same_day": "⚠️ Not genuinely same-day",
+    "ambiguous": "⚠️ Ambiguous",
+    "opinion_speculation": "⚠️ Opinion/speculation, not a factual report",
+}
+
+AI_EVIDENCE_REVIEW_SYSTEM_PROMPT = """You are reviewing evidence already used by a deterministic stock research system. You are NOT generating new evidence, NOT making a recommendation, and NOT predicting anything.
+
+You will be given: a ticker, a company name, today's price move, the deterministic system's classification (Supported or Conflicting), and the specific same-day news/broker item(s) it was based on.
+
+Your ONLY task: assess whether those specific item(s), taken at face value, genuinely and clearly explain today's price move as a factual matter.
+
+CRITICAL RULES — violating any of these makes your output unusable:
+- NEVER recommend buying, selling, or holding any stock, in any form.
+- NEVER predict future price movement.
+- NEVER use directive/advisory language: "should", "consider", "opportunity", "worth watching", "good time to", etc.
+- You are not deciding whether the classification is "right" — the deterministic system's label is fixed and will be shown regardless of your answer. You are only assessing how CLEARLY the underlying material actually explains the move, and whether it is genuinely about this specific company and genuinely from today.
+
+Respond with ONLY a JSON object, nothing else, no markdown, no explanation outside the JSON:
+{"confidence": "<one of: strong, weak, irrelevant, not_same_day, ambiguous, opinion_speculation>", "caveat": "<a short plain-English note, under 200 characters, or empty string if confidence is strong>"}
+
+Meaning of each confidence value:
+- strong: the item(s) clearly and directly explain the price move
+- weak: the item(s) are genuinely about this company but don't clearly explain WHY the price moved today
+- irrelevant: the item(s) do not appear to genuinely be about this specific company (e.g. a name collision with a different company)
+- not_same_day: the item(s) do not appear to genuinely be from today, despite being provided as same-day material
+- ambiguous: there is genuine uncertainty, or the item could reasonably be read as supporting the move or not
+- opinion_speculation: the item is commentary/opinion/speculation rather than a factual report of something that happened"""
+
+
+def review_evidence_with_ai(ticker, company_name, change_pct, evidence_label, same_day_items):
+    """
+    Optional, opt-in, paid, downgrade-only review of an ALREADY-COMPUTED
+    deterministic evidence classification — never a new evidence source,
+    never able to change what's shown as the actual Evidence: label.
+    Returns None (silently) if no API key is configured, if evidence_label
+    isn't "supported"/"conflicting" (nothing directional to review), if the
+    API call fails/times out, or if the response is malformed or contains
+    anything resembling advice/recommendation language — in every one of
+    those cases the dashboard behaves exactly as it does without this
+    feature. Returns {"aiEvidenceConfidence": ..., "aiEvidenceCaveat": ...,
+    "aiEvidenceReviewed": True} only when the response passed every check.
+
+    same_day_items MUST already be the same-day-filtered, relevance-
+    filtered pool (the exact same items_by_ticker[ticker] that
+    classify_evidence itself was given) — never the wider recent-fallback
+    pool. This is what "AI can only review evidence the deterministic
+    system already identified" and "never present recent-fallback news as
+    same-day evidence" mean in practice: the input itself is already
+    constrained to genuine same-day material before the AI ever sees it.
+    """
+    if evidence_label not in ("supported", "conflicting"):
+        return None  # nothing directional for the AI to review
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if not api_key:
+        return None
+    if not same_day_items:
+        return None  # nothing to review — shouldn't normally happen if label is supported/conflicting, but never guess
+
+    items_text = "\n".join(
+        f"- \"{it.get('title', '')}\" (category: {it.get('category', 'news')}, published: {it.get('pubDate', '?')})"
+        for it in same_day_items[:5]  # cap — this is a review of the evidentiary basis, not a full digest
+    )
+    user_content = (
+        f"Ticker: {ticker} ({company_name})\n"
+        f"Today's price move: {change_pct:+.1f}%\n"
+        f"Deterministic classification: {evidence_label}\n"
+        f"Same-day item(s) this classification was based on:\n{items_text}\n\n"
+        f"Assess these specific item(s) per your instructions and respond with the JSON object only."
+    )
+    body = json.dumps({
+        "model": AI_EVIDENCE_REVIEW_MODEL,
+        "max_tokens": 200,
+        "system": AI_EVIDENCE_REVIEW_SYSTEM_PROMPT,
+        "messages": [{"role": "user", "content": user_content}],
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=body,
+        headers={"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+        method="POST",
+    )
+    try:
+        resp_data = json.loads(urllib.request.urlopen(req, timeout=30).read())
+        text = "".join(b.get("text", "") for b in resp_data.get("content", []) if b.get("type") == "text").strip()
+        if not text:
+            return None
+        parsed = json.loads(text)
+        confidence = parsed.get("confidence")
+        caveat = parsed.get("caveat", "")
+        if confidence not in AI_EVIDENCE_CONFIDENCE_VALUES:
+            print(f"  ! AI evidence review discarded: '{confidence}' is not an allowed value.", file=sys.stderr)
+            return None
+        if not isinstance(caveat, str) or len(caveat) > 300:
+            print("  ! AI evidence review discarded: caveat malformed or too long.", file=sys.stderr)
+            return None
+        # Same forbidden-pattern scan already used for the digest — reused, not
+        # duplicated, so both features stay behind the identical safety bar.
+        if any(re.search(pat, caveat, re.IGNORECASE) for pat in FORBIDDEN_DIGEST_PATTERNS):
+            print("  ! AI evidence review discarded: caveat matched an advice-shaped pattern.", file=sys.stderr)
+            return None
+        return {"aiEvidenceConfidence": confidence, "aiEvidenceCaveat": caveat, "aiEvidenceReviewed": True}
+    except json.JSONDecodeError:
+        print("  ! AI evidence review discarded: response was not valid JSON.", file=sys.stderr)
+        return None
+    except urllib.error.HTTPError as e:
+        try:
+            error_body = e.read().decode("utf-8", errors="replace")
+        except Exception:
+            error_body = "(couldn't read error body)"
+        print(f"  ! AI evidence review failed: HTTP {e.code} — {error_body[:300]}", file=sys.stderr)
+        return None
+    except Exception as e:
+        print(f"  ! AI evidence review failed: {e}", file=sys.stderr)
         return None
 
 
@@ -5035,6 +5179,39 @@ def main():
                     quotes[ticker]["volume"] = value
                 continue
             quotes[ticker][key] = value
+
+    # AI evidence-quality review (Phase 1, opt-in via ANTHROPIC_API_KEY) —
+    # runs AFTER the merge above so quotes[ticker] has the SAME fields
+    # (averageVolume, etc) that render_dashboard itself will use, computing
+    # evidence via the identical classify_evidence() call with identical
+    # inputs — never a second, potentially-different evidence computation.
+    # Watchlist only for this initial conservative rollout (not Screener
+    # rows) — a deliberate scoping choice, not an oversight; extending to
+    # Screener would reuse the exact same fields once this is proven out.
+    if os.environ.get("ANTHROPIC_API_KEY", "").strip():
+        try:
+            _ai_events = load_events_store().get("events", [])
+        except Exception:
+            _ai_events = []
+        _ai_latest_events = get_latest_broker_event_per_ticker(_ai_events)
+        for stock in watchlist:
+            ticker = stock["ticker"]
+            if ticker not in quotes:
+                continue
+            q = quotes[ticker]
+            same_day_items = items_by_ticker.get(ticker, [])
+            vol_ratio = compute_volume_ratio(q.get("volume"), q.get("averageVolume"))
+            evidence = classify_evidence(
+                q.get("changePct"), vol_ratio, same_day_items,
+                latest_broker_event=_ai_latest_events.get(ticker),
+            )
+            ai_review = review_evidence_with_ai(
+                ticker, stock["name"], q.get("changePct") or 0, evidence["label"], same_day_items,
+            )
+            if ai_review:
+                quotes[ticker]["aiEvidenceConfidence"] = ai_review["aiEvidenceConfidence"]
+                quotes[ticker]["aiEvidenceCaveat"] = ai_review["aiEvidenceCaveat"]
+                quotes[ticker]["aiEvidenceReviewed"] = True
 
     # Merge this run's market-wide items with previously stored ones (same pattern as
     # the per-ticker feed) so the dashboard shows recent history, not just this cycle.
