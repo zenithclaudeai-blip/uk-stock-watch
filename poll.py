@@ -3930,7 +3930,13 @@ def render_stock_research_html(
         # evidence-history store can capture everything needed for a
         # genuinely honest future backtest of the News/Broker/AI
         # dimensions, without a single new calculation anywhere in this
-        # function.
+        # function. Extended again for the Radar Summary: target/
+        # upside/recommendation, the top news item, the first entry-
+        # supporting (positive) and first contradiction-or-exit-
+        # supporting (warning) fact, and DON'T CHASE's own reasons —
+        # every single one already computed above in this exact
+        # function call, none of it recomputed here.
+        _top_news = news_items[0] if news_items else None
         scorecard_summary_collector.append({
             "ticker": ticker, "name": name, "total": scorecard["total"],
             "signalQuality": signal_quality, "confidence": scorecard["confidence"],
@@ -3939,6 +3945,14 @@ def render_stock_research_html(
             "technicalMarket": subtotals["technicalMarket"], "researchEvidence": subtotals["researchEvidence"],
             "risk": subtotals["risk"],
             "dontChase": dont_chase is not None,
+            "dontChaseReasons": dont_chase["reasons"] if dont_chase else [],
+            "target": target, "recommendation": recommendation, "upsidePct": upside_pct,
+            "topNews": ({"title": _top_news.get("title"), "link": _top_news.get("link"),
+                         "pubDate": _top_news.get("pubDate"), "source": _top_news.get("source")}
+                        if _top_news else None),
+            "mainPositiveEvidence": ee["entry"]["supporting"][0][0] if ee["entry"]["supporting"] else None,
+            "mainWarning": contradictions[0]["conflict"] if contradictions else (ee["exit"]["supporting"][0][0] if ee["exit"]["supporting"] else None),
+            "aiEvidenceConfidence": ai_evidence_confidence, "aiEvidenceCaveat": ai_evidence_caveat,
         })
 
     # Phase 5 chart — pure display, computed from the ALREADY-RETAINED
@@ -4253,12 +4267,100 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
             f'Status: <b>{status_label}</b></div>'
         )
 
+    def radar_summary_card_html(disco, lifecycle_entry, summary, key):
+        """
+        The compact "Radar Summary" row for ONE stock — every field
+        pulled directly from disco (discovery)/lifecycle_entry (Live
+        Radar persistence)/summary (the SAME scorecard_summary_collector
+        entry the detailed card below also uses) — zero new computation,
+        zero new scoring. A quick-glance view; the full, unmodified
+        detailed card underneath remains the actual investigation.
+        """
+        ticker, name = disco["ticker"], disco["name"]
+        header = f'<b>{esc(ticker)}</b>{f" — {esc(name)}" if name else ""}'
+
+        if lifecycle_entry:
+            try:
+                found_dt = datetime.fromisoformat(lifecycle_entry["firstSeen"])
+                refreshed_dt = datetime.fromisoformat(lifecycle_entry["lastSeen"])
+                status = lifecycle_entry.get("status", "")
+                status_badge = _STATUS_LABELS.get(status, esc(status))
+                age = lifecycle_entry.get("age")
+                freshness = (
+                    f'Found {esc(format_london_and_utc(found_dt))} · '
+                    f'Refreshed {esc(format_london_and_utc(refreshed_dt))} · '
+                    f'Age {esc(age) if age else "unavailable"} · Status: {status_badge}'
+                )
+            except (ValueError, TypeError, KeyError):
+                freshness = "Freshness unavailable"
+        else:
+            freshness = "Freshness unavailable"
+
+        by_label = {}
+        for label, reason in disco["sources"]:
+            by_label.setdefault(label, []).append(reason)
+        ordered_labels = [l for l in _SOURCE_ORDER if l in by_label] + [l for l in by_label if l not in _SOURCE_ORDER]
+        found_via = " · ".join(esc(l) for l in ordered_labels)
+        why_reasons = [r for label in ordered_labels for r in by_label[label] if r]
+        why = esc("; ".join(why_reasons)) if why_reasons else "no specific numeric trigger recorded"
+
+        if summary is None:
+            return (
+                f'<div class="meta" style="border-top:1px solid #262b36;padding-top:8px;margin-top:8px;">{header}</div>'
+                f'<div class="meta" style="font-size:11px;">{freshness}</div>'
+                f'<div class="meta" style="font-size:11px;"><b>Found via:</b> {found_via} · <b>Why:</b> {why}</div>'
+                f'<div class="meta" style="font-size:11px;opacity:0.7;">Evidence unavailable for this stock right now.</div>'
+            )
+
+        sq, conf = summary["signalQuality"], summary["confidence"]
+        target, upside, rec = summary.get("target"), summary.get("upsidePct"), summary.get("recommendation")
+        if target:
+            up_cls = "up" if (upside or 0) >= 0 else "down"
+            target_line = (
+                f'target {target} ({esc(rec or "?")}) · '
+                f'<span class="{up_cls}">{"+" if (upside or 0) >= 0 else ""}{upside:.1f}%</span> implied'
+                if upside is not None else f'target {target} ({esc(rec or "?")})'
+            )
+        else:
+            target_line = "No current broker target available"
+
+        top_news = summary.get("topNews")
+        news_line = (
+            f'{esc(top_news["title"])} <span style="opacity:0.6;">'
+            f'({esc(top_news.get("source") or "source unavailable")}'
+            f'{" · " + esc(top_news["pubDate"]) if top_news.get("pubDate") else ""})</span>'
+            if top_news else "No relevant recent news found"
+        )
+
+        dont_chase_line = (
+            f'<div class="meta" style="font-size:11px;color:#e8918a;"><b>⏳ DON\'T CHASE:</b> {esc("; ".join(summary.get("dontChaseReasons", [])))}</div>'
+            if summary.get("dontChase") else ""
+        )
+        positive = summary.get("mainPositiveEvidence")
+        warning = summary.get("mainWarning")
+
+        return (
+            f'<div class="meta" style="border-top:1px solid #262b36;padding-top:8px;margin-top:8px;">{header}</div>'
+            f'<div class="meta" style="font-size:11px;">{freshness}</div>'
+            f'<div class="meta" style="font-size:11px;"><b>Found via:</b> {found_via} · <b>Why:</b> {why}</div>'
+            f'<div class="meta" style="font-size:11px;">Signal Quality: <b>{esc(sq)}</b> · Confidence: <b>{esc(conf)}</b> · '
+            f'Technical/Market: <span class="val">{summary["technicalMarket"]:+d}</span> · '
+            f'Research: <span class="val">{summary["researchEvidence"]:+d}</span> · '
+            f'Risk: <span class="val">{summary["risk"]:+d}</span></div>'
+            f'<div class="meta" style="font-size:11px;">🎯 {target_line}</div>'
+            f'<div class="meta" style="font-size:11px;">📰 {news_line}</div>'
+            + (f'<div class="meta" style="font-size:11px;color:#5dcaa5;">✓ {esc(positive)}</div>' if positive else "")
+            + (f'<div class="meta" style="font-size:11px;color:#e8918a;">⚠ {esc(warning)}</div>' if warning else "")
+            + dont_chase_line
+        )
+
     radar_summary_collector = []  # a THROWAWAY collector, used only to sort this
     # section by existing Signal Quality/Confidence — never merged into the
     # real scorecard_summaries, so no stock is ever double-counted in
     # Strongest Agreeing Evidence, the daily snapshot, or evidence history
     # just because it also appears here.
     radar_entries = []
+    radar_summary_cards = []
     for key, disco in radar_discovery.items():
         ticker = disco["ticker"]
         q = radar_quote_for(ticker)
@@ -4303,9 +4405,12 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
         # label is new.
         evidence_divider = '<div class="meta" style="margin-top:4px;font-weight:600;color:#7fb3ff;">Current Evidence:</div>'
         radar_entries.append((sort_key, key, f'{lifecycle_html}{found_via_html}{evidence_divider}{html_block}'))
+        radar_summary_cards.append((sort_key, key, radar_summary_card_html(disco, radar_lifecycle.get(key) if radar_lifecycle else None, summary, key)))
 
     radar_entries.sort(key=lambda e: (e[0], e[1]))
     radar_stocks_html = "".join(e[2] for e in radar_entries) or '<span class="meta">Nothing on the radar right now.</span>'
+    radar_summary_cards.sort(key=lambda e: (e[0], e[1]))
+    radar_summary_html = "".join(e[2] for e in radar_summary_cards) or '<span class="meta">Nothing on the radar right now.</span>'
 
     def quote_div(t, q):
         name = watchlist_name_by_ticker.get(t, "")
@@ -4992,6 +5097,12 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 <h2 id="radar-stocks">📡 Radar Stocks</h2>
 <p class="meta">Every stock any existing source has surfaced — Watchlist, Heat Map, and LSE Screener — merged once per stock. A discovery list, not a recommendation: this shows the same evidence already computed elsewhere, ranked by existing Signal Quality so the clearest-agreeing evidence appears first, without ranking, scoring, or calling anything a "buy" or "opportunity."</p>
 <div class="disclaimer" style="margin-bottom:10px;"><b>Discovery sources (find NEW stocks):</b> Watchlist, Heat Map, LSE Screener (Volume/Gainers/Losers), and market-wide Broker Research (rating/target changes across the whole LSE, not just watchlist stocks). <b>Evidence sources (enrich stocks already discovered, but cannot discover a stock on their own):</b> Google/Yahoo/Reuters/Bloomberg/FT news feeds and the existing AI Evidence Review — these are per-ticker lookups, not a whole-market scan, so they can only add evidence to a stock some other source already surfaced. <b>Not available, shown honestly rather than invented:</b> genuine insider buy/sell transaction data (only static insider ownership % exists, which is never presented as trading activity) and any web source beyond the news feeds listed above.</div>
+
+<h3 id="radar-summary" style="margin-top:14px;">📋 Radar Summary — all current radar stocks at a glance</h3>
+<p class="meta">Everything below, per stock, in one compact view — same underlying evidence as the full cards further down, nothing new calculated here.</p>
+<div class="quotes">{radar_summary_html}</div>
+
+<h3 style="margin-top:18px;">🔬 Full Radar Stocks evidence</h3>
 {radar_stocks_html}
 
 <h2 id="heatmap">🗺️ Heat Map (top movers, by size of move)</h2>
