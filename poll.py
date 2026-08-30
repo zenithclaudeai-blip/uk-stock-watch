@@ -414,6 +414,13 @@ def fetch_yahoo_analyst(ticker):
         stats = result.get("defaultKeyStatistics") or {}
         price_mod = result.get("price") or {}
         trailing_pe = (summary.get("trailingPE") or {}).get("raw")
+        # Same summaryDetail module already being fetched above for P/E, dividend,
+        # 52-week range — averageVolume sits right alongside them in the same
+        # response. Verified against real Yahoo API response structure (multiple
+        # independent open-source tools/wrappers scraping this same live endpoint
+        # all show this exact field name in this exact module) before adding this
+        # line — not assumed. Zero new network calls.
+        average_volume = (summary.get("averageVolume") or {}).get("raw")
         eps = (stats.get("trailingEps") or {}).get("raw")
         market_cap = (price_mod.get("marketCap") or {}).get("raw")
         fifty_two_low = (summary.get("fiftyTwoWeekLow") or {}).get("raw")
@@ -437,6 +444,7 @@ def fetch_yahoo_analyst(ticker):
             "trailingPE": trailing_pe,
             "trailingEps": eps,
             "marketCap": market_cap,
+            "averageVolume": average_volume,
             "fiftyTwoWeekLow": fifty_two_low,
             "fiftyTwoWeekHigh": fifty_two_high,
             "heldPercentInsidersPct": held_insiders_pct,
@@ -1197,36 +1205,159 @@ def compute_rsi(closes, period=14):
 
 
 def fetch_price_technicals(ticker):
-    """Real, already-happened price history — 5-day % change, RSI(14), and 20-day
-    moving average, all computed from the same single chart fetch (a longer range than
-    strictly needed for the 5-day figure, so RSI/MA come along for free rather than
-    requiring a second network call). Facts about the past, not predictions."""
+    """Real, already-happened price history — 5-day % change, RSI(14), moving
+    averages (20/50/200-day, each only computed when enough real history exists),
+    a simple MA20-vs-MA50 crossover state, and ATR(14) — all computed from the
+    SAME single chart fetch. Facts about the past, not predictions.
+
+    Range extended from 3 months to 1 year specifically so 50/200-day MAs become
+    computable when a stock has that much history — this increases the response
+    SIZE (more bars in the same one HTTP call), not the number of network calls
+    made; RSI/5-day-change/20-day-MA are unaffected, since they still just take
+    the LAST N closes regardless of how much more history precedes them.
+
+    Also extracts the latest day's volume, high, and low from the SAME response
+    — verified against real Yahoo API response structure (documented in multiple
+    independent open-source tools that scrape this exact endpoint) to contain
+    `volume`/`high`/`low` arrays alongside `close`, aligned by index with the
+    same `timestamp` array. All four are paired and filtered TOGETHER (not
+    filtered separately) before taking values — filtering `close` alone for
+    nulls (holidays etc.) would silently desynchronize which day's volume/high/
+    low ends up attached to a given close if a null close and a present value
+    (or vice versa) ever occurred on the same raw index.
+    """
     symbol = yahoo_symbol(ticker)
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(symbol)}?interval=1d&range=3mo"
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(symbol)}?interval=1d&range=1y"
     try:
         data = json.loads(http_get(url))
         result = (data.get("chart") or {}).get("result") or [None]
         if not result[0]:
             return None
-        closes = (result[0].get("indicators", {}).get("quote", [{}])[0] or {}).get("close") or []
-        closes = [c for c in closes if c is not None]  # some days can come back null (holidays etc.)
+        quote0 = (result[0].get("indicators", {}).get("quote", [{}])[0] or {})
+        raw_closes = quote0.get("close") or []
+        raw_volumes = quote0.get("volume") or []
+        raw_highs = quote0.get("high") or []
+        raw_lows = quote0.get("low") or []
+        paired = [
+            (c, v, h, l) for c, v, h, l in zip(raw_closes, raw_volumes, raw_highs, raw_lows)
+            if c is not None
+        ]
+        closes = [c for c, _v, _h, _l in paired]  # some days can come back null (holidays etc.)
         if len(closes) < 6:
             return None  # not enough real trading days to compute even the 5-day change
         latest = closes[-1]
+        latest_volume = paired[-1][1] if paired else None
         five_days_ago = closes[-6]
         change_pct = (latest - five_days_ago) / five_days_ago * 100 if five_days_ago else None
         rsi14 = compute_rsi(closes, 14)
         ma20 = sum(closes[-20:]) / len(closes[-20:]) if len(closes) >= 20 else None
+        ma50 = sum(closes[-50:]) / 50 if len(closes) >= 50 else None
+        ma200 = sum(closes[-200:]) / 200 if len(closes) >= 200 else None
+        ma_crossover = None
+        if ma20 is not None and ma50 is not None:
+            ma_crossover = "bullish" if ma20 > ma50 else ("bearish" if ma20 < ma50 else "flat")
+        atr14 = compute_atr(paired, 14)
+        highs = [h for _c, _v, h, _l in paired]
+        lows = [l for _c, _v, _h, l in paired]
+        support_resistance = compute_support_resistance(highs, lows)
+        breakout_status = compute_breakout_status(latest, highs[:-1], lows[:-1])
         return {
             "changePct5d": change_pct,
             "price": latest,
             "rsi14": rsi14,
             "ma20": ma20,
+            "ma50": ma50,
+            "ma200": ma200,
+            "maCrossover": ma_crossover,
+            "atr14": atr14,
+            "supportResistance": support_resistance,
+            "breakoutStatus": breakout_status,
             "aboveMA20": (latest > ma20) if ma20 else None,
+            "latestVolume": latest_volume,
         }
     except Exception as e:
         print(f"  ! price technicals fetch failed: {ticker} ({e})", file=sys.stderr)
         return None
+
+
+def compute_atr(paired_close_vol_high_low, period=14):
+    """
+    Average True Range over `period` days — a standard, deterministic
+    volatility measure (how much a stock typically moves day-to-day),
+    NOT a prediction. True range for a day = max(high-low,
+    |high-prev_close|, |low-prev_close|); ATR = the average of the most
+    recent `period` true-range values. Returns None if there isn't
+    enough paired (close, volume, high, low) history to compute even
+    one true-range value plus the period average — never fabricated
+    from partial data.
+    """
+    if len(paired_close_vol_high_low) < period + 1:
+        return None
+    true_ranges = []
+    for i in range(1, len(paired_close_vol_high_low)):
+        prev_close = paired_close_vol_high_low[i - 1][0]
+        _c, _v, high, low = paired_close_vol_high_low[i]
+        if high is None or low is None or prev_close is None:
+            continue
+        tr = max(high - low, abs(high - prev_close), abs(low - prev_close))
+        true_ranges.append(tr)
+    if len(true_ranges) < period:
+        return None
+    return sum(true_ranges[-period:]) / period
+
+
+SUPPORT_RESISTANCE_WINDOW_DAYS = 20  # standard Donchian-channel-style window
+
+
+def compute_support_resistance(highs, lows, window=SUPPORT_RESISTANCE_WINDOW_DAYS):
+    """
+    Deterministic support/resistance via the standard N-day rolling
+    high/low convention (a Donchian-channel-style definition, not a
+    subjective reading of chart patterns): resistance = the highest high
+    over the last `window` days (including today); support = the lowest
+    low over the same window. A fixed, publicly documented, reproducible
+    rule — investigated specifically because the brief asked whether an
+    OBJECTIVE definition exists before implementing anything here.
+    Returns None if fewer than `window` days of high/low data exist —
+    never approximated from a shorter window.
+    """
+    recent_highs = highs[-window:]
+    recent_lows = lows[-window:]
+    if len(recent_highs) < window or len(recent_lows) < window:
+        return None
+    valid_highs = [h for h in recent_highs if h is not None]
+    valid_lows = [l for l in recent_lows if l is not None]
+    if len(valid_highs) < window or len(valid_lows) < window:
+        return None
+    return {"resistance": max(valid_highs), "support": min(valid_lows)}
+
+
+def compute_breakout_status(latest_close, prior_highs, prior_lows, window=SUPPORT_RESISTANCE_WINDOW_DAYS):
+    """
+    Deterministic breakout/breakdown status. A "breakout" is today's
+    close exceeding the highest high of the `window` days PRECEDING
+    today (today itself deliberately excluded from that comparison —
+    comparing a value against a window that includes itself is
+    circular and would make "breakout" nearly meaningless). A
+    "breakdown" is today's close falling below the lowest low of the
+    same preceding window. Same standard, reproducible convention as
+    compute_support_resistance, just applied as a threshold test rather
+    than reporting the levels themselves. Returns None if there isn't
+    enough preceding history — never guessed from a partial window.
+    """
+    recent_highs = prior_highs[-window:]
+    recent_lows = prior_lows[-window:]
+    if len(recent_highs) < window or len(recent_lows) < window or latest_close is None:
+        return None
+    valid_highs = [h for h in recent_highs if h is not None]
+    valid_lows = [l for l in recent_lows if l is not None]
+    if len(valid_highs) < window or len(valid_lows) < window:
+        return None
+    if latest_close > max(valid_highs):
+        return "breakout"
+    if latest_close < min(valid_lows):
+        return "breakdown"
+    return "within_range"
 
 
 BIG_MOVER_THRESHOLD_PCT = 5.0  # purely descriptive flag: "this has already moved a lot today"
@@ -1903,6 +2034,346 @@ def eps_scale(eps):
     return scale_bar_html("EPS", f"£{eps:.2f}", pos, "loss-making", "strong profit/share", "#f0997b", "#5dcaa5")
 
 
+# =========================================================================
+# Research-view calculations — Phase 1 of the "actionable LSE research
+# dashboard" work. Every function here is a PURE, deterministic
+# calculation over fields already present on an enriched screener/
+# watchlist row (target price, current price, volume, averageVolume,
+# ma20, rsi14, changePct) — no new network calls, no new data source.
+# None of these functions produce investment advice or a recommendation
+# — they compute and label FACTS (a distance, a ratio, a flag describing
+# an observed combination of already-known figures), never a judgement
+# on what to do about them.
+# =========================================================================
+
+def compute_target_upside_pct(price, target):
+    """
+    (target / price - 1) * 100 — how far the ALREADY-PUBLISHED broker
+    consensus target sits from the current price. This is a distance
+    calculation, not a forecast: it says nothing about whether the
+    target will be reached, only how far away it currently is.
+    Returns None if either input is missing or price is zero/invalid.
+    """
+    if price is None or target is None or price == 0:
+        return None
+    return (target / price - 1) * 100
+
+
+def compute_ma20_distance_pct(price, ma20):
+    """
+    (price / ma20 - 1) * 100 — exact % distance from the 20-day moving
+    average, replacing the previous above/below-only binary. A fact
+    about where today's price sits relative to a recent trend baseline,
+    not a signal to act on by itself.
+    """
+    if price is None or ma20 is None or ma20 == 0:
+        return None
+    return (price / ma20 - 1) * 100
+
+
+def compute_volume_ratio(volume, average_volume):
+    """
+    Today's volume as a multiple of the published average volume — e.g.
+    3.1 means "3.1x average volume". Returns None if either input is
+    missing or the average is zero/invalid (never fabricates a ratio
+    from incomplete data).
+    """
+    if volume is None or average_volume is None or average_volume == 0:
+        return None
+    return volume / average_volume
+
+
+HIGH_VOLUME_RATIO_THRESHOLD = 1.5  # today's volume at least 1.5x the published average
+OVEREXTENDED_RSI_THRESHOLD = 70    # standard RSI "overbought" reference level
+
+
+def compute_opportunity_flags(changePct, volume_ratio, above_ma20, rsi14, has_news):
+    """
+    Deterministic, explainable research flags — transparent rule
+    combinations over already-known figures, NEVER a prediction, and
+    NEVER labelled as a buy/sell signal. Each flag returned as
+    (flag_id, label, reason_string) so the dashboard can show WHY a flag
+    fired, not just that it did. A row can carry more than one flag
+    (e.g. a big rise on strong volume with no news yet is both
+    "momentum + volume" AND, if RSI is also elevated, "overextended" —
+    these are not mutually exclusive facts about the same move).
+
+    Any input that's None is treated as "insufficient data for that
+    specific check" — a flag requiring volume_ratio never fires if
+    volume_ratio is None, rather than guessing.
+    """
+    flags = []
+    chg = changePct or 0
+    significant_move = abs(chg) >= BIG_MOVER_THRESHOLD_PCT
+    high_volume = volume_ratio is not None and volume_ratio >= HIGH_VOLUME_RATIO_THRESHOLD
+
+    if chg > 0 and high_volume and above_ma20:
+        flags.append((
+            "momentum_volume", "🚀 Momentum + volume",
+            f"+{chg:.1f}% · {volume_ratio:.1f}× average volume · above 20-day MA",
+        ))
+    if significant_move and has_news:
+        flags.append((
+            "positive_catalyst" if chg >= 0 else "negative_catalyst",
+            "🟢 Catalyst found" if chg >= 0 else "🔴 Negative catalyst",
+            f"{'+' if chg >= 0 else ''}{chg:.1f}% · relevant same-day news found",
+        ))
+    if significant_move and not has_news:
+        flags.append((
+            "move_without_catalyst", "🟡 Move without catalyst",
+            f"{'+' if chg >= 0 else ''}{chg:.1f}% · "
+            f"{'high volume' if high_volume else 'no volume confirmation'} · no relevant same-day news found",
+        ))
+    if chg > 0 and rsi14 is not None and rsi14 >= OVEREXTENDED_RSI_THRESHOLD:
+        flags.append((
+            "overextended", "🟡 Overextended",
+            f"+{chg:.1f}% recent move · RSI {rsi14:.0f}",
+        ))
+    if chg < 0 and high_volume:
+        flags.append((
+            "weakness_volume", "🔴 Weakness + volume",
+            f"{chg:.1f}% · {volume_ratio:.1f}× average volume",
+        ))
+    return flags
+
+
+# =========================================================================
+# Phase 2 — connective intelligence: evidence-agreement classification,
+# multi-event broker momentum, and market-context helpers. Same
+# discipline as Phase 1: pure, deterministic, no new network calls, and
+# — the important addition here — no fabricated sentiment. This system
+# has no text sentiment analysis and will not simulate one: a generic
+# "news"/"event"/"reiteration"/"target" category item confirms a
+# catalyst EXISTS, never its direction. Direction is only ever asserted
+# from a genuinely directional classification already computed elsewhere
+# (classify()'s upgrade/downgrade/target_raise/target_cut categories).
+# =========================================================================
+
+# Categories with a genuinely known direction — everything else that's
+# still a real catalyst (news, event, reiteration, target, initiation)
+# only ever confirms presence, never a guessed direction. "initiation" is
+# deliberately excluded from the positive set: an initiation's own
+# direction depends on what rating it initiated AT, which classify()'s
+# category alone doesn't tell us — asserting "positive" without knowing
+# that would be exactly the kind of fabrication being avoided here.
+EVIDENCE_POSITIVE_CATEGORIES = {"upgrade", "target_raise"}
+EVIDENCE_NEGATIVE_CATEGORIES = {"downgrade", "target_cut"}
+
+
+def classify_evidence(changePct, volume_ratio, news_items, has_significant_move_threshold=None, latest_broker_event=None):
+    """
+    Deterministic evidence-agreement classification — a fact about whether
+    the AVAILABLE signals (price direction, volume, and any directionally-
+    classified catalyst) agree or conflict, never a prediction and never a
+    buy/sell instruction.
+
+    Returns a dict with every component visible, not just a final label —
+    "no black box": {
+        "label": one of "supported" / "conflicting" / "catalyst_unclear_direction"
+                  / "unexplained_move" / "no_signal",
+        "hasCatalyst": bool — was ANY relevant news/event found for this stock today,
+        "catalystDirection": None | "positive" | "negative" — ONLY set when a
+            genuinely directional item (upgrade/downgrade/target_raise/target_cut,
+            from either a news item's category OR a same-day dated broker event)
+            was found; a generic news item never sets this,
+        "volumeConfirms": True | False | None (None when volume_ratio itself
+            is unavailable, so absence of data is never silently treated as
+            "no confirmation"),
+    }
+
+    "supported": significant move + a directional catalyst whose direction
+    matches the price move (e.g. price up + an upgrade/target-raise today).
+    "conflicting": significant move + a directional catalyst pointing the
+    OTHER way (e.g. price falling despite a same-day upgrade/target-raise —
+    exactly the "conflicting evidence" example given).
+    "catalyst_unclear_direction": significant move + a real catalyst exists,
+    but it's a generic news/event item with no determinable direction —
+    the honest answer when sentiment can't be inferred, not a guess.
+    "unexplained_move": significant move, no catalyst found at all.
+    "no_signal": the move itself isn't significant enough to classify.
+
+    latest_broker_event: the SAME dated event object the Broker
+    Intelligence block renders (see get_latest_broker_event_per_ticker) —
+    added after a real end-to-end scenario walkthrough caught a genuine
+    inconsistency: without this, a same-day broker downgrade that wasn't
+    ALSO independently surfaced by the separate news-scraping pipeline
+    (a realistic gap — the structured events pipeline and the news feed
+    are two different sources) was invisible to this function, so a stock
+    rising +6% on a same-day downgrade was labelled "unexplained_move"
+    here while the Broker Intelligence block directly below correctly
+    showed the downgrade — two parts of the same rendered picture
+    disagreeing. Deliberately scoped to TODAY's date only (London terms),
+    matching the same-day principle news items are already held to; an
+    event from weeks ago being folded into today's evidence picture would
+    be its own kind of misleading.
+    """
+    threshold = has_significant_move_threshold if has_significant_move_threshold is not None else BIG_MOVER_THRESHOLD_PCT
+    chg = changePct or 0
+    significant_move = abs(chg) >= threshold
+    volume_confirms = (volume_ratio >= HIGH_VOLUME_RATIO_THRESHOLD) if volume_ratio is not None else None
+
+    catalyst_direction = None
+    has_catalyst = False
+    for it in (news_items or []):
+        category = it.get("category")
+        if category in EVIDENCE_POSITIVE_CATEGORIES:
+            catalyst_direction = "positive"
+            has_catalyst = True
+        elif category in EVIDENCE_NEGATIVE_CATEGORIES:
+            catalyst_direction = "negative"
+            has_catalyst = True
+        elif category:
+            has_catalyst = True  # a real catalyst, direction just not determinable
+
+    if latest_broker_event and latest_broker_event.get("date"):
+        try:
+            today_london = datetime.now(timezone.utc).astimezone(LONDON_TZ).strftime("%Y-%m-%d")
+            if latest_broker_event["date"] == today_london:
+                action = latest_broker_event.get("action")
+                if action == "UPGRADE":
+                    catalyst_direction = "positive"
+                    has_catalyst = True
+                elif action == "DOWNGRADE":
+                    catalyst_direction = "negative"
+                    has_catalyst = True
+        except Exception:
+            pass  # never let a malformed date field break relevance classification
+
+    if not significant_move:
+        label = "no_signal"
+    elif catalyst_direction is not None:
+        agrees = (chg >= 0 and catalyst_direction == "positive") or (chg < 0 and catalyst_direction == "negative")
+        label = "supported" if agrees else "conflicting"
+    elif has_catalyst:
+        label = "catalyst_unclear_direction"
+    else:
+        label = "unexplained_move"
+
+    return {
+        "label": label,
+        "hasCatalyst": has_catalyst,
+        "catalystDirection": catalyst_direction,
+        "volumeConfirms": volume_confirms,
+    }
+
+
+BROKER_MOMENTUM_LOOKBACK_DAYS = 90  # a quarter-ish window — long enough to see a real
+                                     # trend across multiple events, not just noise from one
+
+
+def compute_broker_momentum(events_for_ticker, lookback_days=BROKER_MOMENTUM_LOOKBACK_DAYS, now_utc=None):
+    """
+    Deterministic broker-sentiment TREND across multiple dated events, not
+    just the single latest one (see get_latest_broker_event_per_ticker for
+    that). A rating UPGRADE or a target RAISE (new_target > old_target,
+    compared numerically when both are present — never inferred from
+    action alone) each count as one positive-direction event; DOWNGRADE
+    or a target CUT each count as one negative. REITERATION/INITIATION/
+    NO_CHANGE/RATING_CHANGE (an ambiguous bucket-comparison fallback)
+    contribute to neither count — never guessed.
+
+    Returns {"direction": "improving"|"stable"|"deteriorating"|"no_recent_activity",
+             "netScore": int, "eventCount": int} — netScore and eventCount
+    are always included so the direction label is never a black box; a
+    caller can always see exactly what it was computed from.
+    """
+    now_utc = now_utc or datetime.now(timezone.utc)
+    positive = 0
+    negative = 0
+    counted = 0
+    for e in (events_for_ticker or []):
+        if e.get("superseded_by"):
+            continue
+        ts = e.get("timestamp")
+        if not ts:
+            continue
+        try:
+            dt = datetime.fromisoformat(ts)
+        except (ValueError, TypeError):
+            continue
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        if (now_utc - dt).days > lookback_days:
+            continue
+        counted += 1
+        action = e.get("action")
+        if action == "UPGRADE":
+            positive += 1
+        elif action == "DOWNGRADE":
+            negative += 1
+        old_t, new_t = e.get("old_target"), e.get("new_target")
+        if old_t is not None and new_t is not None:
+            try:
+                old_f, new_f = float(old_t), float(new_t)
+                if new_f > old_f:
+                    positive += 1
+                elif new_f < old_f:
+                    negative += 1
+            except (TypeError, ValueError):
+                pass
+    if counted == 0:
+        return {"direction": "no_recent_activity", "netScore": 0, "eventCount": 0}
+    net = positive - negative
+    direction = "improving" if net > 0 else ("deteriorating" if net < 0 else "stable")
+    return {"direction": direction, "netScore": net, "eventCount": counted}
+
+
+def compute_relative_to_ftse(stock_change_pct, ftse_change_pct):
+    """
+    (stock % move) - (FTSE 100 % move) — the SAME kind of story-changing
+    context your brief describes ("Shell +4% while FTSE +0.2%" reads very
+    differently from "Shell +4% while FTSE -0.5%"). Genuinely available
+    now: ftse100's own changePct is already fetched every cycle, no new
+    source. Returns None if either input is missing — never fabricated
+    from a partial figure.
+    """
+    if stock_change_pct is None or ftse_change_pct is None:
+        return None
+    return stock_change_pct - ftse_change_pct
+
+
+MIN_SECTOR_SAMPLE_SIZE = 3  # below this, a "sector average" is barely more informative
+                            # than one or two other stocks dressed up as a market signal
+
+
+def compute_sector_relative_context(ticker, sector, all_enriched_rows):
+    """
+    A DELIBERATELY CAUTIOUS sector-context approximation — explicitly NOT
+    presented as an authoritative sector index, because no such data
+    source exists or was found (investigated directly; see the design
+    report). This averages the % move of OTHER stocks that happen to
+    already be in the SAME enriched pool (watchlist + today's screener
+    rankings) and share the same sector — a small, coincidental sample,
+    not the real sector universe.
+
+    Returns None if fewer than MIN_SECTOR_SAMPLE_SIZE other same-sector
+    stocks exist in the pool THIS run — never manufactures a "sector
+    average" from an inadequate sample and presents it as if authoritative,
+    per the explicit requirement not to do that. When it DOES return a
+    value, callers must show the sample size and methodology alongside it
+    (see the rendering — this function only returns the number and count,
+    it doesn't decide how it's labelled).
+    """
+    if not sector:
+        return None
+    same_sector_moves = [
+        row.get("changePct") for row in all_enriched_rows
+        if row.get("sector") == sector and row.get("symbol_or_ticker") != ticker
+        and row.get("changePct") is not None
+    ]
+    if len(same_sector_moves) < MIN_SECTOR_SAMPLE_SIZE:
+        return None
+    avg = sum(same_sector_moves) / len(same_sector_moves)
+    return {"avgChangePct": avg, "sampleSize": len(same_sector_moves)}
+
+
+def esc(s):
+    """Minimal HTML-escaping — module-level (not nested in render_dashboard) so
+    the shared per-stock research rendering function can use it too, from
+    outside render_dashboard's own closure."""
+    return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 def format_epoch_date(epoch_seconds):
     """Formats a Yahoo epoch timestamp (earnings/ex-dividend dates) as a plain London
     date. IMPORTANT: only returns a value if the date is today or in the future — Yahoo
@@ -1921,7 +2392,840 @@ def format_epoch_date(epoch_seconds):
         return None
 
 
-def render_dashboard(data, watchlist):
+EVIDENCE_LABEL_TEXT = {
+    "supported": ("🟢 Supported", "price move agrees with a same-day directional broker action"),
+    "conflicting": ("🔴 Conflicting evidence", "price move disagrees with a same-day directional broker action"),
+    "catalyst_unclear_direction": ("🟡 Catalyst found, direction unclear", "relevant news exists but isn't broker-classified as directionally positive or negative"),
+    "unexplained_move": ("🟡 Unexplained move", "no relevant same-day catalyst found for this move"),
+    "no_signal": ("No signal", "move isn't large enough to classify"),
+}
+
+BROKER_MOMENTUM_LABEL_TEXT = {
+    "improving": "↑ improving",
+    "stable": "→ stable",
+    "deteriorating": "↓ deteriorating",
+    "no_recent_activity": "no recent broker activity",
+}
+
+# =========================================================================
+# Data-quality taxonomy — every evidence line in the entry/exit panel is
+# tagged with one of these, so provenance is always visible rather than
+# blended together. Deliberately scoped to the NEW entry/exit panel for
+# this phase, not retrofitted across every existing line on the
+# dashboard — that would be a much larger, higher-risk pass across
+# already-working, already-tested rendering, and is called out here as a
+# scoping decision, not an oversight.
+# =========================================================================
+DATA_QUALITY_TAGS = {
+    "SOURCE_FACT": "📌 fact",
+    "CALCULATED": "🧮 calculated",
+    "BROKER_OPINION": "🏦 broker opinion",
+    "NEWS_REPORT": "📰 news",
+    "SYSTEM_INTERPRETATION": "🧭 interpretation",
+}
+
+
+SCORECARD_DIMENSIONS = ["TREND", "MOMENTUM", "VOLUME", "NEWS", "BROKER", "TECHNICAL", "MARKET", "RISK"]
+
+
+def compute_research_scorecard(
+    change_pct_5d, above_ma20, rsi14, ma_crossover, volume_ratio, change_pct,
+    evidence, broker_momentum, breakout_status, ftse_relative, sector_context,
+    upside_pct,
+):
+    """
+    A fully decomposable, deterministic research scorecard — explicitly
+    NOT a prediction or a probability. Every dimension's score is a
+    small integer (typically -2..+2) computed from a fixed, documented
+    rule stated in this docstring, never a hidden weighting or anything
+    resembling model output. The TOTAL is simply the sum of the visible
+    parts — never separately calibrated, never converted into a
+    "probability of rising" or similar framing anywhere in this system.
+
+    Rules (each independent of the others, some inputs deliberately
+    contribute to more than one dimension — that's intentional, so a
+    genuine risk shows up wherever it's relevant rather than being
+    hidden by only counting once):
+
+    TREND: +1 if price above 20-day MA else -1; +1 if 5-day change
+    positive else -1 (each only scored when its input is available).
+
+    MOMENTUM: +1 if RSI in a healthy bullish zone (45-70) else -1 if
+    RSI < 30 (weak) else 0; +1 for a bullish MA20/50 crossover, -1 for
+    bearish.
+
+    VOLUME: +2 if volume >=1.5x average AND price rising (confirmed
+    up-move); -2 if >=1.5x average AND price falling (confirmed
+    weakness); -1 if volume <0.8x average (weak participation); else 0.
+
+    NEWS: uses classify_evidence's label directly — "supported": +2,
+    "conflicting": -2, "unexplained_move": -1, else 0. Never infers a
+    score from generic news sentiment (classify_evidence itself never
+    does, so neither does this).
+
+    BROKER: uses compute_broker_momentum's direction — "improving": +2,
+    "deteriorating": -2, else 0.
+
+    TECHNICAL: uses compute_breakout_status — "breakout": +1,
+    "breakdown": -1, else 0. (ATR/volatility is reported elsewhere as
+    context, deliberately NOT scored here — volatility itself isn't
+    inherently positive or negative, so forcing it into a directional
+    point would misrepresent what it actually means.)
+
+    MARKET: +1 if outperforming FTSE 100, -1 if underperforming; +1 more
+    if also outperforming its (sample-safeguarded) sector context, -1 if
+    underperforming it — capped at ±2 total for this dimension.
+
+    RISK: a caution-only accumulator, always <= 0: -1 if RSI >= 70
+    (overextended), -1 if price already >5% above the broker consensus
+    target (limited stated upside), -1 if evidence is "conflicting".
+
+    Returns {"dimensions": {name: (score, [reason strings])}, "total": int,
+    "confidence": "High"|"Medium"|"Low"}. Confidence is based on how many
+    of the underlying inputs were actually AVAILABLE (data completeness),
+    never on how confident the resulting score looks — a score built from
+    mostly-missing data is explicitly labelled Low confidence even if its
+    total happens to look decisive.
+    """
+    dims = {}
+
+    # --- TREND ---
+    trend_score, trend_reasons = 0, []
+    if above_ma20 is True:
+        trend_score += 1; trend_reasons.append("above 20-day MA (+1)")
+    elif above_ma20 is False:
+        trend_score -= 1; trend_reasons.append("below 20-day MA (-1)")
+    if change_pct_5d is not None and change_pct_5d > 0:
+        trend_score += 1; trend_reasons.append("positive 5-day trend (+1)")
+    elif change_pct_5d is not None and change_pct_5d < 0:
+        trend_score -= 1; trend_reasons.append("negative 5-day trend (-1)")
+    dims["TREND"] = (trend_score, trend_reasons)
+
+    # --- MOMENTUM ---
+    mom_score, mom_reasons = 0, []
+    if rsi14 is not None:
+        if 45 <= rsi14 <= 70:
+            mom_score += 1; mom_reasons.append(f"RSI {rsi14:.0f} in healthy bullish zone (+1)")
+        elif rsi14 < 30:
+            mom_score -= 1; mom_reasons.append(f"RSI {rsi14:.0f} weak (-1)")
+    if ma_crossover == "bullish":
+        mom_score += 1; mom_reasons.append("bullish MA20/50 crossover (+1)")
+    elif ma_crossover == "bearish":
+        mom_score -= 1; mom_reasons.append("bearish MA20/50 crossover (-1)")
+    dims["MOMENTUM"] = (mom_score, mom_reasons)
+
+    # --- VOLUME ---
+    vol_score, vol_reasons = 0, []
+    high_vol = volume_ratio is not None and volume_ratio >= HIGH_VOLUME_RATIO_THRESHOLD
+    chg = change_pct or 0
+    if high_vol and chg > 0:
+        vol_score += 2; vol_reasons.append(f"{volume_ratio:.1f}× average volume confirms the rise (+2)")
+    elif high_vol and chg < 0:
+        vol_score -= 2; vol_reasons.append(f"{volume_ratio:.1f}× average volume confirms the decline (-2)")
+    elif volume_ratio is not None and volume_ratio < 0.8:
+        vol_score -= 1; vol_reasons.append(f"only {volume_ratio:.1f}× average — weak participation (-1)")
+    dims["VOLUME"] = (vol_score, vol_reasons)
+
+    # --- NEWS ---
+    news_score, news_reasons = 0, []
+    if evidence["label"] == "supported":
+        news_score += 2; news_reasons.append("evidence supported by a directional broker action (+2)")
+    elif evidence["label"] == "conflicting":
+        news_score -= 2; news_reasons.append("evidence conflicts with a directional broker action (-2)")
+    elif evidence["label"] == "unexplained_move":
+        news_score -= 1; news_reasons.append("no catalyst found for this move (-1)")
+    dims["NEWS"] = (news_score, news_reasons)
+
+    # --- BROKER ---
+    broker_score, broker_reasons = 0, []
+    if broker_momentum and broker_momentum["direction"] == "improving":
+        broker_score += 2; broker_reasons.append(f"broker momentum improving ({broker_momentum['eventCount']} action(s)) (+2)")
+    elif broker_momentum and broker_momentum["direction"] == "deteriorating":
+        broker_score -= 2; broker_reasons.append(f"broker momentum deteriorating ({broker_momentum['eventCount']} action(s)) (-2)")
+    dims["BROKER"] = (broker_score, broker_reasons)
+
+    # --- TECHNICAL ---
+    tech_score, tech_reasons = 0, []
+    if breakout_status == "breakout":
+        tech_score += 1; tech_reasons.append(f"breakout above {SUPPORT_RESISTANCE_WINDOW_DAYS}-day high (+1)")
+    elif breakout_status == "breakdown":
+        tech_score -= 1; tech_reasons.append(f"breakdown below {SUPPORT_RESISTANCE_WINDOW_DAYS}-day low (-1)")
+    dims["TECHNICAL"] = (tech_score, tech_reasons)
+
+    # --- MARKET ---
+    mkt_score, mkt_reasons = 0, []
+    if ftse_relative is not None and ftse_relative > 0:
+        mkt_score += 1; mkt_reasons.append(f"outperforming FTSE 100 by {ftse_relative:.1f}% (+1)")
+    elif ftse_relative is not None and ftse_relative < 0:
+        mkt_score -= 1; mkt_reasons.append(f"underperforming FTSE 100 by {abs(ftse_relative):.1f}% (-1)")
+    if sector_context is not None:
+        if sector_context["avgChangePct"] < chg:
+            mkt_score += 1; mkt_reasons.append(f"outperforming its tracked sector sample, n={sector_context['sampleSize']} (+1)")
+        elif sector_context["avgChangePct"] > chg:
+            mkt_score -= 1; mkt_reasons.append(f"underperforming its tracked sector sample, n={sector_context['sampleSize']} (-1)")
+    dims["MARKET"] = (mkt_score, mkt_reasons)
+
+    # --- RISK (caution-only, always <= 0) ---
+    risk_score, risk_reasons = 0, []
+    if rsi14 is not None and rsi14 >= OVEREXTENDED_RSI_THRESHOLD:
+        risk_score -= 1; risk_reasons.append(f"RSI {rsi14:.0f} overextended (-1)")
+    if upside_pct is not None and upside_pct <= -5:
+        risk_score -= 1; risk_reasons.append(f"price {abs(upside_pct):.1f}% above broker target (-1)")
+    if evidence["label"] == "conflicting":
+        risk_score -= 1; risk_reasons.append("conflicting evidence (-1)")
+    dims["RISK"] = (risk_score, risk_reasons)
+
+    total = sum(score for score, _reasons in dims.values())
+
+    # Confidence: data-completeness based, never probability-based.
+    available_inputs = [
+        change_pct_5d, above_ma20, rsi14, ma_crossover, volume_ratio,
+        upside_pct, ftse_relative,
+        broker_momentum["eventCount"] > 0 if broker_momentum else False,
+        breakout_status,
+    ]
+    available_count = sum(1 for v in available_inputs if v not in (None, False))
+    if available_count >= 7:
+        confidence = "High"
+    elif available_count >= 4:
+        confidence = "Medium"
+    else:
+        confidence = "Low"
+
+    return {"dimensions": dims, "total": total, "confidence": confidence}
+
+
+NEWS_TYPE_KEYWORDS = {
+    "earnings": {"earnings", "profit", "revenue", "quarterly", "interim results", "annual results", "trading update", "full-year results", "half-year results"},
+    "legal_regulatory": {"regulator", "fine", "lawsuit", "investigation", "fca", "antitrust", "compliance", "breach", "sanction"},
+    "operational": {"outage", "shutdown", "incident", "disruption", "fire", "recall", "strike", "closure"},
+    "investment_capex": {"invest", "capex", "expansion", "new plant", "new facility", "to build", "construction"},
+    "management": {"chief executive", "chairman", "appoints", "resigns", "steps down", "names new", "management change"},
+    "mna": {"acquisition", "acquire", "merger", "takeover", "buyout", "divest"},
+}
+
+
+def classify_news_type(title, category=None):
+    """
+    Purely DESCRIPTIVE secondary categorization of what KIND of news a
+    headline is — earnings / legal-regulatory / operational / investment-
+    capex / management / M&A / broker action / other. Completely separate
+    from relevance filtering (passes_relevance_filter never uses this)
+    and NEVER asserts sentiment or direction — same discipline as the
+    relevance-disqualifier work: small, explicit, auditable keyword
+    lists, not an attempt at full topic modelling.
+
+    If `category` is already one of classify()'s broker-action categories
+    (upgrade/downgrade/target/target_raise/target_cut/initiation/
+    reiteration), returns "broker_action" directly — reusing that
+    decision rather than re-deriving it, so the two can never disagree.
+    Otherwise applies the keyword lists above to the headline text; a
+    headline matching none of them is honestly labelled "other" rather
+    than forced into a category it doesn't fit.
+    """
+    if category in ("upgrade", "downgrade", "target", "target_raise", "target_cut", "initiation", "reiteration"):
+        return "broker_action"
+    if not title:
+        return "other"
+    t = title.lower()
+    for type_name, keywords in NEWS_TYPE_KEYWORDS.items():
+        if any(kw in t for kw in keywords):
+            return type_name
+    return "other"
+
+
+NEWS_TYPE_LABELS = {
+    "earnings": "📊 Earnings",
+    "legal_regulatory": "⚖️ Legal/Regulatory",
+    "operational": "🏭 Operational",
+    "investment_capex": "💰 Investment/Capex",
+    "management": "👔 Management",
+    "mna": "🤝 M&A",
+    "broker_action": "🏦 Broker Action",
+    "other": "📰 Other",
+}
+
+
+def detect_contradictions(
+    change_pct, change_pct_5d, above_ma20, rsi14, volume_ratio,
+    evidence, broker_momentum, upside_pct, ma200,
+):
+    """
+    Deeper contradiction detection — checks a FIXED set of specific
+    signal pairs for disagreement (the exact pairs given in the brief),
+    each returned as {"type", "conflict", "supportingA", "supportingB",
+    "missingData"} — what conflicts, what supports each side, and what
+    data would help resolve it further. Distinct from classify_evidence's
+    single overall label (still used here for the price/catalyst check):
+    a stock can have more than one kind of tension at once, and this
+    surfaces all of them rather than collapsing to one verdict. Never
+    resolves a contradiction into an answer — only describes it, so the
+    person can weigh it themselves.
+    """
+    contradictions = []
+    chg = change_pct or 0
+    significant_move = abs(chg) >= BIG_MOVER_THRESHOLD_PCT
+
+    # 1. Price direction vs a same-day directional broker catalyst
+    if evidence["label"] == "conflicting":
+        direction_word = "rising" if chg >= 0 else "falling"
+        catalyst_word = evidence["catalystDirection"] or "?"
+        contradictions.append({
+            "type": "price_vs_catalyst",
+            "conflict": f"Price is {direction_word} ({chg:+.1f}%) but the same-day directional broker action was {catalyst_word}",
+            "supportingA": [f"Price move: {chg:+.1f}%"],
+            "supportingB": [f"Directional broker catalyst: {catalyst_word}"],
+            "missingData": [],
+        })
+
+    # 2. Large move + weak/unconfirmed volume
+    if significant_move and volume_ratio is not None and volume_ratio < 0.8:
+        contradictions.append({
+            "type": "move_without_volume",
+            "conflict": f"A {abs(chg):.1f}% move is not backed by above-average volume",
+            "supportingA": [f"Price move: {chg:+.1f}%"],
+            "supportingB": [f"Volume only {volume_ratio:.1f}× average"],
+            "missingData": [],
+        })
+    elif significant_move and volume_ratio is None:
+        contradictions.append({
+            "type": "move_without_volume",
+            "conflict": f"A {abs(chg):.1f}% move — volume confirmation cannot be checked",
+            "supportingA": [f"Price move: {chg:+.1f}%"],
+            "supportingB": [],
+            "missingData": ["average volume data unavailable"],
+        })
+
+    # 3. Strong rise + already-overextended RSI
+    if significant_move and chg > 0 and rsi14 is not None and rsi14 >= OVEREXTENDED_RSI_THRESHOLD:
+        contradictions.append({
+            "type": "move_vs_overextension",
+            "conflict": f"A strong rise (+{chg:.1f}%) alongside an already-overextended RSI ({rsi14:.0f})",
+            "supportingA": [f"Price move: +{chg:.1f}%"],
+            "supportingB": [f"RSI {rsi14:.0f} — overbought territory"],
+            "missingData": [],
+        })
+
+    # 4. Positive target upside + deteriorating broker momentum
+    if upside_pct is not None and upside_pct > 0 and broker_momentum and broker_momentum["direction"] == "deteriorating":
+        contradictions.append({
+            "type": "upside_vs_broker_deterioration",
+            "conflict": f"Consensus target implies +{upside_pct:.1f}% upside, but broker momentum is deteriorating",
+            "supportingA": [f"Target upside: +{upside_pct:.1f}%"],
+            "supportingB": [f"Broker momentum: deteriorating ({broker_momentum['eventCount']} action(s))"],
+            "missingData": [],
+        })
+
+    # 5. Improving broker momentum + weakening price trend
+    if broker_momentum and broker_momentum["direction"] == "improving" and change_pct_5d is not None and change_pct_5d < 0:
+        contradictions.append({
+            "type": "broker_improving_vs_price_weak",
+            "conflict": f"Broker momentum is improving, but the 5-day price trend is negative ({change_pct_5d:.1f}%)",
+            "supportingA": [f"Broker momentum: improving ({broker_momentum['eventCount']} action(s))"],
+            "supportingB": [f"5-day trend: {change_pct_5d:.1f}%"],
+            "missingData": [],
+        })
+
+    # 6. Strong 5-day move + still below a longer-term moving average.
+    # Uses MA20 (above_ma20) as the available longer-term-relative check;
+    # when 200-day MA data isn't available (needs a full year of
+    # history), that's disclosed explicitly rather than silently
+    # substituted for without comment.
+    if change_pct_5d is not None and change_pct_5d >= UPTREND_5DAY_THRESHOLD_PCT and above_ma20 is False:
+        contradictions.append({
+            "type": "short_term_strength_vs_long_term_weakness",
+            "conflict": f"Strong 5-day gain (+{change_pct_5d:.1f}%) while still below the 20-day MA",
+            "supportingA": [f"5-day trend: +{change_pct_5d:.1f}%"],
+            "supportingB": ["Price below 20-day MA"],
+            "missingData": [] if ma200 is not None else ["insufficient history for 200-day MA context"],
+        })
+
+    return contradictions
+
+
+def compute_entry_exit_evidence(
+    change_pct, change_pct_5d, above_ma20, ma_crossover, rsi14,
+    volume_ratio, upside_pct, evidence, broker_momentum, latest_broker_event,
+    ftse_relative, breakout_status=None,
+):
+    """
+    Structures ALREADY-COMPUTED signals into the ENTRY EVIDENCE / EXIT-RISK
+    EVIDENCE framework — this introduces no new signal of its own; every
+    line here comes from a calculation or classification that already
+    exists elsewhere (compute_ma20_distance_pct, classify_evidence,
+    compute_broker_momentum, etc). Never a buy/sell instruction — purely
+    an organized presentation of existing facts/calculations/opinions,
+    each tagged with its DATA_QUALITY_TAGS provenance so nothing here is
+    presented as more authoritative than it actually is.
+
+    Returns {"entry": {"supporting": [(text, tag), ...], "opposing": [...]},
+             "exit": {"supporting": [...], "opposing": [...]},
+             "holdWait": [(text, tag), ...]}
+    "exit.supporting" = evidence supporting caution/reduction (a risk
+    case, matching the brief's terminology exactly); "exit.opposing" =
+    evidence AGAINST exiting — i.e. the position may still be sound.
+    "holdWait" fires on genuine ambiguity (conflicting evidence, mixed
+    signals on both sides) or genuine data gaps — the system is
+    deliberately willing to say "insufficient evidence" rather than
+    forcing every stock into an entry or exit framing.
+
+    Every rule here fires independently and only when its OWN specific
+    condition is met — a missing input (None) simply means that
+    particular line doesn't appear, never a fabricated placeholder.
+    """
+    entry_supporting, entry_opposing = [], []
+    exit_supporting, exit_opposing = [], []
+    chg = change_pct or 0
+    high_volume = volume_ratio is not None and volume_ratio >= HIGH_VOLUME_RATIO_THRESHOLD
+
+    # --- Trend ---
+    if change_pct_5d is not None and change_pct_5d > 0:
+        entry_supporting.append((f"5-day trend positive (+{change_pct_5d:.1f}%)", "CALCULATED"))
+    elif change_pct_5d is not None and change_pct_5d < 0:
+        exit_supporting.append((f"5-day trend negative ({change_pct_5d:.1f}%) — weakening trend", "CALCULATED"))
+        entry_opposing.append((f"5-day trend negative ({change_pct_5d:.1f}%)", "CALCULATED"))
+    if above_ma20 is True:
+        entry_supporting.append(("Price above 20-day MA", "CALCULATED"))
+    elif above_ma20 is False:
+        exit_supporting.append(("Price below 20-day MA — weakening trend", "CALCULATED"))
+        entry_opposing.append(("Price below 20-day MA", "CALCULATED"))
+
+    # --- Momentum ---
+    if ma_crossover == "bullish":
+        entry_supporting.append(("20-day MA above 50-day MA (bullish crossover)", "CALCULATED"))
+    elif ma_crossover == "bearish":
+        exit_supporting.append(("20-day MA below 50-day MA (bearish crossover)", "CALCULATED"))
+        entry_opposing.append(("20-day MA below 50-day MA (bearish crossover)", "CALCULATED"))
+    if rsi14 is not None and rsi14 >= OVEREXTENDED_RSI_THRESHOLD:
+        entry_opposing.append((f"RSI {rsi14:.0f} — overextended / excessive move risk", "CALCULATED"))
+        exit_supporting.append((f"RSI {rsi14:.0f} — overextended", "CALCULATED"))
+    elif rsi14 is not None and rsi14 <= 30:
+        exit_opposing.append((f"RSI {rsi14:.0f} — oversold, downside momentum may already be exhausted", "CALCULATED"))
+
+    # --- Volume ---
+    if high_volume and chg > 0:
+        entry_supporting.append((f"Volume {volume_ratio:.1f}× average confirms the move", "CALCULATED"))
+    elif high_volume and chg < 0:
+        exit_supporting.append((f"Volume {volume_ratio:.1f}× average on a decline — weakness confirmed by volume", "CALCULATED"))
+
+    # --- News / catalyst (contradiction signals live here) ---
+    if evidence["label"] == "supported":
+        entry_supporting.append(("Price move agrees with a same-day directional broker action", "SYSTEM_INTERPRETATION"))
+    elif evidence["label"] == "conflicting":
+        entry_opposing.append(("Price move CONFLICTS with a same-day directional broker action", "SYSTEM_INTERPRETATION"))
+        exit_supporting.append(("Conflicting evidence between price move and broker action", "SYSTEM_INTERPRETATION"))
+    elif evidence["label"] == "unexplained_move":
+        if chg > 0:
+            entry_opposing.append(("No relevant same-day catalyst found for this rise", "SYSTEM_INTERPRETATION"))
+        else:
+            exit_supporting.append(("No relevant same-day catalyst found for this decline", "SYSTEM_INTERPRETATION"))
+
+    # --- Broker evidence ---
+    if latest_broker_event:
+        action = latest_broker_event.get("action")
+        broker_name = latest_broker_event.get("broker", "?")
+        old_r, new_r = latest_broker_event.get("old_rating"), latest_broker_event.get("new_rating")
+        if action == "UPGRADE":
+            entry_supporting.append((f"Latest broker action: {broker_name} upgraded ({old_r} → {new_r})", "BROKER_OPINION"))
+        elif action == "DOWNGRADE":
+            exit_supporting.append((f"Latest broker action: {broker_name} downgraded ({old_r} → {new_r})", "BROKER_OPINION"))
+    if broker_momentum and broker_momentum["direction"] == "improving":
+        entry_supporting.append((f"Broker momentum improving ({broker_momentum['eventCount']} action(s) recently)", "BROKER_OPINION"))
+        exit_opposing.append(("Broker momentum improving", "BROKER_OPINION"))
+    elif broker_momentum and broker_momentum["direction"] == "deteriorating":
+        entry_opposing.append((f"Broker momentum deteriorating ({broker_momentum['eventCount']} action(s) recently)", "BROKER_OPINION"))
+        exit_supporting.append(("Broker momentum deteriorating", "BROKER_OPINION"))
+    if upside_pct is not None:
+        if upside_pct >= 10:
+            entry_supporting.append((f"Broker consensus target implies +{upside_pct:.1f}% upside", "BROKER_OPINION"))
+        elif upside_pct <= -5:
+            exit_supporting.append((f"Price already {abs(upside_pct):.1f}% above broker consensus target", "CALCULATED"))
+            entry_opposing.append((f"Price already {abs(upside_pct):.1f}% above broker consensus target — limited stated upside", "CALCULATED"))
+
+    # --- Market context ---
+    if ftse_relative is not None and ftse_relative > 0:
+        entry_supporting.append((f"Outperforming FTSE 100 by {ftse_relative:.1f}%", "CALCULATED"))
+    elif ftse_relative is not None and ftse_relative < 0:
+        exit_supporting.append((f"Underperforming FTSE 100 by {abs(ftse_relative):.1f}%", "CALCULATED"))
+
+    # --- Technical confirmation / resistance risk (breakout/breakdown) ---
+    if breakout_status == "breakout":
+        entry_supporting.append((f"Breakout above the {SUPPORT_RESISTANCE_WINDOW_DAYS}-day high — technical confirmation", "CALCULATED"))
+    elif breakout_status == "breakdown":
+        exit_supporting.append((f"Breakdown below the {SUPPORT_RESISTANCE_WINDOW_DAYS}-day low", "CALCULATED"))
+        entry_opposing.append((f"Breakdown below the {SUPPORT_RESISTANCE_WINDOW_DAYS}-day low — technical/resistance risk", "CALCULATED"))
+
+    # --- HOLD / WAIT evidence — the system must be comfortable saying
+    # "insufficient evidence" rather than forcing every stock into an
+    # entry or exit framing. Fires on genuine ambiguity or genuine data
+    # gaps, never as a default filler.
+    hold_wait = []
+    if evidence["label"] == "conflicting":
+        hold_wait.append(("Conflicting evidence between price move and broker action", "SYSTEM_INTERPRETATION"))
+    if evidence["label"] in ("unexplained_move", "no_signal") and evidence["hasCatalyst"] is False:
+        hold_wait.append(("No meaningful catalyst identified", "SYSTEM_INTERPRETATION"))
+    if entry_supporting and entry_opposing:
+        hold_wait.append(("Mixed signals: real evidence exists on both sides", "SYSTEM_INTERPRETATION"))
+    missing_inputs = [
+        x is None for x in (
+            change_pct_5d, rsi14, ma_crossover, volume_ratio, upside_pct,
+        )
+    ] + [broker_momentum is None or broker_momentum.get("eventCount", 0) == 0]
+    if sum(missing_inputs) >= 4:
+        hold_wait.append(("Insufficient data available across trend/momentum/volume/broker signals to form a confident view", "SYSTEM_INTERPRETATION"))
+
+    return {
+        "entry": {"supporting": entry_supporting, "opposing": entry_opposing},
+        "exit": {"supporting": exit_supporting, "opposing": exit_opposing},
+        "holdWait": hold_wait,
+    }
+
+
+def render_stock_research_html(
+    ticker, name, price, change_pct, currency,
+    volume, average_volume, rsi14, ma20, change_pct_5d, above_ma20,
+    target, recommendation, market_cap, wk_low, wk_high, sector,
+    ftse_change_pct=None, sector_context=None,
+    news_items=None, latest_broker_event=None, broker_momentum=None,
+    anchor_id=None, css_class="", include_header=True, ma_crossover=None,
+    ma50=None, ma200=None, atr14=None, support_resistance=None, breakout_status=None,
+    show_stock_intelligence_label=False, progressive_disclosure=False,
+    suppress_extended_market_cap=False,
+):
+    """
+    THE single shared rendering function for a stock's full research
+    picture — called identically by the Watchlist, Screener, and Moving
+    Today sections (see their respective call sites), so all three views
+    can never drift into presenting the same underlying data two
+    different ways.
+
+    Every section is OMITTED, not fabricated, when its underlying data is
+    missing — this function never invents a target, a catalyst, a broker
+    action, or a sector context it doesn't have real data for.
+
+    anchor_id: if given (e.g. f"stock-{ticker}"), wraps the whole block in
+    a div with that id, making it a link target from elsewhere (Screener
+    rows for a stock that's also on the watchlist link to this exact
+    anchor — see the "watchlist_tickers" cross-linking in screener_table).
+
+    progressive_disclosure: Phase 5 addition. When True, the output is
+    split into an always-visible CORE (price/move, volume×average,
+    5-day trend, RSI, MA20 position, target+upside, broker consensus,
+    latest broker action, evidence status, key flags, top news headline)
+    and an EXTENDED section — MA50/MA200/crossover/ATR/support-resistance/
+    breakout, FTSE/sector context, market-cap/52-week/sector fundamentals,
+    broker momentum/history, contradictions, the full entry/exit/hold-wait
+    evidence panel, and the scorecard — wrapped in a native HTML
+    <details>/<summary> element, collapsed by default. No JavaScript, no
+    new dependency: <details> is standard HTML with built-in expand/
+    collapse behaviour in every modern browser. NOTHING is removed or
+    computed differently — every extended-section calculation is
+    identical to before, only WHERE it renders changes. When False (the
+    Watchlist's existing behaviour — deliberately unchanged, "do not
+    downgrade the Watchlist to match the compact Screener"), core and
+    extended content are concatenated directly, exactly as before this
+    phase.
+    """
+    news_items = news_items or []
+    vol_ratio = compute_volume_ratio(volume, average_volume)
+    ma_dist_pct = compute_ma20_distance_pct(price, ma20)
+    upside_pct = compute_target_upside_pct(price, target)
+    ftse_relative = compute_relative_to_ftse(change_pct, ftse_change_pct)
+    evidence = classify_evidence(change_pct, vol_ratio, news_items, latest_broker_event=latest_broker_event)
+
+    currency_suffix = "p" if currency == "GBp" else ""
+    chg_cls = "up" if (change_pct or 0) >= 0 else "down"
+    chg_arrow = "▲" if (change_pct or 0) >= 0 else "▼"
+
+    header = ""
+    if include_header:
+        intel_label = '<div style="font-size:10px;color:#7fb3ff;font-weight:700;letter-spacing:0.5px;">🔬 STOCK INTELLIGENCE</div>' if show_stock_intelligence_label else ""
+        header = (
+            f'{intel_label}<b>{esc(ticker)}</b>{f" — {esc(name)}" if name else ""} '
+            f'<span class="{chg_cls}">{price if price is not None else "?"}{currency_suffix} '
+            f'{chg_arrow}{abs(change_pct or 0):.2f}%</span>'
+        )
+
+    # --- CORE: Volume × average (always visible) ---------------------------------------------
+    core_lines = []
+    if volume is not None:
+        ratio_str = f' (<span class="val">{vol_ratio:.1f}×</span> average)' if vol_ratio is not None else ""
+        core_lines.append(f'<div class="meta">📊 volume: <span class="val">{volume:,}</span>{ratio_str}</div>')
+
+    # --- EXTENDED: FTSE-relative context ---------------------------------------------
+    extended_lines = []
+    if ftse_relative is not None:
+        rel_cls = "up" if ftse_relative >= 0 else "down"
+        extended_lines.append(
+            f'<div class="meta">🇬🇧 vs FTSE 100: <span class="{rel_cls}">{"+" if ftse_relative >= 0 else ""}{ftse_relative:.1f}%</span></div>'
+        )
+
+    # --- CORE: 5-day trend, MA20 position, RSI (always visible) ---------------------------------------------
+    trend_parts = []
+    if change_pct_5d is not None:
+        d5_cls = "up" if change_pct_5d >= 0 else "down"
+        trend_parts.append(f'5-day: <span class="{d5_cls}">{"+" if change_pct_5d >= 0 else ""}{change_pct_5d:.1f}%</span>')
+    if ma_dist_pct is not None:
+        ma_cls = "up" if ma_dist_pct >= 0 else "down"
+        trend_parts.append(f'20-day MA: <span class="{ma_cls}">{"+" if ma_dist_pct >= 0 else ""}{ma_dist_pct:.1f}%</span>')
+    elif above_ma20 is not None:
+        trend_parts.append(f'<span class="val">{"above" if above_ma20 else "below"}</span> 20-day MA')
+    if rsi14 is not None:
+        trend_parts.append(f'RSI: <span class="val">{rsi14:.1f}</span>')
+    if trend_parts:
+        core_lines.append(f'<div class="meta">📈 {" · ".join(trend_parts)}</div>')
+
+    # --- EXTENDED: MA50/MA200/crossover/ATR/support-resistance/breakout/sector-context ---------------------------------------------
+    tech_extra_parts = []
+    if ma50 is not None:
+        tech_extra_parts.append(f'MA50: <span class="val">{ma50:.2f}</span>')
+    if ma200 is not None:
+        tech_extra_parts.append(f'MA200: <span class="val">{ma200:.2f}</span>')
+    elif ma50 is not None:
+        tech_extra_parts.append('<span style="opacity:0.6;">MA200: insufficient history (needs ~1yr)</span>')
+    if ma_crossover:
+        tech_extra_parts.append(f'MA20/50: <span class="val">{esc(ma_crossover)}</span>')
+    if tech_extra_parts:
+        extended_lines.append(f'<div class="meta" style="font-size:11px;">{" · ".join(tech_extra_parts)}</div>')
+    if atr14 is not None:
+        extended_lines.append(f'<div class="meta" style="font-size:11px;">ATR(14): <span class="val">{atr14:.2f}</span> (typical daily range — volatility context, not a signal)</div>')
+    if support_resistance is not None:
+        extended_lines.append(
+            f'<div class="meta" style="font-size:11px;">{SUPPORT_RESISTANCE_WINDOW_DAYS}-day support/resistance: '
+            f'<span class="val">{support_resistance["support"]:.2f}</span> / <span class="val">{support_resistance["resistance"]:.2f}</span></div>'
+        )
+    if breakout_status and breakout_status != "within_range":
+        extended_lines.append(f'<div class="meta" style="font-size:11px;">📐 {esc(breakout_status.capitalize())} vs {SUPPORT_RESISTANCE_WINDOW_DAYS}-day range</div>')
+
+    if sector_context is not None:
+        sec_cls = "up" if sector_context["avgChangePct"] >= 0 else "down"
+        extended_lines.append(
+            f'<div class="meta" style="font-size:11px;">vs {esc(sector or "sector")} '
+            f'(n={sector_context["sampleSize"]} stocks tracked, not the full sector): '
+            f'<span class="{sec_cls}">{"+" if sector_context["avgChangePct"] >= 0 else ""}{sector_context["avgChangePct"]:.1f}%</span></div>'
+        )
+
+    # --- EXTENDED: Fundamentals (52-wk range, sector; mkt cap optionally
+    # suppressed here — see suppress_extended_market_cap) ---------------------------------------------
+    fundamentals_parts = []
+    mcap_str = format_market_cap(market_cap)
+    # suppress_extended_market_cap: the Screener already shows market cap
+    # in its OWN pre-existing, always-visible P/E/EPS/scale-bar block
+    # (built from the exact same canonical `market_cap` value, not a
+    # second calculation) — showing it again here, behind the click,
+    # was a genuine harmless-but-real duplication caught in the prior
+    # audit. Scoped ONLY to that one call site: Watchlist and Moving
+    # Today have no such separate block, so they keep showing it here,
+    # completely unchanged.
+    if mcap_str and not suppress_extended_market_cap:
+        fundamentals_parts.append(f'mkt cap <span class="val">{mcap_str}</span>')
+    if wk_low is not None and wk_high is not None:
+        fundamentals_parts.append(f'52-wk <span class="val">{wk_low:.2f}</span>–<span class="val">{wk_high:.2f}</span>')
+    if sector:
+        fundamentals_parts.append(f'<span class="val">{esc(sector)}</span>')
+    if fundamentals_parts:
+        extended_lines.append(f'<div class="meta">{" · ".join(fundamentals_parts)}</div>')
+
+    # --- CORE: top news headline (always visible) ---------------------------------------------
+    if news_items:
+        top = news_items[0]
+        extra_count = f" (+{len(news_items) - 1} more)" if len(news_items) > 1 else ""
+        news_type = classify_news_type(top.get("title", ""), top.get("category"))
+        news_type_label = NEWS_TYPE_LABELS.get(news_type, "📰")
+        core_lines.append(
+            f'<div class="meta"><span style="opacity:0.7;font-size:11px;">{esc(news_type_label)}</span><br/>'
+            f'<a href="{esc(top.get("link", "#"))}" target="_blank" '
+            f'style="color:#7fb3ff;">{esc(top.get("title", ""))}</a>{extra_count}</div>'
+        )
+    else:
+        core_lines.append('<div class="meta">📰 No relevant same-day news found.</div>')
+
+    # --- CORE: broker consensus/target/upside + latest dated action (always visible) ---------------------------------------------
+    if target or recommendation:
+        upside_html = ""
+        if upside_pct is not None:
+            up_cls = "up" if upside_pct >= 0 else "down"
+            upside_html = f' · distance to target <span class="{up_cls}">{"+" if upside_pct >= 0 else ""}{upside_pct:.1f}%</span>'
+        core_lines.append(f'<div class="meta">🎯 consensus: {esc(recommendation or "?")} · target {target if target else "?"}{upside_html}</div>')
+    if latest_broker_event:
+        old_r = latest_broker_event.get("old_rating") or "?"
+        new_r = latest_broker_event.get("new_rating") or "?"
+        old_t, new_t = latest_broker_event.get("old_target"), latest_broker_event.get("new_target")
+        action = latest_broker_event.get("action")
+        # Explicit action-type label (UPGRADE/DOWNGRADE/TARGET RAISE/TARGET
+        # CUT) rather than just showing the before/after numbers — the
+        # brief specifically wants "not just Consensus: Buy" but the
+        # actual nature of the change made explicit.
+        action_label = ""
+        if action == "UPGRADE":
+            action_label = '<b style="color:#5dcaa5;">UPGRADE</b> '
+        elif action == "DOWNGRADE":
+            action_label = '<b style="color:#f0997b;">DOWNGRADE</b> '
+        elif old_t is not None and new_t is not None:
+            try:
+                action_label = ('<b style="color:#5dcaa5;">TARGET RAISE</b> ' if float(new_t) > float(old_t)
+                                 else '<b style="color:#f0997b;">TARGET CUT</b> ' if float(new_t) < float(old_t) else "")
+            except (TypeError, ValueError):
+                pass
+        target_change = f' · target {old_t} → {new_t}' if (old_t is not None and new_t is not None) else ""
+        core_lines.append(
+            f'<div class="meta">🏦 {action_label}{esc(latest_broker_event.get("date", ""))} — {esc(latest_broker_event.get("broker", "?"))} — '
+            f'{esc(str(old_r))} → {esc(str(new_r))}{esc(target_change)}</div>'
+        )
+
+    # --- EXTENDED: broker momentum/history ---------------------------------------------
+    if broker_momentum and broker_momentum.get("eventCount", 0) > 0:
+        label = BROKER_MOMENTUM_LABEL_TEXT.get(broker_momentum["direction"], broker_momentum["direction"])
+        extended_lines.append(
+            f'<div class="meta" style="font-size:11px;">Broker momentum: <span class="val">{esc(label)}</span> '
+            f'({broker_momentum["eventCount"]} action(s) in the last {BROKER_MOMENTUM_LOOKBACK_DAYS} days)</div>'
+        )
+
+    # --- CORE: evidence status + key flags (always visible) ---------------------------------------------
+    evidence_label, evidence_reason = EVIDENCE_LABEL_TEXT.get(evidence["label"], (evidence["label"], ""))
+    core_lines.append(f'<div class="meta">🧭 Evidence: <span class="val">{esc(evidence_label)}</span> — {esc(evidence_reason)}</div>')
+    # Reuses evidence["hasCatalyst"] rather than re-deriving bool(news_items)
+    # separately — evidence is already computed just above and, since the
+    # classify_evidence fix, correctly accounts for a same-day broker event
+    # too, not just news_items. Re-deriving has_news independently here
+    # would silently reintroduce the exact inconsistency that was just fixed.
+    flags = compute_opportunity_flags(change_pct, vol_ratio, above_ma20, rsi14, evidence["hasCatalyst"])
+    if flags:
+        flag_badges = " ".join(esc(label) for _fid, label, _reason in flags)
+        core_lines.append(f'<div class="meta">🔎 {flag_badges}</div>')
+
+    # --- Block: Entry / Exit Research (structured evidence panel) ---------------------------------------------
+    # Deliberately evidence-based, never an instruction — see
+    # compute_entry_exit_evidence's docstring. Each bullet is tagged with
+    # its DATA_QUALITY_TAGS provenance so a reader can see at a glance
+    # whether a line is a calculation, a broker's own opinion, or this
+    # system's interpretation of the combination — never presented as if
+    # all evidence carries the same weight or certainty.
+    ee = compute_entry_exit_evidence(
+        change_pct, change_pct_5d, above_ma20, ma_crossover, rsi14,
+        vol_ratio, upside_pct, evidence, broker_momentum, latest_broker_event,
+        ftse_relative, breakout_status,
+    )
+
+    def render_evidence_list(items):
+        if not items:
+            return '<span class="meta" style="font-size:11px;">None identified</span>'
+        return "".join(
+            f'<div class="meta" style="font-size:11px;">• {esc(text)} <span style="opacity:0.6;">[{DATA_QUALITY_TAGS.get(tag, tag)}]</span></div>'
+            for text, tag in items
+        )
+
+    entry_exit_lines = []
+    if any([ee["entry"]["supporting"], ee["entry"]["opposing"], ee["exit"]["supporting"], ee["exit"]["opposing"]]):
+        entry_exit_lines.append(
+            '<div class="meta" style="margin-top:6px;"><b style="font-size:12px;">🔍 ENTRY EVIDENCE</b></div>'
+            '<div class="meta" style="font-size:11px;">Supporting further investigation:</div>'
+            f'{render_evidence_list(ee["entry"]["supporting"])}'
+            '<div class="meta" style="font-size:11px;margin-top:3px;">ENTRY RISKS / caution:</div>'
+            f'{render_evidence_list(ee["entry"]["opposing"])}'
+            '<div class="meta" style="margin-top:6px;"><b style="font-size:12px;">⚠️ EXIT / RISK EVIDENCE</b></div>'
+            '<div class="meta" style="font-size:11px;">Supporting caution or reduction:</div>'
+            f'{render_evidence_list(ee["exit"]["supporting"])}'
+            '<div class="meta" style="font-size:11px;margin-top:3px;">Against exiting (position may still be sound):</div>'
+            f'{render_evidence_list(ee["exit"]["opposing"])}'
+        )
+    if ee["holdWait"]:
+        entry_exit_lines.append(
+            '<div class="meta" style="margin-top:6px;"><b style="font-size:12px;">⏸️ HOLD / WAIT EVIDENCE</b></div>'
+            f'{render_evidence_list(ee["holdWait"])}'
+        )
+
+    # --- Block: Contradictions (deeper, multi-pattern) ---------------------------------------------
+    contradictions = detect_contradictions(
+        change_pct, change_pct_5d, above_ma20, rsi14, vol_ratio,
+        evidence, broker_momentum, upside_pct, ma200,
+    )
+    contradiction_lines = []
+    if contradictions:
+        contradiction_lines.append('<div class="meta" style="margin-top:6px;"><b style="font-size:12px;">⚡ CONTRADICTIONS</b></div>')
+        for c in contradictions:
+            missing_html = f' <span style="opacity:0.6;">(missing: {esc(", ".join(c["missingData"]))})</span>' if c["missingData"] else ""
+            contradiction_lines.append(
+                f'<div class="meta" style="font-size:11px;">• {esc(c["conflict"])}{missing_html}</div>'
+            )
+
+    # --- Block: Transparent Scorecard ---------------------------------------------
+    scorecard = compute_research_scorecard(
+        change_pct_5d, above_ma20, rsi14, ma_crossover, vol_ratio, change_pct,
+        evidence, broker_momentum, breakout_status, ftse_relative, sector_context,
+        upside_pct,
+    )
+    scorecard_lines = ['<div class="meta" style="margin-top:6px;"><b style="font-size:12px;">📋 RESEARCH SCORECARD</b></div>']
+    for dim in SCORECARD_DIMENSIONS:
+        score, reasons = scorecard["dimensions"][dim]
+        sign = "+" if score > 0 else ""
+        reason_str = f' — {"; ".join(reasons)}' if reasons else ' — no contributing signal'
+        scorecard_lines.append(f'<div class="meta" style="font-size:11px;">{dim}: <span class="val">{sign}{score}</span>{esc(reason_str)}</div>')
+    total_sign = "+" if scorecard["total"] > 0 else ""
+    scorecard_lines.append(
+        f'<div class="meta">TOTAL: <span class="val">{total_sign}{scorecard["total"]}</span> · '
+        f'Confidence/evidence quality: <span class="val">{scorecard["confidence"]}</span> '
+        f'<span style="opacity:0.6;font-size:10px;">(based on data completeness, NOT a probability the stock will rise)</span></div>'
+    )
+    extended_lines = extended_lines + contradiction_lines + entry_exit_lines + scorecard_lines
+
+    if progressive_disclosure and extended_lines:
+        # Native <details>/<summary> — zero JavaScript, zero new dependency,
+        # standard HTML with built-in expand/collapse in every modern
+        # browser. Collapsed by default so a Screener/Moving Today row
+        # shows only the CORE line set at a glance; nothing in
+        # extended_lines is removed or recalculated differently, only
+        # WHERE it renders changes.
+        extended_html = "".join(extended_lines)
+        body = "".join(core_lines) + (
+            f'<details style="margin-top:4px;">'
+            f'<summary style="cursor:pointer;color:#7fb3ff;font-size:12px;font-weight:600;">▸ Full Stock Intelligence</summary>'
+            f'{extended_html}</details>'
+        )
+    else:
+        body = "".join(core_lines + extended_lines)
+
+    attrs = []
+    if anchor_id:
+        attrs.append(f'id="{esc(anchor_id)}"')
+    if css_class:
+        attrs.append(f'class="{esc(css_class)}"')
+    attr_str = (" " + " ".join(attrs)) if attrs else ""
+    return f'<div{attr_str}>{header}{body}</div>'
+
+
+def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticker=None):
+    """
+    latest_broker_events: optional dict of ticker -> latest non-superseded broker
+    event within LATEST_BROKER_EVENT_MAX_AGE_DAYS (see get_latest_broker_event_per_
+    ticker). events_by_ticker: optional dict of ticker -> full list of that
+    ticker's events (see group_events_by_ticker), used for compute_broker_momentum
+    (a multi-event trend, distinct from the single latest_broker_events entry).
+    Both default to loading the events store fresh from disk if not provided —
+    the defaults keep main()'s existing call site unchanged, while tests can
+    inject specific data directly without touching the filesystem. Loaded from
+    state/events.json as it stood at the START of this run (the broker-events
+    collection step itself runs AFTER render_dashboard in main(), a pre-existing
+    ordering untouched here) — a genuinely new rating change is reflected on the
+    NEXT run's dashboard, not the same run that collected it. A roughly 5-minute
+    lag on a signal that changes at most a few times a month is a minor, disclosed
+    limitation, not a correctness bug.
+    """
+    if latest_broker_events is None or events_by_ticker is None:
+        try:
+            _events = load_events_store().get("events", [])
+        except Exception:
+            _events = []
+        if latest_broker_events is None:
+            try:
+                latest_broker_events = get_latest_broker_event_per_ticker(_events)
+            except Exception:
+                latest_broker_events = {}  # never let a broker-events read failure break the whole dashboard
+        if events_by_ticker is None:
+            try:
+                events_by_ticker = group_events_by_ticker(_events)
+            except Exception:
+                events_by_ticker = {}
     items_by_ticker = data.get("items", {})
     quotes = data.get("quotes", {})
     screener = data.get("screener", {})
@@ -1955,9 +3259,6 @@ def render_dashboard(data, watchlist):
         all_items.extend(its)
     all_items.sort(key=item_sort_key, reverse=True)
 
-    def esc(s):
-        return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-
     ftse_html = ""
     if ftse100:
         chg = ftse100.get("changePct") or 0
@@ -1968,18 +3269,41 @@ def render_dashboard(data, watchlist):
             f'<span class="{cls}">{ftse100.get("price",""):,.2f} {arrow}{abs(chg):.2f}%</span></p>'
         )
 
+    watchlist_name_by_ticker = {stock["ticker"]: stock["name"] for stock in watchlist}
+    ftse_change_pct_val = (ftse100.get("changePct") if ftse100 else None)
+
+    # Combined pool of every enriched stock currently known this run (watchlist +
+    # screener-ranked) — used ONLY for the deliberately-cautious sector-context
+    # approximation (see compute_sector_relative_context's docstring on why this
+    # is a small coincidental sample, never presented as the real sector).
+    all_enriched_rows = [
+        {"symbol_or_ticker": t, "sector": q.get("sector"), "changePct": q.get("changePct")}
+        for t, q in quotes.items()
+    ] + [
+        {"symbol_or_ticker": row.get("symbol"), "sector": row.get("sector"), "changePct": row.get("changePct")}
+        for section in ("volume", "gainers", "losers")
+        for row in screener.get(section, [])
+    ]
+
     def quote_div(t, q):
-        chg_cls = "up" if (q.get("change") or 0) >= 0 else "down"
-        chg_arrow = "▲" if (q.get("change") or 0) >= 0 else "▼"
-        target = q.get("targetMeanPrice")
-        rec = q.get("recommendationKey")
-        extra = ""
-        if target or rec:
-            extra = f'<div class="meta">consensus: {esc(rec or "?")} · target {target if target else "?"}</div>'
-        return (
-            f'<div class="q"><b>{esc(t)}</b> '
-            f'<span class="{chg_cls}">{q.get("price", "?")}{"p" if q.get("currency") == "GBp" else ""} '
-            f'{chg_arrow}{abs(q.get("changePct") or 0):.2f}%</span>{extra}</div>'
+        name = watchlist_name_by_ticker.get(t, "")
+        sector = q.get("sector")
+        sector_context = compute_sector_relative_context(t, sector, all_enriched_rows)
+        momentum = compute_broker_momentum(events_by_ticker.get(t, []) if events_by_ticker else [])
+        return render_stock_research_html(
+            ticker=t, name=name, price=q.get("price"), change_pct=q.get("changePct"), currency=q.get("currency"),
+            volume=q.get("volume"), average_volume=q.get("averageVolume"),
+            rsi14=q.get("rsi14"), ma20=q.get("ma20"), change_pct_5d=q.get("changePct5d"), above_ma20=q.get("aboveMA20"),
+            target=q.get("targetMeanPrice"), recommendation=q.get("recommendationKey"),
+            market_cap=q.get("marketCap"), wk_low=q.get("fiftyTwoWeekLow"), wk_high=q.get("fiftyTwoWeekHigh"), sector=sector,
+            ftse_change_pct=ftse_change_pct_val, sector_context=sector_context,
+            news_items=items_by_ticker.get(t, []),
+            latest_broker_event=latest_broker_events.get(t) if latest_broker_events else None,
+            broker_momentum=momentum,
+            anchor_id=f"stock-{t}", css_class="q", ma_crossover=q.get("maCrossover"),
+            ma50=q.get("ma50"), ma200=q.get("ma200"), atr14=q.get("atr14"),
+            support_resistance=q.get("supportResistance"), breakout_status=q.get("breakoutStatus"),
+            show_stock_intelligence_label=True,
         )
 
     quote_rows = "".join(quote_div(t, q) for t, q in quotes.items())
@@ -2018,26 +3342,13 @@ def render_dashboard(data, watchlist):
             last_cls = f' class="{chg_cls}"' if show_pct else ""
             symbol = q.get("symbol", "")
             name = esc(q.get("name") or symbol)
-            # Inline news link — the same lookup already built for the "News on Today's
-            # Top Movers" section, shown right where you'd actually look for it: next to
-            # the stock itself, not just in a separate section further down the page.
-            news_for_symbol = screener_news.get(symbol) or []
-            if news_for_symbol:
-                top = news_for_symbol[0]
-                extra = f" (+{len(news_for_symbol)-1} more)" if len(news_for_symbol) > 1 else ""
-                news_html = (
-                    f'<br/><a href="{esc(top.get("link","#"))}" target="_blank" '
-                    f'style="color:#7fb3ff;font-size:12px;font-weight:600;">📰 {esc(top.get("title",""))}</a>'
-                    f'<span class="meta">{extra}</span>'
-                )
-            else:
-                news_html = ""
-            target = q.get("targetMeanPrice")
-            rec = q.get("recommendationKey")
-            target_html = (
-                f'<br/><span class="meta">🎯 target <span class="val">{target:.2f}</span>{f" · {esc(rec)}" if rec else ""}</span>'
-                if target else ""
-            )
+
+            # Screener-specific fundamentals NOT covered by the shared research
+            # function (P/E, EPS, earnings/ex-div dates, dividend, insider %,
+            # short interest, business summary) — kept here since they're a
+            # discovery/vetting depth specific to this section, not duplicated
+            # into the shared function (which would bloat the Watchlist with
+            # fields that fit initial screening better than ongoing monitoring).
             earnings_date = format_epoch_date(q.get("nextEarningsDate"))
             ex_div_date = format_epoch_date(q.get("exDividendDate"))
             div_rate = q.get("dividendRate")
@@ -2054,48 +3365,66 @@ def render_dashboard(data, watchlist):
                 calendar_html += f'<br/><span class="meta">💷 dividend: {joined}</span>'
             pe = q.get("trailingPE")
             eps = q.get("trailingEps")
-            mcap = format_market_cap(q.get("marketCap"))
             fundamentals_parts = []
             if pe is not None:
                 fundamentals_parts.append(f'P/E <span class="val">{pe:.1f}</span>')
             if eps is not None:
                 fundamentals_parts.append(f'EPS <span class="val">{eps:.2f}</span>')
-            if mcap:
-                fundamentals_parts.append(f'mkt cap <span class="val">{mcap}</span>')
             if fundamentals_parts:
                 calendar_html += f'<br/><span class="meta">📊 {" · ".join(fundamentals_parts)}</span>'
             scales_html = pe_scale(pe) + mktcap_scale(q.get("marketCap")) + eps_scale(eps)
             if scales_html:
                 calendar_html += f'<div style="margin-top:4px;">{scales_html}</div>'
-            wk_low = q.get("fiftyTwoWeekLow")
-            wk_high = q.get("fiftyTwoWeekHigh")
-            if wk_low is not None and wk_high is not None:
-                calendar_html += f'<br/><span class="meta">📏 52-wk range: <span class="val">{wk_low:.2f}</span> – <span class="val">{wk_high:.2f}</span></span>'
             insiders = q.get("heldPercentInsidersPct")
             if insiders is not None:
                 calendar_html += f'<br/><span class="meta">🧑‍💼 insider ownership: <span class="val">{insiders:.1f}%</span></span>'
             short_pct = q.get("shortInterestPct")
             if short_pct is not None:
                 calendar_html += f'<br/><span class="meta">📉 short interest: <span class="val">{short_pct:.2f}%</span> (FCA)</span>'
-            sector = q.get("sector")
             industry = q.get("industry")
-            if sector or industry:
-                sector_bit = " · ".join(s for s in (sector, industry) if s)
-                calendar_html += f'<br/><span class="meta">🏷️ <span class="val">{esc(sector_bit)}</span></span>'
+            sector = q.get("sector")
+            if industry:
+                calendar_html += f'<br/><span class="meta">🏷️ <span class="val">{esc(industry)}</span></span>'
             biz_summary = q.get("businessSummary")
             if biz_summary:
                 calendar_html += f'<br/><span class="meta" style="display:block;max-width:520px;">ℹ️ {esc(biz_summary)}</span>'
-            rsi14 = q.get("rsi14")
-            above_ma = q.get("aboveMA20")
-            technicals_html = ""
-            if rsi14 is not None:
-                technicals_html += f'<br/><span class="meta">RSI(14): <span class="val">{rsi14:.1f}</span></span>'
-                technicals_html += f'<div style="margin-top:4px;">{rsi_scale(rsi14)}</div>'
-            if above_ma is not None:
-                technicals_html += f'<br/><span class="meta">Price is <span class="val">{"above" if above_ma else "below"}</span> its 20-day average</span>'
+
+            # Cross-link to the Watchlist's full Stock Intelligence view for
+            # this exact stock, when it's also being watched — resolves the
+            # SAME underlying stock identity across sections. No target exists
+            # yet for a screener-only stock not on the watchlist, so no link
+            # is rendered for those — never a dead link.
+            symbol_html = esc(symbol)
+            if symbol in watchlist_name_by_ticker:
+                symbol_html = f'<a href="#stock-{esc(symbol)}" style="color:inherit;text-decoration:underline;">{esc(symbol)}</a>'
+
+            # Everything else (news, target/upside, RSI/MA/MA50/MA200/
+            # crossover/ATR/support-resistance/breakout, broker action +
+            # momentum, evidence, contradictions, entry/exit/hold-wait,
+            # scorecard) now comes from the SAME shared function the
+            # Watchlist uses — one source of truth, no duplicate calculation
+            # or rendering logic maintained in two places.
+            news_for_symbol = screener_news.get(symbol) or []
+            sector_context = compute_sector_relative_context(symbol, sector, all_enriched_rows)
+            momentum = compute_broker_momentum(events_by_ticker.get(symbol, []) if events_by_ticker else [])
+            research_html = render_stock_research_html(
+                ticker=symbol, name=q.get("name") or symbol, price=q.get("price"), change_pct=chg, currency=q.get("currency"),
+                volume=vol, average_volume=q.get("averageVolume"),
+                rsi14=q.get("rsi14"), ma20=q.get("ma20"), change_pct_5d=q.get("changePct5d"), above_ma20=q.get("aboveMA20"),
+                target=q.get("targetMeanPrice"), recommendation=q.get("recommendationKey"),
+                market_cap=q.get("marketCap"), wk_low=q.get("fiftyTwoWeekLow"), wk_high=q.get("fiftyTwoWeekHigh"), sector=sector,
+                ftse_change_pct=ftse_change_pct_val, sector_context=sector_context,
+                news_items=news_for_symbol,
+                latest_broker_event=latest_broker_events.get(symbol) if latest_broker_events else None,
+                broker_momentum=momentum, ma_crossover=q.get("maCrossover"),
+                ma50=q.get("ma50"), ma200=q.get("ma200"), atr14=q.get("atr14"),
+                support_resistance=q.get("supportResistance"), breakout_status=q.get("breakoutStatus"),
+                include_header=False, progressive_disclosure=True, suppress_extended_market_cap=True,
+            )
+
             return (
-                f'<tr><td>{i+1}</td><td><b style="font-size:14px;">{esc(symbol)}</b><br/>'
-                f'<span class="meta">{name}</span>{news_html}{target_html}{calendar_html}{technicals_html}</td><td{last_cls}>{last_col}</td></tr>'
+                f'<tr><td>{i+1}</td><td><b style="font-size:14px;">{symbol_html}</b><br/>'
+                f'<span class="meta">{name}</span>{calendar_html}{research_html}</td><td{last_cls}>{last_col}</td></tr>'
             )
         return "".join(row(i, q) for i, q in enumerate(rows)) or '<tr><td colspan="3" class="meta">No data yet</td></tr>'
 
@@ -2170,7 +3499,8 @@ def render_dashboard(data, watchlist):
 
     def heatmap_cell(q):
         chg = q.get("changePct") or 0
-        symbol = esc(q.get("symbol", ""))
+        raw_symbol = q.get("symbol", "")
+        symbol = esc(raw_symbol)
         name = esc(q.get("name") or symbol)
         # Colour by direction, intensity (lightness) by magnitude of the move —
         # bigger swings render darker/more saturated, capped at a 10% move.
@@ -2178,16 +3508,76 @@ def render_dashboard(data, watchlist):
         lightness = 55 - (magnitude * 30)  # 55% (small move) down to 25% (big move)
         hue = 142 if chg >= 0 else 4  # green / red
         bg = f"hsl({hue}, 55%, {lightness:.0f}%)"
-        return (
-            f'<div class="heat-cell" style="background:{bg}" title="{name}">'
+        # Cell SIZE now reflects market cap too, not just colour by % move — a tiny
+        # illiquid stock and a multi-billion-pound company no longer look visually
+        # identical. grid-column span (2 tiers: large-cap gets 2 columns, everything
+        # else gets 1) rather than a continuous size — deterministic, and safe
+        # within the existing fixed-column CSS grid, where a genuinely continuous
+        # size would need a different (non-grid) layout entirely.
+        mcap = q.get("marketCap") or 0
+        span = 2 if mcap >= 5_000_000_000 else 1
+        span_style = "grid-column:span 2;" if span == 2 else ""
+        # Compact hover tooltip — a bit more than just the name, without
+        # turning the Heat Map into a wall of text (that's what clicking
+        # through to Stock Intelligence is for). Uses the browser's native
+        # title attribute, so no extra JS/CSS machinery needed.
+        tooltip_parts = [f"{name} ({symbol})", f"{'+' if chg >= 0 else ''}{chg:.1f}%"]
+        vol_ratio_tip = compute_volume_ratio(q.get("volume"), q.get("averageVolume"))
+        if vol_ratio_tip is not None:
+            tooltip_parts.append(f"{vol_ratio_tip:.1f}x avg volume")
+        mcap_str_tip = format_market_cap(mcap) if mcap else None
+        if mcap_str_tip:
+            tooltip_parts.append(f"mkt cap {mcap_str_tip}")
+        if raw_symbol in watchlist_name_by_ticker:
+            tooltip_parts.append("click for full research view")
+        tooltip = esc(" · ".join(tooltip_parts))
+        inner = (
             f'<div class="heat-symbol">{symbol}</div>'
             f'<div class="heat-pct">{"▲" if chg >= 0 else "▼"}{abs(chg):.1f}%</div>'
-            f"</div>"
         )
+        # Cross-link to the Watchlist's full research view for this exact stock,
+        # when it's also being watched — resolves the same underlying stock
+        # identity across sections. No target exists for a stock that's ONLY in
+        # the screener/heat map (no separate deep-dive page built yet), so no
+        # link is rendered for those — never a dead link.
+        if raw_symbol in watchlist_name_by_ticker:
+            return (
+                f'<a class="heat-cell" href="#stock-{symbol}" '
+                f'style="background:{bg};{span_style}display:block;text-decoration:none;color:inherit;" '
+                f'title="{tooltip}">{inner}</a>'
+            )
+        return f'<div class="heat-cell" style="background:{bg};{span_style}" title="{tooltip}">{inner}</div>'
 
+    # Grouped by sector for a scannable, clustered layout — sector groups
+    # ordered by their own largest move (same "biggest moves surface
+    # fastest" principle as the original flat sort, applied at the group
+    # level too), with stocks WITHIN each sector still sorted by
+    # magnitude (preserved from the pre-grouping sort order). A stock
+    # with no sector data falls under an explicit "Other" heading rather
+    # than being silently dropped. grid-column:1/-1 on the sector label
+    # forces a clean new row in the existing CSS grid without needing a
+    # different layout system. Capped at a modest total (24, a small
+    # increase from the prior flat 20) so this stays a quick visual scan,
+    # not a wall of every sector fully expanded.
     heatmap_pool = (screener.get("gainers", []) + screener.get("losers", []))
     heatmap_pool.sort(key=lambda q: abs(q.get("changePct") or 0), reverse=True)
-    heatmap_cells = "".join(heatmap_cell(q) for q in heatmap_pool[:20])
+    heatmap_pool = heatmap_pool[:24]
+
+    sector_groups = {}
+    for q in heatmap_pool:
+        sector_groups.setdefault(q.get("sector") or "Other", []).append(q)
+    ordered_sectors = sorted(
+        sector_groups.items(),
+        key=lambda kv: max(abs(s.get("changePct") or 0) for s in kv[1]),
+        reverse=True,
+    )
+    heatmap_cell_parts = []
+    for sector_name, stocks_in_sector in ordered_sectors:
+        heatmap_cell_parts.append(
+            f'<div style="grid-column:1/-1;font-size:12px;font-weight:700;color:#9aa0a6;margin:8px 0 2px;">{esc(sector_name)}</div>'
+        )
+        heatmap_cell_parts.extend(heatmap_cell(q) for q in stocks_in_sector)
+    heatmap_cells = "".join(heatmap_cell_parts)
 
     # Explicit, visible universe/source status — never let a drop from full FTSE
     # 100+250 coverage down to FTSE-100-only, a stale cache, or fully unrestricted
@@ -2247,12 +3637,37 @@ def render_dashboard(data, watchlist):
 
     research_rows = "".join(research_card(s) for s in watchlist)
 
-    mover_rows = "".join(
-        f'<div class="q"><b>{esc(m["ticker"])}</b> '
-        f'<span class="{"up" if (m.get("changePct") or 0) >= 0 else "down"}">'
-        f'{"▲" if (m.get("changePct") or 0) >= 0 else "▼"}{abs(m.get("changePct") or 0):.2f}%</span></div>'
-        for m in big_movers
-    )
+    # "Moving Today" now shows the same full research picture as the
+    # Watchlist/Screener — the SAME shared function, SAME source of truth —
+    # rather than just a bare ticker and %. Looks up each mover's ticker in
+    # `quotes` (the fully-enriched dict at render time) rather than using
+    # `big_movers` for anything beyond identifying WHICH tickers qualify —
+    # big_movers itself is a snapshot taken at the moment of the initial
+    # lightweight quote fetch, before enrichment; quotes is what's current
+    # by the time this renders.
+    def mover_div(m):
+        ticker = m.get("ticker", "")
+        q = quotes.get(ticker, m)  # fall back to the snapshot if genuinely absent from quotes
+        name = watchlist_name_by_ticker.get(ticker, "")
+        sector = q.get("sector")
+        sector_context = compute_sector_relative_context(ticker, sector, all_enriched_rows)
+        momentum = compute_broker_momentum(events_by_ticker.get(ticker, []) if events_by_ticker else [])
+        return render_stock_research_html(
+            ticker=ticker, name=name, price=q.get("price"), change_pct=q.get("changePct"), currency=q.get("currency"),
+            volume=q.get("volume"), average_volume=q.get("averageVolume"),
+            rsi14=q.get("rsi14"), ma20=q.get("ma20"), change_pct_5d=q.get("changePct5d"), above_ma20=q.get("aboveMA20"),
+            target=q.get("targetMeanPrice"), recommendation=q.get("recommendationKey"),
+            market_cap=q.get("marketCap"), wk_low=q.get("fiftyTwoWeekLow"), wk_high=q.get("fiftyTwoWeekHigh"), sector=sector,
+            ftse_change_pct=ftse_change_pct_val, sector_context=sector_context,
+            news_items=items_by_ticker.get(ticker, []),
+            latest_broker_event=latest_broker_events.get(ticker) if latest_broker_events else None,
+            broker_momentum=momentum, ma_crossover=q.get("maCrossover"),
+            ma50=q.get("ma50"), ma200=q.get("ma200"), atr14=q.get("atr14"),
+            support_resistance=q.get("supportResistance"), breakout_status=q.get("breakoutStatus"),
+            css_class="q", progressive_disclosure=True,
+        )
+
+    mover_rows = "".join(mover_div(m) for m in big_movers)
 
     html = f"""<!DOCTYPE html>
 <html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -2910,6 +4325,8 @@ def main():
                     entry["trailingEps"] = analyst["trailingEps"]
                 if analyst.get("marketCap") is not None:
                     entry["marketCap"] = analyst["marketCap"]
+                if analyst.get("averageVolume") is not None:
+                    entry["averageVolume"] = analyst["averageVolume"]
                 if analyst.get("fiftyTwoWeekLow") is not None:
                     entry["fiftyTwoWeekLow"] = analyst["fiftyTwoWeekLow"]
                 if analyst.get("fiftyTwoWeekHigh") is not None:
@@ -2926,6 +4343,19 @@ def main():
                     entry["rsi14"] = hist.get("rsi14")
                     entry["ma20"] = hist.get("ma20")
                     entry["aboveMA20"] = hist.get("aboveMA20")
+                    # Named distinctly from "volume" (screener rows already have their own,
+                    # more precise regularMarketVolume-derived "volume" field from
+                    # fetch_gb_screener) — this exists purely so watchlist rows, which have
+                    # no other volume source, can get one via the merge below without ever
+                    # risking overwriting a screener row's existing value.
+                    entry["latestVolume"] = hist.get("latestVolume")
+                    entry["changePct5d"] = hist.get("changePct5d")
+                    entry["ma50"] = hist.get("ma50")
+                    entry["ma200"] = hist.get("ma200")
+                    entry["maCrossover"] = hist.get("maCrossover")
+                    entry["atr14"] = hist.get("atr14")
+                    entry["supportResistance"] = hist.get("supportResistance")
+                    entry["breakoutStatus"] = hist.get("breakoutStatus")
                 si = match_short_interest(name, short_interest_map)
                 if si:
                     entry["shortInterestPct"] = si["pct"]
@@ -2941,6 +4371,12 @@ def main():
                 extra = screener_targets.get(row["symbol"])
                 if extra:
                     row.update(extra)  # attach whichever fields were found: target, recommendation, earnings/ex-div dates, RSI/MA
+
+        # NOTE: the enrichment merge from screener_targets into `quotes` for
+        # watchlist tickers happens AFTER the per-stock watchlist loop below,
+        # not here — see the comment there for why (this merge must run
+        # against THIS run's freshly-fetched quotes, not the persisted ones
+        # still sitting in `quotes` at this point in the function).
 
         # Market-wide broker alerts: covers ALL LSE companies for upgrade/downgrade news,
         # not just the watchlist — this is what "all LSE companies" actually needs, without
@@ -3125,6 +4561,47 @@ def main():
                 new_alerts.append(it)
 
         time.sleep(0.5)  # be polite to free sources
+
+    # Merge the screener_targets enrichment (RSI/MA20/MA50/MA200/crossover/ATR/
+    # support-resistance/breakout/market cap/average volume/52-week range/
+    # sector — everything fetched in the shared uptrend_targets loop above)
+    # into the watchlist's `quotes` dict. THIS MUST RUN HERE — after the
+    # per-stock loop above has finished setting quotes[ticker] = quote for
+    # every watchlist ticker — not earlier. An earlier version of this merge
+    # ran BEFORE that per-stock loop, against the persisted `quotes` from the
+    # previous run's data.json; since quotes[ticker] = quote a few lines
+    # above is a FULL replacement (not an update), that earlier ordering
+    # meant every field this merge added was silently wiped out moments
+    # later for any ticker that got a fresh quote this run — which is the
+    # normal case. Caught by checking main()'s actual execution order end to
+    # end, not just by testing render_dashboard() in isolation against
+    # hand-constructed data (which is exactly why it wasn't caught earlier —
+    # isolated rendering tests never exercise this ordering at all).
+    # targetMeanPrice/recommendationKey are left as already set by the
+    # watchlist's own earlier fetch_yahoo_analyst call (still needed there
+    # for analyst_items/news-feed history, a separate purpose from this
+    # merge) rather than overwritten, though both ultimately come from the
+    # same underlying figure.
+    for stock in watchlist:
+        ticker = stock["ticker"]
+        if ticker not in quotes:
+            continue
+        extra = screener_targets.get(ticker)
+        if not extra:
+            continue
+        for key, value in extra.items():
+            if key in ("targetMeanPrice", "recommendationKey"):
+                continue  # already set by the watchlist's own earlier fetch; don't disturb
+            if key == "latestVolume":
+                # Named distinctly upstream specifically so it can be safely mapped
+                # to "volume" here — fetch_yahoo_quote (the watchlist's own price
+                # source) never returns volume at all, so there's nothing to collide
+                # with; a screener row's own "volume" field is never touched by this
+                # loop at all, since this only ever writes into `quotes`.
+                if value is not None:
+                    quotes[ticker]["volume"] = value
+                continue
+            quotes[ticker][key] = value
 
     # Merge this run's market-wide items with previously stored ones (same pattern as
     # the per-ticker feed) so the dashboard shows recent history, not just this cycle.
@@ -3971,6 +5448,71 @@ def load_events_store(path=None):
     if not isinstance(data, dict) or not isinstance(data.get("events"), list):
         raise EventsStoreCorruptError(f"{path} does not match the expected {{version, events}} shape")
     return data
+
+
+# Not "recent" beyond this — the broker-events pipeline itself keeps full
+# history regardless, this is purely about what counts as a "NEW" change
+# worth surfacing prominently on the research view specifically.
+LATEST_BROKER_EVENT_MAX_AGE_DAYS = 30
+
+
+def get_latest_broker_event_per_ticker(events, max_age_days=LATEST_BROKER_EVENT_MAX_AGE_DAYS, now_utc=None):
+    """
+    Given the flat event list from load_events_store()["events"], returns
+    a dict: ticker -> the single most recent, NON-SUPERSEDED event for
+    that ticker, only if it falls within max_age_days of now_utc.
+
+    Pure function of its inputs — reads the ALREADY-COLLECTED events
+    store, never triggers a new fetch and never touches the collection
+    pipeline itself. Never invents or infers a change: a ticker with no
+    qualifying event is simply absent from the result, and the caller
+    must render nothing for it rather than a fabricated "no recent
+    change" line dressed up as a real data point.
+
+    An event with `superseded_by` set is skipped — a newer record has
+    already replaced it, so it's no longer "the latest" for that ticker
+    even if its own timestamp would otherwise qualify.
+    """
+    now_utc = now_utc or datetime.now(timezone.utc)
+    latest_by_ticker = {}
+    for e in events:
+        if e.get("superseded_by"):
+            continue
+        ticker = e.get("ticker")
+        ts = e.get("timestamp")
+        if not ticker or not ts:
+            continue
+        try:
+            event_dt = datetime.fromisoformat(ts)
+        except (ValueError, TypeError):
+            continue
+        if event_dt.tzinfo is None:
+            event_dt = event_dt.replace(tzinfo=timezone.utc)
+        if (now_utc - event_dt).days > max_age_days:
+            continue
+        existing = latest_by_ticker.get(ticker)
+        if existing is None or event_dt > existing[1]:
+            latest_by_ticker[ticker] = (e, event_dt)
+    return {ticker: e for ticker, (e, _dt) in latest_by_ticker.items()}
+
+
+def group_events_by_ticker(events):
+    """
+    Plain grouping — ticker -> list of that ticker's events, in whatever
+    order they appear in the source list. No filtering (date, superseded)
+    happens here; that's each consumer's own job (compute_broker_momentum
+    filters superseded + lookback window itself). Kept as a separate, tiny
+    function so the SAME grouped structure can feed both the latest-event
+    lookup and the multi-event momentum calculation without re-scanning
+    the full flat event list twice.
+    """
+    grouped = {}
+    for e in (events or []):
+        ticker = e.get("ticker")
+        if not ticker:
+            continue
+        grouped.setdefault(ticker, []).append(e)
+    return grouped
 
 
 def atomic_write_json(path, data):
