@@ -1186,21 +1186,34 @@ def bare_ticker(symbol):
     return s.rstrip(".")
 
 
-def discover_radar_stocks(watchlist, big_movers, screener):
+def discover_radar_stocks(watchlist, big_movers, screener, latest_broker_events=None):
     """
     Scans every EXISTING discovery source — Watchlist, Heat Map
-    (big_movers), and Screener Volume/Gainers/Losers — and returns an
-    ordered dict, keyed by bare_ticker (so "GLEN" and "GLEN.L" merge
-    into one entry), of every stock any of them found. Each entry is
-    {"ticker": <the specific ticker string to use for lookups>, "name":
-    ..., "sources": [(label, reason_or_None), ...]}. A stock appearing
-    in multiple sources gets multiple (label, reason) pairs, never
-    duplicated into multiple entries.
+    (big_movers), Screener Volume/Gainers/Losers, and market-wide Broker
+    Research (latest_broker_events, which genuinely covers tickers
+    beyond Watchlist/Screener — see get_latest_broker_event_per_ticker's
+    own docstring) — and returns an ordered dict, keyed by bare_ticker
+    (so "GLEN" and "GLEN.L" merge into one entry), of every stock any of
+    them found. Each entry is {"ticker": <the specific ticker string to
+    use for lookups>, "name": ..., "sources": [(label, reason_or_None),
+    ...]}. A stock appearing in multiple sources gets multiple (label,
+    reason) pairs, never duplicated into multiple entries.
 
     Every "reason" is derived directly from data ALREADY computed
     elsewhere for that exact source (the same changePct/volume numbers
     the Heat Map or Screener sections already display) — never
     invented, never a second, independent calculation.
+
+    NEWS and AI EVIDENCE are deliberately NOT independent discovery
+    sources here: this project's news fetching is per-ticker (it
+    searches for news ABOUT a ticker already known from another source),
+    not a whole-market news scan that could discover an unknown ticker —
+    and AI Evidence Review only ever runs on an already-identified
+    stock, for the same structural reason. Treating either as a
+    "discovery source" would misrepresent what's actually happening;
+    both remain fully shown as EVIDENCE for stocks discovered another
+    way (see render_stock_research_html), just never claimed as a
+    discovery route in their own right.
 
     This function only DISCOVERS which stocks and why — it renders
     nothing and computes no evidence itself, keeping discovery cleanly
@@ -1240,7 +1253,190 @@ def discover_radar_stocks(watchlist, big_movers, screener):
                 reason = None
             add(ticker, entry.get("name"), label, reason)
 
+    for ticker, event in (latest_broker_events or {}).items():
+        action = event.get("normalizedAction")
+        broker = event.get("broker")
+        if action and broker:
+            reason = f"{broker} {action.lower()}"
+        elif action:
+            reason = action.lower()
+        else:
+            reason = None
+        add(ticker, event.get("company") or ticker, "Broker Research", reason)
+
     return discoveries
+
+
+# --- Live Radar: persistent cross-poll-cycle lifecycle tracking ---------
+# Models the SAME first_seen/last_seen-preserved-forever discipline already
+# proven in load_events_store/enrich_stored_event (see that function's own
+# docstring) — never overwriting or deleting history, only ever adding to
+# it or bumping last_seen when a stock is genuinely re-discovered.
+RADAR_HISTORY_FILE = os.path.join(STATE_DIR, "radar_history.json")
+RADAR_HISTORY_VERSION = 1
+RADAR_AGING_THRESHOLD_MINUTES = 60  # not re-discovered by any source in
+# this long -> AGING (still shown prominently, clearly flagged)
+RADAR_STALE_THRESHOLD_MINUTES = 240  # not re-discovered in this long ->
+# STALE below this, CLEARED beyond it (the historical record in
+# radar_history.json is still preserved, per the explicit "don't
+# immediately erase it" requirement — CLEARED just means "no longer
+# shown as if it were current" in the LIVE section)
+RADAR_HISTORY_RETENTION_DAYS = 90  # how long a CLEARED entry's full
+# discovery record is kept before being pruned from the persisted store
+# entirely, to avoid unbounded growth
+
+
+class RadarHistoryCorruptError(Exception):
+    """Same discipline as every other state file here — a file that
+    EXISTS but fails to parse must never be silently treated as empty."""
+    pass
+
+
+def load_radar_history(path=None):
+    """Missing file -> fresh empty store (legitimate first-run case).
+    Existing-but-corrupt file -> raises, never silently treated as
+    empty — same contract as load_events_store/load_daily_snapshots."""
+    path = path or RADAR_HISTORY_FILE
+    if not os.path.exists(path):
+        return {"version": RADAR_HISTORY_VERSION, "stocks": {}}
+    with open(path, "r", encoding="utf-8") as f:
+        raw = f.read()
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise RadarHistoryCorruptError(f"{path} contains invalid JSON: {e}") from e
+    if not isinstance(data, dict) or not isinstance(data.get("stocks"), dict):
+        raise RadarHistoryCorruptError(f"{path} does not match the expected {{version, stocks}} shape")
+    return data
+
+
+def compute_radar_status(first_seen_iso, last_seen_iso, now_iso, discovered_this_run):
+    """
+    Pure function: NEW / ACTIVE / AGING / STALE / CLEARED — never a
+    guess, always derived from the actual timestamps. NEW and ACTIVE
+    both mean "discovered again THIS run" (freshly confirmed); the
+    distinction is only whether this is the very first time ever
+    (first_seen == this run) or a continuing detection. AGING/STALE/
+    CLEARED all mean "NOT re-discovered this run", escalating purely by
+    how long ago it was last genuinely re-detected by any source —
+    exactly the configured thresholds above, nothing implicit.
+    """
+    now_dt = datetime.fromisoformat(now_iso)
+    if discovered_this_run:
+        return "NEW" if first_seen_iso == last_seen_iso == now_iso else "ACTIVE"
+    last_seen_dt = datetime.fromisoformat(last_seen_iso)
+    age_minutes = (now_dt - last_seen_dt).total_seconds() / 60
+    if age_minutes < RADAR_AGING_THRESHOLD_MINUTES:
+        return "AGING"
+    if age_minutes < RADAR_STALE_THRESHOLD_MINUTES:
+        return "STALE"
+    return "CLEARED"
+
+
+def format_radar_age(now_iso, since_iso):
+    """Human-readable age string ('5 minutes', '2 hours', '3 days') —
+    never fabricated: a negative or malformed timestamp pair returns
+    None rather than a nonsensical age, so the caller can show an
+    honest 'unavailable' instead of a wrong number."""
+    try:
+        now_dt = datetime.fromisoformat(now_iso)
+        since_dt = datetime.fromisoformat(since_iso)
+    except (ValueError, TypeError):
+        return None
+    delta_seconds = (now_dt - since_dt).total_seconds()
+    if delta_seconds < 0:
+        return None  # a future timestamp is invalid data, never displayed as an age
+    minutes = delta_seconds / 60
+    if minutes < 1:
+        return "less than a minute"
+    if minutes < 60:
+        return f"{int(minutes)} minute{'s' if int(minutes) != 1 else ''}"
+    hours = minutes / 60
+    if hours < 24:
+        return f"{hours:.1f} hour{'s' if hours != 1 else ''}"
+    days = hours / 24
+    return f"{days:.1f} day{'s' if days != 1 else ''}"
+
+
+def merge_radar_history(history, radar_discovery, now_iso):
+    """
+    Pure function — takes the LOADED prior history and THIS run's fresh
+    discovery, returns a NEW, updated history dict (never mutates the
+    input) plus a per-ticker lifecycle dict for rendering. Reused
+    discipline from enrich_stored_event: a ticker not yet in history is
+    added with first_seen=last_seen=now; a ticker already in history
+    that's discovered again gets last_seen bumped to now and its
+    sourcesEverSeen UNIONED (never shrunk) with this run's sources; a
+    ticker in history but NOT discovered this run is left completely
+    untouched here — its last_seen stays in the past, which is exactly
+    what lets its age (and therefore its AGING/STALE/CLEARED status)
+    grow naturally on subsequent runs, with NO explicit "mark as
+    aging" step needed anywhere.
+
+    CLEARED entries older than RADAR_HISTORY_RETENTION_DAYS are pruned
+    from the returned store entirely — the only case this function ever
+    removes a record, and only after it's been long enough that the
+    live "don't immediately erase it" requirement is well satisfied.
+    """
+    new_stocks = {k: dict(v) for k, v in history.get("stocks", {}).items()}
+    lifecycle = {}
+
+    for key, disco in radar_discovery.items():
+        sources_this_run = sorted({label for label, _reason in disco["sources"]})
+        if key not in new_stocks:
+            new_stocks[key] = {
+                "ticker": disco["ticker"], "name": disco["name"],
+                "firstSeen": now_iso, "lastSeen": now_iso,
+                "sourcesEverSeen": sources_this_run,
+            }
+        else:
+            existing = new_stocks[key]
+            existing["lastSeen"] = now_iso
+            existing["ticker"] = disco["ticker"]
+            existing["name"] = disco["name"] or existing.get("name")
+            existing["sourcesEverSeen"] = sorted(set(existing.get("sourcesEverSeen", [])) | set(sources_this_run))
+        record = new_stocks[key]
+        status = compute_radar_status(record["firstSeen"], record["lastSeen"], now_iso, discovered_this_run=True)
+        lifecycle[key] = {
+            "firstSeen": record["firstSeen"], "lastSeen": record["lastSeen"], "status": status,
+            "sourcesEverSeen": record["sourcesEverSeen"], "sourcesActiveThisRun": sources_this_run,
+            "age": format_radar_age(now_iso, record["firstSeen"]),
+        }
+
+    # Stocks in history but NOT discovered this run — left untouched
+    # (first_seen/last_seen never modified here), just given a computed
+    # status/age for rendering purposes and pruned if long CLEARED.
+    pruned_stocks = {}
+    for key, record in new_stocks.items():
+        if key in lifecycle:
+            pruned_stocks[key] = record
+            continue
+        status = compute_radar_status(record["firstSeen"], record["lastSeen"], now_iso, discovered_this_run=False)
+        if status == "CLEARED":
+            try:
+                last_seen_dt = datetime.fromisoformat(record["lastSeen"])
+                now_dt = datetime.fromisoformat(now_iso)
+                if (now_dt - last_seen_dt).days > RADAR_HISTORY_RETENTION_DAYS:
+                    continue  # pruned entirely — the only case this function ever removes a record
+            except (ValueError, TypeError):
+                pass
+        pruned_stocks[key] = record
+        lifecycle[key] = {
+            "firstSeen": record["firstSeen"], "lastSeen": record["lastSeen"], "status": status,
+            "sourcesEverSeen": record.get("sourcesEverSeen", []), "sourcesActiveThisRun": [],
+            "age": format_radar_age(now_iso, record["firstSeen"]),
+        }
+
+    return {"version": RADAR_HISTORY_VERSION, "stocks": pruned_stocks}, lifecycle
+
+
+def save_radar_history(history, path=None):
+    """Straightforward atomic write — the merge/pruning logic above is
+    where the actual discipline lives; this just persists whatever
+    merge_radar_history already computed."""
+    path = path or RADAR_HISTORY_FILE
+    atomic_write_json(path, history)
+    return {"written": True, "stockCount": len(history.get("stocks", {}))}
 
 
 def yahoo_news_url(ticker):
@@ -3565,6 +3761,10 @@ def render_stock_research_html(
             up_cls = "up" if upside_pct >= 0 else "down"
             upside_html = f' · distance to target <span class="{up_cls}">{"+" if upside_pct >= 0 else ""}{upside_pct:.1f}%</span>'
         core_lines.append(f'<div class="meta">🎯 consensus: {esc(recommendation or "?")} · target {target if target else "?"}{upside_html}</div>')
+    else:
+        # Explicit, never a silent omission — no AI-estimated or otherwise
+        # fabricated target is ever substituted in when none genuinely exists.
+        core_lines.append('<div class="meta">🎯 No current broker target available</div>')
     if latest_broker_event:
         old_r = latest_broker_event.get("old_rating") or "?"
         new_r = latest_broker_event.get("new_rating") or "?"
@@ -3788,7 +3988,7 @@ def render_stock_research_html(
     return f'<div{attr_str}>{header}{body}</div>'
 
 
-def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticker=None, prior_snapshot=None, backtest_results=None):
+def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticker=None, prior_snapshot=None, backtest_results=None, radar_lifecycle=None):
     """
     latest_broker_events: optional dict of ticker -> latest non-superseded broker
     event within LATEST_BROKER_EVENT_MAX_AGE_DAYS (see get_latest_broker_event_per_
@@ -3987,7 +4187,7 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
     # Volume/Gainers/Losers), merged once per stock, showing exactly the
     # SAME evidence already computed and displayed elsewhere — never a
     # new score, never a verdict, never invented data.
-    radar_discovery = discover_radar_stocks(watchlist, big_movers, screener)
+    radar_discovery = discover_radar_stocks(watchlist, big_movers, screener, latest_broker_events)
 
     # Screener rows carry their own quote-shaped data (keyed by "symbol",
     # not present in the Watchlist-only `quotes` dict) — merged once here
@@ -4003,7 +4203,7 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
     def radar_quote_for(ticker):
         return quotes.get(ticker) or screener_quotes_by_ticker.get(ticker) or {}
 
-    _SOURCE_ORDER = ("Watchlist", "Heat Map", "LSE Volume", "LSE Gainers", "LSE Losers")
+    _SOURCE_ORDER = ("Watchlist", "Heat Map", "LSE Volume", "LSE Gainers", "LSE Losers", "Broker Research")
 
     def radar_found_via_html(sources):
         by_label = {}
@@ -4014,6 +4214,44 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
         reasons = [r for label in ordered_labels for r in by_label[label] if r]
         why_line = f'<div class="meta">Why it appeared: {esc("; ".join(reasons))}</div>' if reasons else ""
         return f'<div class="meta"><b>Found via:</b> {found_via}</div>{why_line}'
+
+    _STATUS_LABELS = {
+        "NEW": "🆕 NEW", "ACTIVE": "🟢 ACTIVE", "AGING": "🟡 AGING",
+        "STALE": "🟠 STALE", "CLEARED": "⚪ CLEARED",
+    }
+
+    def radar_lifecycle_html(entry):
+        """
+        Renders the exact Found/Last refreshed/Age/Status block the spec
+        asks for, plus a MULTI-SOURCE callout when independent sources
+        agree — built ENTIRELY from merge_radar_history's own output
+        (computed once in main(), passed in read-only), never a second
+        timestamp calculation here. Returns an empty string if no
+        lifecycle entry exists for this ticker (radar_lifecycle not
+        provided, or genuinely absent — never a fabricated timestamp).
+        """
+        if not entry:
+            return ""
+        try:
+            found_dt = datetime.fromisoformat(entry["firstSeen"])
+            refreshed_dt = datetime.fromisoformat(entry["lastSeen"])
+        except (ValueError, TypeError, KeyError):
+            return ""
+        status = entry.get("status", "")
+        status_label = _STATUS_LABELS.get(status, esc(status))
+        age = entry.get("age")
+        age_str = f"Age: {esc(age)}" if age else "Age: unavailable"
+        source_count = len(entry.get("sourcesEverSeen", []))
+        multi_source = (
+            f'<div class="meta" style="color:#7fb3ff;font-weight:600;">MULTI-SOURCE: {source_count} sources</div>'
+            if source_count >= 2 else ""
+        )
+        return (
+            f'{multi_source}'
+            f'<div class="meta">Found: {esc(format_london_and_utc(found_dt))}</div>'
+            f'<div class="meta">Last refreshed: {esc(format_london_and_utc(refreshed_dt))} · {age_str} · '
+            f'Status: <b>{status_label}</b></div>'
+        )
 
     radar_summary_collector = []  # a THROWAWAY collector, used only to sort this
     # section by existing Signal Quality/Confidence — never merged into the
@@ -4055,7 +4293,16 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
         quality_rank = {"Strong": 0, "Mixed": 1, "Weak": 2}.get(summary["signalQuality"], 3) if summary else 3
         sort_key = (quality_rank, -abs(summary["total"]) if summary else 0)
         found_via_html = radar_found_via_html(disco["sources"])
-        radar_entries.append((sort_key, key, f'{found_via_html}{html_block}'))
+        lifecycle_html = radar_lifecycle_html(radar_lifecycle.get(key)) if radar_lifecycle else ""
+        # Explicit hierarchy separator: WHY IT APPEARED (found_via_html,
+        # above) is deliberately distinct from CURRENT EVIDENCE (the
+        # reused, unmodified html_block below) — a stock being on Radar
+        # for a price move or a screener appearance must never be
+        # conflated with the scoring system's own separate evidence
+        # about it. The evidence block itself is untouched; only this
+        # label is new.
+        evidence_divider = '<div class="meta" style="margin-top:4px;font-weight:600;color:#7fb3ff;">Current Evidence:</div>'
+        radar_entries.append((sort_key, key, f'{lifecycle_html}{found_via_html}{evidence_divider}{html_block}'))
 
     radar_entries.sort(key=lambda e: (e[0], e[1]))
     radar_stocks_html = "".join(e[2] for e in radar_entries) or '<span class="meta">Nothing on the radar right now.</span>'
@@ -4744,6 +4991,7 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 <main>
 <h2 id="radar-stocks">📡 Radar Stocks</h2>
 <p class="meta">Every stock any existing source has surfaced — Watchlist, Heat Map, and LSE Screener — merged once per stock. A discovery list, not a recommendation: this shows the same evidence already computed elsewhere, ranked by existing Signal Quality so the clearest-agreeing evidence appears first, without ranking, scoring, or calling anything a "buy" or "opportunity."</p>
+<div class="disclaimer" style="margin-bottom:10px;"><b>Discovery sources (find NEW stocks):</b> Watchlist, Heat Map, LSE Screener (Volume/Gainers/Losers), and market-wide Broker Research (rating/target changes across the whole LSE, not just watchlist stocks). <b>Evidence sources (enrich stocks already discovered, but cannot discover a stock on their own):</b> Google/Yahoo/Reuters/Bloomberg/FT news feeds and the existing AI Evidence Review — these are per-ticker lookups, not a whole-market scan, so they can only add evidence to a stock some other source already surfaced. <b>Not available, shown honestly rather than invented:</b> genuine insider buy/sell transaction data (only static insider ownership % exists, which is never presented as trading activity) and any web source beyond the news feeds listed above.</div>
 {radar_stocks_html}
 
 <h2 id="heatmap">🗺️ Heat Map (top movers, by size of move)</h2>
@@ -6035,7 +6283,49 @@ def main():
     except Exception as e:
         print(f"  ! backtest results lookup failed — Signal Backtest section will show as unavailable this run: {e}", file=sys.stderr)
 
-    scorecard_summaries = render_dashboard(data, watchlist, prior_snapshot=prior_snapshot, backtest_results=backtest_results)
+    # Live Radar: load the persistent cross-run history, merge THIS run's
+    # fresh discovery into it (never mutating the loaded copy — see
+    # merge_radar_history's own docstring), and hold the updated store to
+    # save AFTER rendering — same load-before/save-after pattern as every
+    # other persistence path here. A corrupt history file means the
+    # lifecycle info (Found/Age/Status) is unavailable this run, but never
+    # blocks the rest of the dashboard from rendering.
+    radar_lifecycle = None
+    updated_radar_history = None
+    try:
+        _radar_now_iso = datetime.now(timezone.utc).isoformat()
+        _radar_history = load_radar_history()
+        # Mirrors render_dashboard's own default-loading logic for
+        # latest_broker_events (see that function's docstring) — main()
+        # doesn't otherwise have this available before render_dashboard
+        # runs, and it's a pure read of the already-persisted events
+        # store, no side effects, safe to load here too.
+        try:
+            _radar_broker_events = get_latest_broker_event_per_ticker(load_events_store().get("events", []))
+        except Exception:
+            _radar_broker_events = {}
+        _radar_discovery = discover_radar_stocks(
+            watchlist, data.get("bigMovers", []), data.get("screener", {}), _radar_broker_events,
+        )
+        updated_radar_history, radar_lifecycle = merge_radar_history(_radar_history, _radar_discovery, _radar_now_iso)
+    except RadarHistoryCorruptError as e:
+        print(f"  ! radar history store CORRUPT — Radar Stocks will show without Found/Age/Status this run: {e}", file=sys.stderr)
+    except Exception as e:
+        print(f"  ! radar history lookup failed — Radar Stocks will show without Found/Age/Status this run: {e}", file=sys.stderr)
+
+    scorecard_summaries = render_dashboard(
+        data, watchlist, prior_snapshot=prior_snapshot, backtest_results=backtest_results,
+        radar_lifecycle=radar_lifecycle,
+    )
+
+    # Saved only once rendering has succeeded — a render failure never
+    # persists a lifecycle update whose corresponding HTML was never
+    # actually produced.
+    if updated_radar_history is not None:
+        try:
+            save_radar_history(updated_radar_history)
+        except Exception as e:
+            print(f"  ! radar history save FAILED — previous file left untouched: {e}", file=sys.stderr)
 
     # Captures TODAY's snapshot from the SAME scorecard_summaries
     # render_dashboard just returned — never a second scorecard/evidence
