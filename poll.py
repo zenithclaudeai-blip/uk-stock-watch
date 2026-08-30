@@ -762,6 +762,29 @@ def passes_news_filters(pub_date_str):
     return True
 
 
+RECENT_NEWS_FALLBACK_MAX_AGE_DAYS = 7  # a "most recent available, not from today" fallback
+# is only shown for items within this window — old enough to survive a quiet
+# weekend, nowhere near NEWS_MAX_AGE_DAYS (21), which exists for a different
+# purpose (the outer ceiling on what's retained at all).
+
+
+def passes_recency_filter_wide(pub_date_str, max_age_days=RECENT_NEWS_FALLBACK_MAX_AGE_DAYS):
+    """
+    Age-only recency check, deliberately WITHOUT the same-day requirement —
+    used ONLY to build a separate, display-only "most recent available"
+    fallback pool, completely independent of items_by_ticker/marketWide
+    (which stay strictly same-day, per passes_news_filters, and are what
+    feeds classify_evidence/compute_entry_exit_evidence/the scorecard).
+    That system's own displayed text makes explicit same-day claims
+    ("no relevant same-day catalyst found") — feeding it anything wider
+    than today would make those claims false. This function exists
+    specifically so a genuinely relevant 2-day-old headline can still be
+    SHOWN to the user (clearly dated, never presented as today's), without
+    ever being treated as today's catalyst by the evidence system.
+    """
+    return is_recent_enough(pub_date_str, max_age_days=max_age_days)
+
+
 def item_sort_key(it):
     """Sort key for ordering news/alert items latest-first. NEVER sort on the raw
     pubDate string directly — RFC 822 dates start with the day name ("Thu, 27 Aug...",
@@ -1040,7 +1063,7 @@ def passes_relevance_filter(title, cleaned_name, fetch_source=None):
     return True
 
 
-def revalidate_stored_news_items(stored_items, current_name):
+def revalidate_stored_news_items(stored_items, current_name, date_filter_fn=None):
     """
     Re-validates a ticker's carried-forward news items against BOTH
     today's date filter (passes_news_filters) AND today's relevance
@@ -1064,10 +1087,18 @@ def revalidate_stored_news_items(stored_items, current_name):
     structured analyst-history API, ticker-scoped by construction, not
     a text search) are exempt from relevance re-checking, same as at
     fetch time.
+
+    date_filter_fn: which date/recency check to apply — defaults to
+    passes_news_filters (same-day), preserving exact existing behaviour
+    for every current caller. Pass passes_recency_filter_wide instead
+    to revalidate the wider "most recent available" fallback pool
+    against its own (looser) recency rule — relevance checking is
+    identical either way.
     """
+    date_filter_fn = date_filter_fn or passes_news_filters
     kept = []
     for it in stored_items:
-        if not passes_news_filters(it.get("pubDate")):
+        if not date_filter_fn(it.get("pubDate")):
             continue
         fetch_source = it.get("fetchSource")
         if fetch_source == "analyst":
@@ -3244,6 +3275,15 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
     screener = data.get("screener", {})
     ftse100 = data.get("ftse100")
     screener_news = data.get("screenerNews", {})
+    screener_news_recent = data.get("screenerNewsRecent", {})
+    mover_news_fetch_attempts = data.get("moverNewsFetchAttempts", 0)
+    mover_news_fetch_failures = data.get("moverNewsFetchFailures", 0)
+    if mover_news_fetch_attempts == 0:
+        mover_news_status = "not_checked"
+    elif mover_news_fetch_failures >= mover_news_fetch_attempts:
+        mover_news_status = "failed"
+    else:
+        mover_news_status = "ok"
     uptrend_stocks = data.get("uptrendStocks", [])
     big_movers = data.get("bigMovers", [])
     market_wide = data.get("marketWide", [])
@@ -3308,6 +3348,62 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
     for ticker, its in items_by_ticker.items():
         all_items.extend(its)
     all_items.sort(key=item_sort_key, reverse=True)
+
+    recent_items_by_ticker = data.get("recentItems", {})
+    recent_market_wide = data.get("recentMarketWide", [])
+    market_wide_alerts_status = data.get("marketWideAlertsStatus", "not_checked")
+    news_fetch_attempts = data.get("newsFetchAttempts", 0)
+    news_fetch_failures = data.get("newsFetchFailures", 0)
+    if news_fetch_attempts == 0:
+        news_fetch_status = "not_checked"
+    elif news_fetch_failures >= news_fetch_attempts:
+        news_fetch_status = "failed"
+    else:
+        news_fetch_status = "ok"  # includes partial failure — a real per-source outage
+        # doesn't make every OTHER stock's successfully-fetched news untrustworthy
+
+    def news_empty_state_html(status, recent_pool, label="news", render_fn=None):
+        """
+        Same four-way distinction as screener_empty_state_html, extended
+        with a fifth behaviour specific to news: when the fetch genuinely
+        worked but there's nothing from TODAY, fall back to showing the
+        most recent AVAILABLE items instead of an empty section — each one
+        still rendered through render_fn (defaults to item_div), which
+        already shows its real pubDate, so a 2-day-old headline is never
+        presented as if it were today's. This fallback pool is completely
+        separate from what feeds the evidence/scorecard system (see
+        passes_recency_filter_wide's docstring) — showing it here never
+        changes what any "same-day catalyst" claim elsewhere on the page
+        means.
+
+        render_fn: how to render each fallback item — defaults to item_div
+        (used by Market-wide Broker Alerts and the News & Broker Feed,
+        where ticker is already embedded in each item's own dict). The
+        Top Movers section instead uses screener_news_item(symbol, it),
+        which takes the ticker as a SEPARATE argument — passed in here as
+        a small wrapper rather than duplicating this whole function.
+        """
+        render_fn = render_fn or item_div
+        if status == "failed":
+            return f'<p class="meta" style="color:#f0997b;">⚠️ Fetch failed this run — {label} could not be retrieved. Check again next cycle; if it persists, something needs investigating.</p>'
+        if status == "not_checked":
+            return f'<p class="meta">Not checked this run.</p>'
+        # status == "ok", nothing from today — try the wider recent pool first.
+        if recent_pool:
+            recent_sorted = sorted(recent_pool, key=item_sort_key, reverse=True)
+            recent_html = "".join(render_fn(it) for it in recent_sorted[:20])
+            context = ""
+            if market_hours_at_generation is False:
+                context = " Markets were closed at the time of this update, so no same-day items is expected."
+            return (
+                f'<p class="meta">No same-day {label} found this run (checked successfully).{context} '
+                f'Showing the most recent available instead — each item below is dated, not from today:</p>{recent_html}'
+            )
+        if market_hours_at_generation is False:
+            return f'<p class="meta">⚪ No {label} found this run — markets were closed at the time of this update, so this is expected.</p>'
+        if market_hours_at_generation is True:
+            return f'<p class="meta">No {label} found this run (checked successfully, markets were open).</p>'
+        return f'<p class="meta">No {label} found this run (checked successfully).</p>'
 
     ftse_html = ""
     if ftse100:
@@ -3380,6 +3476,18 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
 
     item_rows = "".join(item_div(it) for it in all_items[:150])
     market_wide_rows = "".join(item_div(it) for it in market_wide[:60])
+
+    all_recent_items = []
+    for ticker, its in recent_items_by_ticker.items():
+        all_recent_items.extend(its)
+    # Exclude anything that's ALREADY shown in the same-day list (by link) —
+    # the recent-fallback pool should only ever add genuinely NEW information
+    # (older items not already visible), never duplicate what's already on screen.
+    _same_day_links = {it.get("link") for it in all_items}
+    all_recent_items = [it for it in all_recent_items if it.get("link") not in _same_day_links]
+
+    _same_day_mw_links = {it.get("link") for it in market_wide}
+    recent_market_wide_filtered = [it for it in recent_market_wide if it.get("link") not in _same_day_mw_links]
 
     def screener_table(rows, show_pct=True, section_key=None):
         def row(i, q):
@@ -3498,6 +3606,12 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
         for symbol, items in screener_news.items()
         for it in items
     )
+
+    all_recent_mover_news = []
+    for symbol, items in screener_news_recent.items():
+        all_recent_mover_news.extend(items)
+    _same_day_mover_links = {it.get("link") for its in screener_news.values() for it in its}
+    all_recent_mover_news = [it for it in all_recent_mover_news if it.get("link") not in _same_day_mover_links]
 
     uptrend_rows = "".join(
         f'<div class="quote-row"><b>{esc(s["symbol"])}</b> ({esc(s["name"])}) — '
@@ -3898,7 +4012,7 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 
 <h2 id="mover-news">📰 News on Today's Top Movers</h2>
 <p class="meta">Real, dated-today news for any stock currently in Volume/Gainers/Losers above — not limited to your watchlist.</p>
-<div>{screener_news_rows or '<span class="meta">No same-day news found for today&#39;s ranked stocks yet.</span>'}</div>
+<div>{screener_news_rows or news_empty_state_html(mover_news_status, all_recent_mover_news, "news for today's ranked stocks", render_fn=lambda it: screener_news_item(it.get("ticker", ""), it))}</div>
 
 <h2 id="uptrend">📈 5-Day Uptrend ({UPTREND_5DAY_THRESHOLD_PCT:.0f}%+, screener + watchlist)</h2>
 <p class="meta">Real closing-price history over the last 5 trading days — a fact about the past, not a forecast of what happens next.</p>
@@ -3921,10 +4035,10 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 
 <h2 id="broker-alerts">⬆⬇🎯 Market-wide Broker Alerts (all LSE, not just watchlist)</h2>
 <p class="meta">Upgrades/downgrades from anywhere on the LSE, not limited to your watchlist below.</p>
-{market_wide_rows or '<p class="meta">No market-wide alerts yet.</p>'}
+{market_wide_rows or news_empty_state_html(market_wide_alerts_status, recent_market_wide_filtered, "market-wide alerts")}
 
 <h2 id="news-feed">📰 News &amp; Broker Feed (watchlist)</h2>
-{item_rows or '<p class="meta">No items yet — first run may still be in progress.</p>'}
+{item_rows or news_empty_state_html(news_fetch_status, all_recent_items, "news")}
 <p class="lastpoll">Last checked: {esc(str(last_poll))}</p>
 </body></html>"""
     os.makedirs(DOCS_DIR, exist_ok=True)
@@ -4260,8 +4374,11 @@ def main():
     _recent_send_times = list(seen_state.get("recentSendTimes", []))
     data = load_json(DATA_FILE, {"items": {}, "quotes": {}, "lastPoll": None})
     items_by_ticker = data.get("items", {})
+    recent_items_by_ticker = data.get("recentItems", {})
     quotes = data.get("quotes", {})
     market_research = data.get("marketResearch", {})
+    news_fetch_attempts = 0
+    news_fetch_failures = 0
 
     yahoo_crumb = get_yahoo_crumb()
     print(f"Yahoo auth crumb: {'obtained' if yahoo_crumb else 'FAILED — screener/analyst-history will likely 401'}")
@@ -4270,10 +4387,16 @@ def main():
     mention_counts = {}  # ticker -> {"name": ..., "count": ...} — today's mention volume, purely descriptive
     big_movers = []
     market_wide_enriched = []
+    market_wide_enriched_wide = []
     screener = {}
     screener_status = {"volume": "not_checked", "gainers": "not_checked", "losers": "not_checked"}
+    ratings_fetch_failed = None  # None = not attempted this run (SKIP_MARKET_WIDE), True/False once it is
+    market_wide_fetch_failed = None
     ratings_items = []
     screener_news = {}
+    screener_news_recent = {}
+    mover_news_fetch_attempts = 0
+    mover_news_fetch_failures = 0
     uptrend_stocks = []
     screener_targets = {}
     ftse_universe_names = None
@@ -4282,8 +4405,8 @@ def main():
     ftse100 = fetch_ftse100()
 
     if not SKIP_MARKET_WIDE:
-        ratings_items, _ = fetch_feed(ANALYST_RATINGS_FEED_URL)
-        market_wide_items, _ = fetch_feed(market_wide_broker_news_url())
+        ratings_items, ratings_fetch_failed = fetch_feed(ANALYST_RATINGS_FEED_URL)
+        market_wide_items, market_wide_fetch_failed = fetch_feed(market_wide_broker_news_url())
 
         # Restrict the screener to genuine FTSE 100/250 constituents — Yahoo's raw LSE
         # screener includes the whole market (AIM micro-caps and all), which is why
@@ -4331,6 +4454,9 @@ def main():
         # deduped by symbol (a stock can appear in more than one list), one query each,
         # staggered to avoid the burst-triggered 503s seen earlier in this project.
         screener_news = {}
+        screener_news_recent = data.get("screenerNewsRecent", {})
+        mover_news_fetch_attempts = 0
+        mover_news_fetch_failures = 0
         ranked_stocks = {}
         for section in ("volume", "gainers", "losers"):
             for row in screener.get(section, []):
@@ -4341,24 +4467,60 @@ def main():
             # dashboard still displays the full "name" as-is, only the search query
             # uses the cleaned version, since that's what actually matches real news.
             cleaned_name = clean_company_name(name)
-            items, _ = fetch_feed(general_news_url(cleaned_name))
-            items = [it for it in items if passes_news_filters(it.get("pubDate"))]
+            items, mover_news_failed = fetch_feed(general_news_url(cleaned_name))
+            mover_news_fetch_attempts += 1
+            mover_news_fetch_failures += 1 if mover_news_failed else 0
             # Google matches a keyword search against full article content, not just
             # the headline — confirmed live: this pool surfaced items unrelated to the
             # searched stock. Requiring the (cleaned) company name to actually appear
             # in the item's own title before tagging it with this stock's ticker closes
             # that gap — same fix applied to the watchlist's own per-stock news loop.
             items = [it for it in items if cleaned_name.lower() in it.get("title", "").lower()]
-            if items:
-                now_iso_sc = datetime.now(timezone.utc).isoformat()
-                enriched_items = []
-                for it in items[:5]:  # cap per-stock to keep dashboard/message size sane
+            # Built ONCE against the wider age ceiling, same restructuring
+            # pattern as the other two news sections — the existing
+            # same-day screener_news (which feeds evidence/scorecard via
+            # render_stock_research_html's news_items parameter) is DERIVED
+            # from this, guaranteeing byte-identical existing behaviour,
+            # while a separate recent-fallback pool becomes available
+            # purely for the "News on Today's Top Movers" DISPLAY, never
+            # passed into evidence.
+            items_wide = [it for it in items if passes_recency_filter_wide(it.get("pubDate"))]
+            items_today = [it for it in items_wide if is_today_in_london(it.get("pubDate"))]
+            now_iso_sc = datetime.now(timezone.utc).isoformat()
+
+            def _enrich_mover_items(raw_items):
+                out = []
+                for it in raw_items[:5]:  # cap per-stock to keep dashboard/message size sane
                     category = classify(it["title"])
                     broker = detect_broker(it["title"]) if category in ("upgrade", "downgrade", "target", "target_raise", "target_cut", "initiation", "reiteration") else None
-                    enriched_items.append({**it, "ticker": symbol, "company": name, "category": category, "broker": broker,
-                                            "detectedAt": now_iso_sc, "normalizedAt": now_iso_sc,
-                                            "normalizedAction": CATEGORY_TO_NORMALIZED_ACTION.get(category)})
-                screener_news[symbol] = enriched_items
+                    out.append({**it, "ticker": symbol, "company": name, "category": category, "broker": broker,
+                                "detectedAt": now_iso_sc, "normalizedAt": now_iso_sc,
+                                "normalizedAction": CATEGORY_TO_NORMALIZED_ACTION.get(category)})
+                return out
+
+            if items_today:
+                screener_news[symbol] = _enrich_mover_items(items_today)
+
+            # Recent-fallback pool: merge with whatever was persisted for this
+            # symbol, revalidate against the wide recency+relevance rule
+            # (same principle as the other two sections — a stored item that
+            # would no longer qualify today, whether by age or a relevance
+            # rule change, doesn't linger indefinitely), dedupe, cap.
+            existing_recent_sc = revalidate_stored_news_items(
+                screener_news_recent.get(symbol, []), name, date_filter_fn=passes_recency_filter_wide,
+            )
+            merged_recent_sc = _enrich_mover_items(items_wide) + existing_recent_sc
+            seen_links_sc = set()
+            deduped_recent_sc = []
+            for it in merged_recent_sc:
+                if it["link"] in seen_links_sc:
+                    continue
+                seen_links_sc.add(it["link"])
+                deduped_recent_sc.append(it)
+            deduped_recent_sc.sort(key=item_sort_key, reverse=True)
+            if deduped_recent_sc:
+                screener_news_recent[symbol] = deduped_recent_sc[:5]
+
             time.sleep(1)  # stagger — this is the change most likely to trip Google's rate limiting if rushed
 
         # 5-day uptrend: real closing-price history for the same deduped stock set (no
@@ -4515,8 +4677,16 @@ def main():
                 confirmed_ratings_items.append(it)
                 ratings_resolved[it["link"]] = (r_ticker, r_company)
         market_wide_pool = confirmed_ratings_items + market_wide_items
-        market_wide_pool = [it for it in market_wide_pool if passes_news_filters(it.get("pubDate"))]
+        # Built ONCE against the WIDER age ceiling (not same-day), then the
+        # existing same-day subset is DERIVED from it below — guarantees
+        # market_wide_enriched (which feeds alerts/seen-tracking/AI-digest,
+        # unchanged) ends up with the EXACT same items as before this
+        # change, while a new wider pool becomes available alongside it for
+        # the "most recent available, not from today" display fallback —
+        # without re-running the classification/enrichment logic twice.
+        market_wide_pool = [it for it in market_wide_pool if passes_recency_filter_wide(it.get("pubDate"))]
         now_iso_mw = datetime.now(timezone.utc).isoformat()
+        market_wide_enriched_wide = []
         for it in market_wide_pool:
             category = classify(it["title"])
             # "target" = a broker raising/cutting their price target — a genuine, already-
@@ -4525,7 +4695,7 @@ def main():
             if category not in ("upgrade", "downgrade", "target", "target_raise", "target_cut", "initiation", "reiteration"):
                 continue
             resolved = ratings_resolved.get(it["link"])
-            market_wide_enriched.append({
+            market_wide_enriched_wide.append({
                 **it,
                 "ticker": resolved[0] if resolved else "MARKET",
                 "company": resolved[1] if resolved else "",
@@ -4535,10 +4705,13 @@ def main():
                 "normalizedAt": now_iso_mw,
                 "normalizedAction": CATEGORY_TO_NORMALIZED_ACTION.get(category),
             })
-        market_wide_dedup = {}
-        for it in market_wide_enriched:
-            market_wide_dedup[it["link"]] = it  # de-dupe within this run (same story can appear in both feeds)
-        market_wide_enriched = list(market_wide_dedup.values())
+        market_wide_dedup_wide = {}
+        for it in market_wide_enriched_wide:
+            market_wide_dedup_wide[it["link"]] = it
+        market_wide_enriched_wide = list(market_wide_dedup_wide.values())
+        # The EXISTING same-day pool — identical items to before this change,
+        # just now derived from the wider set rather than separately filtered.
+        market_wide_enriched = [it for it in market_wide_enriched_wide if is_today_in_london(it.get("pubDate"))]
 
         for it in market_wide_enriched:
             if it["link"] in seen:
@@ -4552,9 +4725,11 @@ def main():
         ticker, name = stock["ticker"], stock["name"]
         print(f"Polling {ticker} ({name})...")
 
-        g_items, _ = fetch_feed(google_news_url(name))
-        y_items, _ = fetch_feed(yahoo_news_url(ticker))
-        rb_items, _ = fetch_feed(reuters_bloomberg_url(name))
+        g_items, g_failed = fetch_feed(google_news_url(name))
+        y_items, y_failed = fetch_feed(yahoo_news_url(ticker))
+        rb_items, rb_failed = fetch_feed(reuters_bloomberg_url(name))
+        news_fetch_attempts += 3
+        news_fetch_failures += sum([g_failed, y_failed, rb_failed])
         _cleaned_name = clean_company_name(name)
         # ONE shared relevance gate (passes_relevance_filter) now applied to every
         # source, including y_items — investigated directly, not assumed exempt: Yahoo's
@@ -4568,9 +4743,15 @@ def main():
         y_items = [it for it in y_items if passes_relevance_filter(it.get("title", ""), _cleaned_name, "y")]
         rb_items = [it for it in rb_items if passes_relevance_filter(it.get("title", ""), _cleaned_name, "rb")]
         matched_ratings = [it for it in ratings_items if passes_relevance_filter(it.get("title", ""), _cleaned_name, "ratings")]
-        combined_tagged = [("g", it) for it in g_items] + [("y", it) for it in y_items] \
+        combined_tagged_all = [("g", it) for it in g_items] + [("y", it) for it in y_items] \
             + [("rb", it) for it in rb_items] + [("ratings", it) for it in matched_ratings]
-        combined_tagged = [(src, it) for src, it in combined_tagged if passes_news_filters(it.get("pubDate"))]
+        # Built ONCE against the wider age ceiling, same pattern as the
+        # market-wide restructuring above — the existing same-day subset is
+        # DERIVED from it, guaranteeing byte-identical behaviour for
+        # anything already consuming `combined_tagged` (evidence/scorecard
+        # included), while a wider pool becomes available alongside it.
+        combined_tagged_wide = [(src, it) for src, it in combined_tagged_all if passes_recency_filter_wide(it.get("pubDate"))]
+        combined_tagged = [(src, it) for src, it in combined_tagged_wide if is_today_in_london(it.get("pubDate"))]
         # Purely a count of real, already-published items mentioning this stock today
         # (deduped by link) — a fact about today's coverage volume, not a prediction of
         # anything. NEWS_SAME_LONDON_DAY_ONLY already restricts `combined` to today.
@@ -4592,27 +4773,34 @@ def main():
             quotes[ticker]["recommendationKey"] = analyst.get("recommendationKey")
 
         now_iso = datetime.now(timezone.utc).isoformat()
-        enriched = []
-        for fetch_source, it in combined_tagged:
-            category = classify(it["title"])
-            # Only tag a broker when the item is actually a rating/target call — otherwise
-            # a story that merely mentions a bank's name (e.g. a personnel/legal story
-            # about "Barclays") gets mislabeled as if that bank issued the rating.
-            broker = detect_broker(it["title"]) if category in ("upgrade", "downgrade", "target", "target_raise", "target_cut", "initiation", "reiteration") else None
-            enriched.append({
-                **it,
-                "ticker": ticker,
-                "company": name,
-                "category": category,
-                "broker": broker,
-                "detectedAt": now_iso,
-                "normalizedAt": now_iso,
-                "normalizedAction": CATEGORY_TO_NORMALIZED_ACTION.get(category),
-                # Recorded so a LATER run can re-apply the correct, source-aware
-                # relevance policy when this item is carried forward — see
-                # revalidate_stored_news_items().
-                "fetchSource": fetch_source,
-            })
+
+        def _enrich_tagged(tagged_pairs):
+            out = []
+            for fetch_source, it in tagged_pairs:
+                category = classify(it["title"])
+                # Only tag a broker when the item is actually a rating/target call —
+                # otherwise a story that merely mentions a bank's name (e.g. a
+                # personnel/legal story about "Barclays") gets mislabeled as if that
+                # bank issued the rating.
+                broker = detect_broker(it["title"]) if category in ("upgrade", "downgrade", "target", "target_raise", "target_cut", "initiation", "reiteration") else None
+                out.append({
+                    **it,
+                    "ticker": ticker,
+                    "company": name,
+                    "category": category,
+                    "broker": broker,
+                    "detectedAt": now_iso,
+                    "normalizedAt": now_iso,
+                    "normalizedAction": CATEGORY_TO_NORMALIZED_ACTION.get(category),
+                    # Recorded so a LATER run can re-apply the correct, source-aware
+                    # relevance policy when this item is carried forward — see
+                    # revalidate_stored_news_items().
+                    "fetchSource": fetch_source,
+                })
+            return out
+
+        enriched = _enrich_tagged(combined_tagged)
+        enriched_wide = _enrich_tagged(combined_tagged_wide)
         # Analyst history items already carry structured category/broker/pubDate —
         # merge as-is rather than re-running keyword classification on them. Not a text
         # search result at all (Yahoo's quoteSummary API returns these keyed directly to
@@ -4620,6 +4808,8 @@ def main():
         # carry-forward revalidation knows to exempt these too, not just this run.
         for it in analyst_items:
             enriched.append({**it, "ticker": ticker, "company": name, "detectedAt": now_iso, "fetchSource": "analyst"})
+            enriched_wide.append({**it, "ticker": ticker, "company": name, "detectedAt": now_iso, "fetchSource": "analyst"})
+
 
         # Re-validate PERSISTED items against TODAY's date filter AND today's relevance
         # rule — not date alone. A stored item that would fail the relevance check if
@@ -4642,6 +4832,25 @@ def main():
             deduped.append(it)
         deduped.sort(key=item_sort_key, reverse=True)
         items_by_ticker[ticker] = deduped[:MAX_ITEMS_PER_TICKER]
+
+        # Wider-window ("most recent available, not necessarily today")
+        # parallel pool for this ticker — display-only, NEVER fed into
+        # evidence/scorecard/contradiction logic (that stays exclusively on
+        # items_by_ticker above). Same merge-with-persisted-and-revalidate
+        # pattern, just against the wider recency rule.
+        existing_recent = revalidate_stored_news_items(
+            recent_items_by_ticker.get(ticker, []), name, date_filter_fn=passes_recency_filter_wide,
+        )
+        merged_recent = enriched_wide + existing_recent
+        seen_links_recent = set()
+        deduped_recent = []
+        for it in merged_recent:
+            if it["link"] in seen_links_recent:
+                continue
+            seen_links_recent.add(it["link"])
+            deduped_recent.append(it)
+        deduped_recent.sort(key=item_sort_key, reverse=True)
+        recent_items_by_ticker[ticker] = deduped_recent[:MAX_ITEMS_PER_TICKER]
 
         for it in enriched:
             if it["link"] in seen:
@@ -4715,6 +4924,23 @@ def main():
     deduped_market_wide.sort(key=item_sort_key, reverse=True)
     deduped_market_wide = deduped_market_wide[:MAX_ITEMS_PER_TICKER]
 
+    # Wider-window ("most recent available, not necessarily today") parallel
+    # pool — display-only, NEVER fed into evidence/scorecard/contradiction
+    # logic, which stays exclusively on the same-day deduped_market_wide
+    # above. Same merge-with-persisted pattern, just against
+    # RECENT_NEWS_FALLBACK_MAX_AGE_DAYS instead of same-day-only.
+    existing_market_wide_recent = [it for it in data.get("recentMarketWide", []) if passes_recency_filter_wide(it.get("pubDate"))]
+    merged_market_wide_recent = market_wide_enriched_wide + existing_market_wide_recent
+    seen_links_mw_recent = set()
+    deduped_market_wide_recent = []
+    for it in merged_market_wide_recent:
+        if it["link"] in seen_links_mw_recent:
+            continue
+        seen_links_mw_recent.add(it["link"])
+        deduped_market_wide_recent.append(it)
+    deduped_market_wide_recent.sort(key=item_sort_key, reverse=True)
+    deduped_market_wide_recent = deduped_market_wide_recent[:MAX_ITEMS_PER_TICKER]
+
     # Refresh a capped batch of the stalest Market Research write-ups (see function
     # docstring for why this doesn't refresh everyone every run) using this run's
     # freshly-gathered items_by_ticker/quotes as the factual source.
@@ -4724,14 +4950,34 @@ def main():
     _last_poll_str = _last_poll_now.strftime("%Y-%m-%d %H:%M:%S")
     data = {
         "items": items_by_ticker,
+        "recentItems": recent_items_by_ticker,
         "quotes": quotes,
         "screener": screener,
         "screenerStatus": screener_status,
         "ftse100": ftse100,
         "screenerNews": screener_news,
+        "screenerNewsRecent": screener_news_recent,
+        "moverNewsFetchAttempts": mover_news_fetch_attempts,
+        "moverNewsFetchFailures": mover_news_fetch_failures,
         "uptrendStocks": uptrend_stocks,
         "bigMovers": big_movers,
         "marketWide": deduped_market_wide,
+        "recentMarketWide": deduped_market_wide_recent,
+        # Per-section fetch health, same "did it actually work" distinction
+        # as screenerStatus — None means genuinely not attempted this run
+        # (SKIP_MARKET_WIDE), never conflated with a real failure.
+        "marketWideAlertsStatus": (
+            "not_checked" if ratings_fetch_failed is None and market_wide_fetch_failed is None
+            else "failed" if (ratings_fetch_failed and market_wide_fetch_failed)
+            else "ok"
+        ),
+        # Aggregate across every per-ticker news fetch this run (3 feeds ×
+        # every watchlist stock) — a per-ticker granular breakdown would be
+        # a much larger change for limited extra value; this answers the
+        # real question ("is something actually broken right now") without
+        # needing to inspect each of potentially dozens of individual fetches.
+        "newsFetchAttempts": news_fetch_attempts,
+        "newsFetchFailures": news_fetch_failures,
         "marketResearch": market_research,
         "lastPoll": _last_poll_str,
         # Explicit, persisted universe/source status — surfaced on the dashboard itself
