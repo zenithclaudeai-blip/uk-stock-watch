@@ -3667,10 +3667,21 @@ def render_stock_research_html(
         # with price and evidenceLabel, both already computed above, for
         # the daily "What Changed" snapshot — still zero duplicate
         # computation, just two more already-known facts captured.
+        # Extended again (Phase 7B) with the full 8-dimension breakdown,
+        # both subtotals, and DON'T CHASE state — all already computed
+        # above for this stock's own display — so the prospective
+        # evidence-history store can capture everything needed for a
+        # genuinely honest future backtest of the News/Broker/AI
+        # dimensions, without a single new calculation anywhere in this
+        # function.
         scorecard_summary_collector.append({
             "ticker": ticker, "name": name, "total": scorecard["total"],
             "signalQuality": signal_quality, "confidence": scorecard["confidence"],
             "price": price, "evidenceLabel": evidence["label"],
+            "dimensions": {dim: score for dim, (score, _reasons) in scorecard["dimensions"].items()},
+            "technicalMarket": subtotals["technicalMarket"], "researchEvidence": subtotals["researchEvidence"],
+            "risk": subtotals["risk"],
+            "dontChase": dont_chase is not None,
         })
 
     # Phase 5 chart — pure display, computed from the ALREADY-RETAINED
@@ -3720,7 +3731,7 @@ def render_stock_research_html(
     return f'<div{attr_str}>{header}{body}</div>'
 
 
-def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticker=None, prior_snapshot=None):
+def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticker=None, prior_snapshot=None, backtest_results=None):
     """
     latest_broker_events: optional dict of ticker -> latest non-superseded broker
     event within LATEST_BROKER_EVENT_MAX_AGE_DAYS (see get_latest_broker_event_per_
@@ -4000,6 +4011,12 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
                     f'<b>{esc(c["ticker"])}</b> ({esc(c["name"])})</a> — {" · ".join(parts)}</div>'
                 )
             whats_changed_html = "".join(rows)
+
+    # Phase 7C: renders whatever load_backtest_results() produced,
+    # loaded by main() and passed in here — this function never loads
+    # the file itself, matching render_dashboard's existing "pure
+    # function of its inputs" character elsewhere in this codebase.
+    backtest_html = render_backtest_results_html(backtest_results)
 
     def item_div(it):
         # Defense in depth: only render a broker badge for genuine rating/target items,
@@ -4578,7 +4595,8 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 <a href="#watchlist" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">👀 Watchlist</a>
 <a href="#market-research" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🔎 Market Research</a>
 <a href="#broker-alerts" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">⬆⬇🎯 Broker Alerts</a>
-<a href="#news-feed" style="color:#7fb3ff;text-decoration:none;">📰 News Feed</a>
+<a href="#news-feed" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📰 News Feed</a>
+<a href="#backtest" style="color:#7fb3ff;text-decoration:none;">📊 Signal Backtest</a>
 </nav>
 
 <main>
@@ -4637,6 +4655,10 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 
 <h2 id="news-feed">📰 News &amp; Broker Feed (watchlist)</h2>
 {item_rows or news_empty_state_html(news_fetch_status, all_recent_items, "news")}
+
+<h2 id="backtest">📊 Signal Backtest (Technical Signals Only)</h2>
+{backtest_html}
+
 <p class="lastpoll">Last checked: {esc(str(last_poll))}</p>
 </main>
 </body></html>"""
@@ -5842,7 +5864,20 @@ def main():
     except Exception as e:
         print(f"  ! daily snapshots lookup failed — 'What Changed' will show as unavailable this run: {e}", file=sys.stderr)
 
-    scorecard_summaries = render_dashboard(data, watchlist, prior_snapshot=prior_snapshot)
+    # Phase 7C: loads whatever backtest results were most recently saved
+    # by a SEPARATE backtest run (see --backtest below) — never computed
+    # here, since a full historical backtest is far heavier than this
+    # 5-minute poll cycle. A missing/corrupt results file just means the
+    # dashboard shows its own honest "no backtest run yet" state.
+    backtest_results = None
+    try:
+        backtest_results = load_backtest_results()
+    except BacktestResultsCorruptError as e:
+        print(f"  ! backtest results file CORRUPT — Signal Backtest section will show as unavailable this run: {e}", file=sys.stderr)
+    except Exception as e:
+        print(f"  ! backtest results lookup failed — Signal Backtest section will show as unavailable this run: {e}", file=sys.stderr)
+
+    scorecard_summaries = render_dashboard(data, watchlist, prior_snapshot=prior_snapshot, backtest_results=backtest_results)
 
     # Captures TODAY's snapshot from the SAME scorecard_summaries
     # render_dashboard just returned — never a second scorecard/evidence
@@ -5855,6 +5890,18 @@ def main():
             print(f"Daily snapshot: not written this run (reason={snapshot_result.get('reason')})")
     except Exception as e:
         print(f"  ! Daily snapshot capture failed entirely — state/daily_snapshots.json left untouched: {e}", file=sys.stderr)
+
+    # Phase 7B: prospective evidence-history capture — from the SAME
+    # scorecard_summaries, same fail-safe wrapping, entirely separate
+    # from the Phase 6 snapshot above (different file, richer schema,
+    # different purpose — building toward a future honest backtest of
+    # the News/Broker/AI dimensions).
+    try:
+        evidence_history_result = capture_daily_evidence_snapshot(scorecard_summaries or [])
+        if not evidence_history_result.get("written"):
+            print(f"Evidence history: not written this run (reason={evidence_history_result.get('reason')})")
+    except Exception as e:
+        print(f"  ! Evidence history capture failed entirely — state/evidence_history.json left untouched: {e}", file=sys.stderr)
 
     # --- Broker-events pipeline (additive, isolated, separate from state/
     # data.json above) -------------------------------------------------
@@ -6802,6 +6849,112 @@ def format_since_label(prior_snapshot, now=None):
     return f"{prior_date.strftime('%a %d %b')} ({days_ago} {day_word} ago)"
 
 
+# --- Phase 7B: Prospective evidence-history store -----------------------
+# A SEPARATE, additive store from daily_snapshots.json (Phase 6) — that
+# store's schema is fixed and working in production for the "What
+# Changed" feature; this is a NEW store with a RICHER schema (the full
+# 8-dimension breakdown, both subtotals, RISK, DON'T CHASE state) built
+# specifically so a genuinely honest backtest of the News/Broker/AI
+# Evidence dimensions becomes possible in the future — built from what
+# ACTUALLY happened, going forward from whenever this is deployed, never
+# reconstructed or guessed for any date before that. Same file/directory
+# reliability already proven by events.json and daily_snapshots.json
+# across many real GitHub Actions runs.
+EVIDENCE_HISTORY_FILE = os.path.join(STATE_DIR, "evidence_history.json")
+EVIDENCE_HISTORY_VERSION = 1
+EVIDENCE_HISTORY_RETENTION_DAYS = 730  # ~2 years — deliberately much longer
+# than daily_snapshots.json's 30 days, since THAT store exists only to
+# support a short "what changed recently" comparison, while THIS store
+# exists specifically to accumulate enough history for a future backtest.
+
+
+class EvidenceHistoryCorruptError(Exception):
+    """Same discipline as EventsStoreCorruptError/DailySnapshotsCorruptError:
+    a file that EXISTS but fails to parse or match the expected shape must
+    never be silently treated as empty — only a genuinely MISSING file is
+    a legitimate fresh-start case."""
+    pass
+
+
+def load_evidence_history(path=None):
+    """Mirrors load_daily_snapshots/load_events_store exactly: a MISSING
+    file is the only case that legitimately produces a fresh empty store;
+    a file that EXISTS but fails to parse or match the expected shape
+    raises EvidenceHistoryCorruptError instead of silently returning
+    empty."""
+    path = path or EVIDENCE_HISTORY_FILE
+    if not os.path.exists(path):
+        return {"version": EVIDENCE_HISTORY_VERSION, "days": []}
+    with open(path, "r", encoding="utf-8") as f:
+        raw = f.read()
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise EvidenceHistoryCorruptError(f"{path} contains invalid JSON: {e}") from e
+    if not isinstance(data, dict) or not isinstance(data.get("days"), list):
+        raise EvidenceHistoryCorruptError(f"{path} does not match the expected {{version, days}} shape")
+    return data
+
+
+def capture_daily_evidence_snapshot(evidence_summaries, now=None, path=None):
+    """
+    Appends today's FULL scorecard state for every watchlist stock —
+    all 8 dimensions, both subtotals, RISK, Signal Quality, Confidence,
+    Evidence label, and DON'T CHASE state — built entirely from
+    evidence_summaries, the SAME per-stock data render_dashboard already
+    produces as a side effect of its existing scorecard computation
+    (see that computation's own comments) — never a new calculation.
+
+    Deduplicated by London calendar date, same discipline as
+    capture_daily_snapshot (Phase 6): a later run on the same day is a
+    no-op. On a corrupt existing store, this deliberately does NOT
+    write — same fail-safe-by-skipping discipline as every other
+    persistence path in this project. Retention: keeps at most
+    EVIDENCE_HISTORY_RETENTION_DAYS most recent days.
+    """
+    path = path or EVIDENCE_HISTORY_FILE
+    now = now or datetime.now(timezone.utc)
+    today_london = now.astimezone(LONDON_TZ).strftime("%Y-%m-%d")
+
+    try:
+        store = load_evidence_history(path)
+    except EvidenceHistoryCorruptError as e:
+        print(f"  ! evidence history store CORRUPT — skipping persistence this cycle to avoid data loss: {e}", file=sys.stderr)
+        return {"written": False, "reason": "existing_store_corrupt"}
+
+    if any(d.get("date") == today_london for d in store["days"]):
+        return {"written": False, "reason": "already_captured_today"}
+
+    stocks = {}
+    for s in evidence_summaries:
+        ticker = s.get("ticker")
+        if not ticker:
+            continue
+        stocks[ticker] = {
+            "ticker": ticker, "price": s.get("price"), "total": s.get("total"),
+            "signalQuality": s.get("signalQuality"), "confidence": s.get("confidence"),
+            "evidenceLabel": s.get("evidenceLabel"), "dimensions": s.get("dimensions"),
+            "technicalMarket": s.get("technicalMarket"), "researchEvidence": s.get("researchEvidence"),
+            "risk": s.get("risk"), "dontChase": s.get("dontChase"),
+        }
+
+    store["days"].append({
+        "date": today_london,
+        "capturedAt": now.astimezone(timezone.utc).isoformat(),
+        "stocks": stocks,
+    })
+    store["days"].sort(key=lambda d: d["date"])
+    store["days"] = store["days"][-EVIDENCE_HISTORY_RETENTION_DAYS:]
+
+    try:
+        atomic_write_json(path, store)
+    except Exception as e:
+        print(f"  ! evidence history write FAILED — previous file left untouched: {e}", file=sys.stderr)
+        return {"written": False, "reason": "write_failed"}
+
+    return {"written": True, "date": today_london, "stockCount": len(stocks)}
+
+
 class EventsStoreCorruptError(Exception):
     """Raised when state/events.json exists but doesn't parse as valid
     JSON, or doesn't match the expected {version, events} shape. The
@@ -7404,7 +7557,634 @@ def collect_and_persist_broker_events(watchlist, screener_rows=None, dry_run=Fal
 
 
 
+import statistics
+
+
+# =========================================================================
+# Phase 7A: Technical Backtesting Engine
+# =========================================================================
+#
+# Scope, exactly as specified: tests the EXISTING scoring logic already
+# live in this dashboard, using historical price/volume data reconstructed
+# walk-forward (never using future data to compute a past day's signal).
+# Reuses the SAME pure functions the live dashboard uses
+# (compute_rsi, compute_atr, compute_support_resistance,
+# compute_breakout_status, compute_research_scorecard,
+# compute_scorecard_subtotals, compute_signal_quality,
+# compute_dont_chase_warning) rather than reimplementing any of this
+# logic a second time — this IS "test the existing logic, don't optimise
+# it" in concrete form.
+#
+# Explicitly NOT reconstructed: NEWS, BROKER, and the target-proximity/
+# conflicting-evidence components of RISK — there is no reliable
+# historical source for point-in-time broker ratings or news relevance.
+# This is achieved by passing NEUTRAL inputs (evidence label "no_signal",
+# broker_momentum=None, upside_pct=None) into the SAME
+# compute_research_scorecard() the live dashboard calls — confirmed by
+# direct test that this produces NEWS=0, BROKER=0, and a RISK score
+# reflecting ONLY the RSI-overextension component, with zero new/
+# duplicate scoring logic required.
+
+BACKTEST_FORWARD_HORIZONS = [5, 20, 60]  # trading days
+BACKTEST_MIN_SAMPLE_SIZE = 30  # n below this -> "insufficient data", never a claim
+BACKTEST_AVERAGE_VOLUME_WINDOW = 20  # trailing trading days — a specific,
+# documented methodological choice: historical chart data has no
+# point-in-time "average volume" field the way a live quote does, so this
+# defines it explicitly as a trailing 20-day average rather than silently
+# assuming a number.
+
+# Pre-registered signal list — FIXED before any evaluation, per the
+# explicit instruction not to cherry-pick, add, or remove hypotheses based
+# on results. Each is a small, specific, individually named condition
+# reusing the live dashboard's own existing thresholds/functions.
+BACKTEST_SIGNAL_IDS = [
+    "technical_subtotal_strong_positive",  # Technical/Market subtotal >= +4
+    "technical_subtotal_strong_negative",  # Technical/Market subtotal <= -4
+    "technical_signal_quality_strong_positive",  # technical-only Signal Quality: Strong, positive direction
+    "technical_signal_quality_strong_negative",  # technical-only Signal Quality: Strong, negative direction
+    "rsi_overbought",  # RSI(14) >= OVEREXTENDED_RSI_THRESHOLD (70)
+    "rsi_oversold",  # RSI(14) <= 30 (the existing MOMENTUM dimension's own "weak" threshold)
+    "bullish_ma_crossover",  # MA20 crosses above MA50 — a FRESH crossover, not merely "currently bullish"
+    "bearish_ma_crossover",  # MA20 crosses below MA50 — a FRESH crossover
+    "high_volume_breakout",  # breakout above 20-day high AND volume >= HIGH_VOLUME_RATIO_THRESHOLD
+    "dont_chase_triggered",  # compute_dont_chase_warning fires
+]
+BACKTEST_SUBTOTAL_STRONG_THRESHOLD = 4  # named, adjustable — matches the
+# magnitude already used informally elsewhere in this project as "a
+# clearly decisive score," not a new invented number
+
+
+def reconstruct_technical_state(closes, volumes, highs, lows, index):
+    """
+    Reconstructs exactly the technical inputs the live dashboard computes
+    for TODAY, but as of `index` in a historical series — using ONLY
+    closes[:index+1] / volumes[:index+1] / highs[:index+1] / lows[:index+1]
+    at every step. This is THE walk-forward discipline: never pass the
+    full series to any calculation, always the trailing slice up to and
+    including the evaluation point, so a signal computed for day T can
+    never see day T+1 or later.
+
+    Reuses compute_rsi / compute_atr / compute_support_resistance /
+    compute_breakout_status directly — the exact same functions
+    fetch_price_technicals uses for the live dashboard — never a second,
+    parallel implementation of any of this arithmetic.
+
+    Returns None if there isn't enough trailing history at this index for
+    even the most basic calculation (5-day change) — never a partially
+    fabricated state.
+    """
+    trailing_closes = closes[:index + 1]
+    trailing_volumes = volumes[:index + 1]
+    trailing_highs = highs[:index + 1]
+    trailing_lows = lows[:index + 1]
+    if len(trailing_closes) < 6:
+        return None
+    latest_close = trailing_closes[-1]
+    five_days_ago = trailing_closes[-6]
+    change_pct_5d = (latest_close - five_days_ago) / five_days_ago * 100 if five_days_ago else None
+    change_pct = None
+    if len(trailing_closes) >= 2 and trailing_closes[-2]:
+        change_pct = (latest_close - trailing_closes[-2]) / trailing_closes[-2] * 100
+
+    rsi14 = compute_rsi(trailing_closes, 14)
+    ma20 = sum(trailing_closes[-20:]) / len(trailing_closes[-20:]) if len(trailing_closes) >= 20 else None
+    ma50 = sum(trailing_closes[-50:]) / 50 if len(trailing_closes) >= 50 else None
+    ma_crossover = None
+    if ma20 is not None and ma50 is not None:
+        ma_crossover = "bullish" if ma20 > ma50 else ("bearish" if ma20 < ma50 else "flat")
+    above_ma20 = (latest_close > ma20) if ma20 is not None else None
+
+    paired = list(zip(trailing_closes, trailing_volumes, trailing_highs, trailing_lows))
+    atr14 = compute_atr(paired, 14)
+    support_resistance = compute_support_resistance(trailing_highs, trailing_lows)
+    breakout_status = compute_breakout_status(latest_close, trailing_highs[:-1], trailing_lows[:-1])
+
+    avg_volume = None
+    if len(trailing_volumes) >= BACKTEST_AVERAGE_VOLUME_WINDOW:
+        window_vols = [v for v in trailing_volumes[-BACKTEST_AVERAGE_VOLUME_WINDOW:] if v is not None]
+        if len(window_vols) == BACKTEST_AVERAGE_VOLUME_WINDOW:
+            avg_volume = sum(window_vols) / BACKTEST_AVERAGE_VOLUME_WINDOW
+    latest_volume = trailing_volumes[-1]
+    volume_ratio = compute_volume_ratio(latest_volume, avg_volume)
+
+    return {
+        "close": latest_close, "changePct": change_pct, "changePct5d": change_pct_5d,
+        "rsi14": rsi14, "ma20": ma20, "ma50": ma50, "maCrossover": ma_crossover,
+        "aboveMA20": above_ma20, "atr14": atr14, "supportResistance": support_resistance,
+        "breakoutStatus": breakout_status, "volumeRatio": volume_ratio,
+    }
+
+
+def compute_technical_only_scorecard(state, ftse_relative=None):
+    """
+    Calls compute_research_scorecard/compute_scorecard_subtotals/
+    compute_signal_quality DIRECTLY — the exact live functions — with
+    NEUTRAL inputs for the non-reconstructable dimensions (evidence
+    label "no_signal", broker_momentum=None, upside_pct=None,
+    sector_context=None), so NEWS and BROKER always resolve to 0 and
+    RISK reflects ONLY its RSI-overextension component. Confirmed by a
+    direct test that this produces exactly that result — not assumed.
+    """
+    neutral_evidence = {"label": "no_signal", "hasCatalyst": False, "catalystDirection": None, "volumeConfirms": None}
+    scorecard = compute_research_scorecard(
+        state["changePct5d"], state["aboveMA20"], state["rsi14"], state["maCrossover"],
+        state["volumeRatio"], state["changePct"], neutral_evidence, None,
+        state["breakoutStatus"], ftse_relative, None, None,
+    )
+    subtotals = compute_scorecard_subtotals(scorecard["dimensions"])
+    signal_quality = compute_signal_quality(scorecard["dimensions"], [])  # no contradiction detection reconstructed — technical-only dims can't produce the news/broker-based contradiction types
+    return {"dimensions": scorecard["dimensions"], "technicalMarket": subtotals["technicalMarket"], "signalQuality": signal_quality}
+
+
+def _signal_fired(signal_id, state, prev_state, tech_scorecard, dont_chase):
+    """
+    Evaluates ONE pre-registered signal ID against the current
+    reconstructed state (and, for crossover-type signals, the
+    immediately preceding day's state — needed to detect a FRESH
+    crossover rather than "currently in a long-running bullish/bearish
+    state", which would otherwise make an episode span months and be a
+    near-meaningless single "event"). Every threshold reused here is the
+    SAME named constant the live dashboard already uses
+    (OVEREXTENDED_RSI_THRESHOLD, HIGH_VOLUME_RATIO_THRESHOLD,
+    BACKTEST_SUBTOTAL_STRONG_THRESHOLD) — never a new number invented
+    just for this function.
+    """
+    if state is None:
+        return False
+    if signal_id == "technical_subtotal_strong_positive":
+        return tech_scorecard["technicalMarket"] >= BACKTEST_SUBTOTAL_STRONG_THRESHOLD
+    if signal_id == "technical_subtotal_strong_negative":
+        return tech_scorecard["technicalMarket"] <= -BACKTEST_SUBTOTAL_STRONG_THRESHOLD
+    if signal_id == "technical_signal_quality_strong_positive":
+        return tech_scorecard["signalQuality"] == "Strong" and tech_scorecard["technicalMarket"] > 0
+    if signal_id == "technical_signal_quality_strong_negative":
+        return tech_scorecard["signalQuality"] == "Strong" and tech_scorecard["technicalMarket"] < 0
+    if signal_id == "rsi_overbought":
+        return state["rsi14"] is not None and state["rsi14"] >= OVEREXTENDED_RSI_THRESHOLD
+    if signal_id == "rsi_oversold":
+        return state["rsi14"] is not None and state["rsi14"] < 30
+    if signal_id == "bullish_ma_crossover":
+        return (state["maCrossover"] == "bullish" and prev_state is not None
+                and prev_state["maCrossover"] is not None and prev_state["maCrossover"] != "bullish")
+    if signal_id == "bearish_ma_crossover":
+        return (state["maCrossover"] == "bearish" and prev_state is not None
+                and prev_state["maCrossover"] is not None and prev_state["maCrossover"] != "bearish")
+    if signal_id == "high_volume_breakout":
+        return (state["breakoutStatus"] == "breakout" and state["volumeRatio"] is not None
+                and state["volumeRatio"] >= HIGH_VOLUME_RATIO_THRESHOLD)
+    if signal_id == "dont_chase_triggered":
+        return dont_chase is not None
+    raise ValueError(f"Unknown signal id: {signal_id}")  # a typo here must fail loudly, never silently evaluate nothing
+
+
+def detect_signal_events(closes, volumes, highs, lows, signal_id):
+    """
+    Walks the FULL historical series day by day, reconstructing the
+    technical state at each index using ONLY data through that index
+    (see reconstruct_technical_state's own walk-forward discipline),
+    and records the FIRST day of every consecutive run where the given
+    signal fires as one "episode" — collapsing a persistent condition
+    (e.g. RSI >= 70 for five consecutive days) into a single event at
+    its start, rather than five separate (and non-independent)
+    observations. This IS the required episode/de-duplication rule.
+
+    Crossover-type signals are inherently single-day by their own
+    "fresh change" definition and don't need this collapsing, but
+    sharing one pass keeps the logic in one place rather than two
+    parallel walks.
+
+    Returns a list of event indices into the `closes` array.
+    """
+    n = len(closes)
+    events = []
+    prev_state = None
+    was_firing = False
+    for i in range(n):
+        state = reconstruct_technical_state(closes, volumes, highs, lows, i)
+        if state is None:
+            prev_state = None
+            was_firing = False
+            continue
+        tech_scorecard = compute_technical_only_scorecard(state)
+        dont_chase = compute_dont_chase_warning(state["changePct5d"], state["rsi14"], state["volumeRatio"])
+        firing = _signal_fired(signal_id, state, prev_state, tech_scorecard, dont_chase)
+        if firing and not was_firing:
+            events.append(i)
+        was_firing = firing
+        prev_state = state
+    return events
+
+
+def forward_return(closes, event_index, horizon_days):
+    """
+    (close[event_index + horizon_days] - close[event_index]) /
+    close[event_index] — a raw price return, explicitly NOT adjusted for
+    dividends (see the module-level note on this), and explicitly NOT
+    net of any transaction cost or slippage — reported as a plain fact
+    about what the price actually did, nothing assumed on top of it.
+    Returns None when there isn't enough FUTURE data yet to compute this
+    horizon (expected and normal near the end of the available history —
+    never approximated from a shorter window).
+    """
+    target_index = event_index + horizon_days
+    if target_index >= len(closes):
+        return None
+    start_price = closes[event_index]
+    end_price = closes[target_index]
+    if not start_price:
+        return None
+    return (end_price - start_price) / start_price * 100
+
+
+import math
+
+
+def _standard_normal_cdf(x):
+    return 0.5 * (1 + math.erf(x / math.sqrt(2)))
+
+
+def _two_tailed_p_value(mean, stdev, n):
+    """
+    Two-tailed p-value for a one-sample test of mean != 0, using a
+    NORMAL approximation rather than a true t-distribution. This is a
+    standard, well-justified simplification given this project is
+    stdlib-only (no scipy) — and BACKTEST_MIN_SAMPLE_SIZE is already 30,
+    exactly the sample size at which the t-distribution and normal
+    distribution converge closely enough that this approximation is
+    defensible, not a shortcut that meaningfully changes conclusions at
+    the sample sizes this backtest actually reports on.
+    """
+    if n < 2 or stdev is None or stdev == 0:
+        return None
+    standard_error = stdev / math.sqrt(n)
+    z = mean / standard_error
+    return 2 * (1 - _standard_normal_cdf(abs(z)))
+
+
+def summarize_signal_horizon(returns, benchmark_returns, baseline_returns):
+    """
+    Statistical summary for ONE signal at ONE forward horizon. `returns`
+    are the signal's own forward returns at every episode where it
+    fired; `benchmark_returns` are the FTSE 100's forward returns over
+    the SAME event windows; `baseline_returns` are the stock's own
+    UNCONDITIONAL forward returns at this horizon (sampled across every
+    trading day, not just signal-firing days) — both comparators
+    required, matching "does this signal add anything beyond a
+    generally-drifting market or a generally-drifting stock."
+    """
+    n = len(returns)
+    if n == 0:
+        return {"n": 0, "insufficientSample": True, "meanReturn": None, "medianReturn": None,
+                "winRate": None, "stdev": None, "pValue": None, "vsBenchmark": None, "vsBaseline": None}
+    mean_ret = statistics.mean(returns)
+    median_ret = statistics.median(returns)
+    win_rate = sum(1 for r in returns if r > 0) / n
+    stdev = statistics.stdev(returns) if n > 1 else None
+    p_value = _two_tailed_p_value(mean_ret, stdev, n)
+    benchmark_mean = statistics.mean(benchmark_returns) if benchmark_returns else None
+    baseline_mean = statistics.mean(baseline_returns) if baseline_returns else None
+    return {
+        "n": n, "meanReturn": mean_ret, "medianReturn": median_ret, "winRate": win_rate,
+        "stdev": stdev, "pValue": p_value,
+        "vsBenchmark": (mean_ret - benchmark_mean) if benchmark_mean is not None else None,
+        "vsBaseline": (mean_ret - baseline_mean) if baseline_mean is not None else None,
+        "insufficientSample": n < BACKTEST_MIN_SAMPLE_SIZE,
+    }
+
+
+BACKTEST_HISTORY_RANGE = "1y"  # matches fetch_price_technicals's own proven
+# range exactly — NOT verified today to be extendable to 2y/5y/max; that
+# needs a real, live check against Yahoo's actual API before ever being
+# widened, since I cannot make that live call myself (see this module's
+# own capability notes). Widening this constant is a one-line change
+# once verified — deliberately NOT done speculatively here.
+
+
+def fetch_backtest_history(symbol):
+    """
+    Fetches one symbol's historical daily close/volume/high/low for
+    backtesting — reuses http_get and the exact same Yahoo chart
+    endpoint fetch_price_technicals already uses successfully, just
+    keeping the RAW series instead of collapsing it to today's
+    scalars. Returns {"closes": [...], "volumes": [...], "highs": [...],
+    "lows": [...], "dates": [...]} or None on any failure — same
+    fail-safe-by-returning-None contract as every other fetch function
+    in this file, never a partial/fabricated series.
+    """
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(symbol)}?interval=1d&range={BACKTEST_HISTORY_RANGE}"
+    try:
+        data = json.loads(http_get(url))
+        result = (data.get("chart") or {}).get("result") or [None]
+        if not result[0]:
+            return None
+        timestamps = result[0].get("timestamp") or []
+        quote0 = (result[0].get("indicators", {}).get("quote", [{}])[0] or {})
+        raw_closes = quote0.get("close") or []
+        raw_volumes = quote0.get("volume") or []
+        raw_highs = quote0.get("high") or []
+        raw_lows = quote0.get("low") or []
+        paired = [
+            (t, c, v, h, l) for t, c, v, h, l in zip(timestamps, raw_closes, raw_volumes, raw_highs, raw_lows)
+            if c is not None
+        ]
+        if len(paired) < 30:
+            return None  # not enough real history to be worth including
+        dates = [datetime.fromtimestamp(t, tz=timezone.utc).astimezone(LONDON_TZ).strftime("%Y-%m-%d") for t, *_ in paired]
+        return {
+            "dates": dates,
+            "closes": [p[1] for p in paired], "volumes": [p[2] for p in paired],
+            "highs": [p[3] for p in paired], "lows": [p[4] for p in paired],
+        }
+    except Exception as e:
+        print(f"  ! backtest history fetch failed: {symbol} ({e})", file=sys.stderr)
+        return None
+
+
+def run_backtest_cli(watchlist):
+    """
+    The actual entry point for `python poll.py --backtest` — fetches
+    real historical data for every watchlist stock plus the FTSE 100
+    index, runs run_technical_backtest(), and saves the result via
+    save_backtest_results(). This is DELIBERATELY separate from the
+    normal 5-minute poll cycle (main()) — a full historical backtest
+    across many stocks is far heavier than a live poll, and has no
+    business running on that cadence.
+
+    Must be run somewhere with genuine network access to Yahoo Finance
+    — this sandbox's own network access does not include that domain,
+    so this function's real-data path has been written and reviewed
+    but not personally executed against live data; see this module's
+    capability notes.
+    """
+    print(f"Backtest: fetching historical data for {len(watchlist)} watchlist stock(s) + FTSE 100...")
+    stock_histories = {}
+    all_dates = None
+    for stock in watchlist:
+        ticker = stock["ticker"]
+        hist = fetch_backtest_history(yahoo_symbol(ticker))
+        if hist is None:
+            print(f"  ! skipping {ticker}: history fetch failed or too short")
+            continue
+        stock_histories[ticker] = hist
+        if all_dates is None or len(hist["dates"]) < len(all_dates):
+            all_dates = hist["dates"]  # shortest series sets the shared alignment window
+        time.sleep(0.3)
+
+    if not stock_histories:
+        print("Backtest: no usable stock histories fetched — aborting.", file=sys.stderr)
+        return
+
+    ftse_hist = fetch_backtest_history("%5EFTSE")
+    if ftse_hist is None:
+        print("Backtest: FTSE 100 history fetch failed — cannot compute a benchmark, aborting.", file=sys.stderr)
+        return
+
+    # Align every series onto the SAME trailing window length (the
+    # shortest available series) — see run_technical_backtest's own
+    # documented precondition that all series must be index-aligned to
+    # one shared calendar. This is a simple, honest alignment by
+    # trailing-length only; it does not attempt to reconcile genuine
+    # calendar gaps (a stock's own trading halt, for instance) beyond
+    # this — a real limitation, disclosed here rather than silently
+    # assumed away.
+    min_len = min(len(h["closes"]) for h in stock_histories.values())
+    min_len = min(min_len, len(ftse_hist["closes"]))
+    for ticker in stock_histories:
+        for key in ("closes", "volumes", "highs", "lows", "dates"):
+            stock_histories[ticker][key] = stock_histories[ticker][key][-min_len:]
+    ftse_closes = ftse_hist["closes"][-min_len:]
+    dates = stock_histories[next(iter(stock_histories))]["dates"]
+
+    in_sample_cutoff_index = int(min_len * 0.7)  # 70/30 in-sample/out-of-sample split
+    stock_histories_for_engine = {t: {k: v for k, v in h.items() if k != "dates"} for t, h in stock_histories.items()}
+    results = run_technical_backtest(stock_histories_for_engine, ftse_closes, in_sample_cutoff_index)
+
+    metadata = {
+        "runAt": datetime.now(timezone.utc).isoformat(),
+        "historyStartDate": dates[0], "historyEndDate": dates[-1],
+        "stockCount": len(stock_histories), "inSampleCutoffDate": dates[in_sample_cutoff_index],
+    }
+    save_backtest_results(results, metadata)
+    print(f"Backtest: complete. {len(stock_histories)} stocks, {dates[0]} to {dates[-1]}, "
+          f"in-sample cutoff {dates[in_sample_cutoff_index]}. Results saved to {BACKTEST_RESULTS_FILE}.")
+
+
+def run_technical_backtest(stock_histories, ftse_closes, in_sample_cutoff_index):
+    """
+    Full Phase 7A orchestration. Preconditions the caller must satisfy
+    (documented here since this module cannot itself fetch or align
+    real market data — see the module's own capability notes):
+    - `stock_histories`: {ticker: {"closes": [...], "volumes": [...],
+      "highs": [...], "lows": [...]}} — one list per field, all the SAME
+      length for a given ticker, in chronological order.
+    - `ftse_closes`: a list of FTSE 100 closes, INDEX-ALIGNED to the
+      SAME trading-day calendar as every stock series (i.e. index i in
+      ftse_closes is the same calendar day as index i in every stock's
+      closes). Real-world stocks can have small gaps (suspensions,
+      listing dates); aligning series onto one shared calendar is the
+      caller's responsibility before this function is used with real
+      data.
+    - `in_sample_cutoff_index`: the index splitting in-sample
+      (development) from out-of-sample (held-out) — the held-out period
+      must never have influenced the signal definitions above, which it
+      cannot, since BACKTEST_SIGNAL_IDS is fixed in this module's own
+      source, not derived from any data.
+
+    Returns a nested results structure: for each signal, for each of
+    "inSample"/"outOfSample", for each forward horizon, a
+    summarize_signal_horizon() result — plus the Bonferroni-corrected
+    significance threshold applied across the whole batch.
+    """
+    total_tests = len(BACKTEST_SIGNAL_IDS) * len(BACKTEST_FORWARD_HORIZONS) * 2  # *2 for in-sample + out-of-sample, each a separate test
+    bonferroni_alpha = 0.05 / total_tests
+
+    # Unconditional baseline forward returns per horizon, sampled once
+    # across every trading day of every stock — computed independently
+    # of any signal, used as every signal's baseline comparator.
+    baseline_returns_by_period_horizon = {"inSample": {h: [] for h in BACKTEST_FORWARD_HORIZONS},
+                                            "outOfSample": {h: [] for h in BACKTEST_FORWARD_HORIZONS}}
+    for ticker, hist in stock_histories.items():
+        closes = hist["closes"]
+        for i in range(len(closes)):
+            period = "inSample" if i < in_sample_cutoff_index else "outOfSample"
+            for h in BACKTEST_FORWARD_HORIZONS:
+                r = forward_return(closes, i, h)
+                if r is not None:
+                    baseline_returns_by_period_horizon[period][h].append(r)
+
+    results = {"signals": {}, "bonferroniAlpha": bonferroni_alpha, "totalTests": total_tests}
+    for signal_id in BACKTEST_SIGNAL_IDS:
+        period_results = {"inSample": {}, "outOfSample": {}}
+        events_by_period = {"inSample": [], "outOfSample": []}
+        for ticker, hist in stock_histories.items():
+            closes, volumes, highs, lows = hist["closes"], hist["volumes"], hist["highs"], hist["lows"]
+            event_indices = detect_signal_events(closes, volumes, highs, lows, signal_id)
+            for idx in event_indices:
+                period = "inSample" if idx < in_sample_cutoff_index else "outOfSample"
+                events_by_period[period].append((ticker, idx))
+        for period in ("inSample", "outOfSample"):
+            horizon_results = {}
+            for h in BACKTEST_FORWARD_HORIZONS:
+                sig_returns, bench_returns = [], []
+                for ticker, idx in events_by_period[period]:
+                    r = forward_return(stock_histories[ticker]["closes"], idx, h)
+                    if r is None:
+                        continue
+                    sig_returns.append(r)
+                    fr_bench = forward_return(ftse_closes, idx, h)
+                    if fr_bench is not None:
+                        bench_returns.append(fr_bench)
+                horizon_results[h] = summarize_signal_horizon(
+                    sig_returns, bench_returns, baseline_returns_by_period_horizon[period][h],
+                )
+            period_results[period] = horizon_results
+        results["signals"][signal_id] = {
+            "eventCount": {"inSample": len(events_by_period["inSample"]), "outOfSample": len(events_by_period["outOfSample"])},
+            "horizons": period_results,
+        }
+    return results
+
+
+# --- Phase 7C: Backtest results persistence + dashboard reporting -------
+BACKTEST_RESULTS_FILE = os.path.join(STATE_DIR, "backtest_results.json")
+
+
+class BacktestResultsCorruptError(Exception):
+    """Same discipline as every other state file in this project — a file
+    that EXISTS but fails to parse must never be silently treated as
+    absent."""
+    pass
+
+
+def load_backtest_results(path=None):
+    """
+    Returns the most recently saved backtest results, or None if no
+    backtest has ever been run — the dashboard's own honest "not run
+    yet" state, never a fabricated placeholder. Raises
+    BacktestResultsCorruptError on a file that exists but fails to
+    parse, same discipline as every other state file here — even though
+    this specific file isn't accumulating irreplaceable history the way
+    events.json/evidence_history.json are (a corrupt results file just
+    means re-running the backtest, not losing anything), silently
+    treating corruption as "no backtest run yet" would misrepresent the
+    actual situation to whoever reads the dashboard.
+    """
+    path = path or BACKTEST_RESULTS_FILE
+    if not os.path.exists(path):
+        return None
+    with open(path, "r", encoding="utf-8") as f:
+        raw = f.read()
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise BacktestResultsCorruptError(f"{path} contains invalid JSON: {e}") from e
+
+
+def save_backtest_results(results, run_metadata, path=None):
+    """
+    Persists a completed backtest run. `run_metadata` should include at
+    minimum: runAt (ISO timestamp), historyStartDate, historyEndDate,
+    stockCount, inSampleCutoffDate — the concrete facts needed to know
+    WHAT was actually tested, not just the statistical output, so the
+    dashboard can honestly state its own scope rather than imply a
+    single canonical "the" backtest.
+    """
+    path = path or BACKTEST_RESULTS_FILE
+    payload = {"metadata": run_metadata, "results": results}
+    atomic_write_json(path, payload)
+    return {"written": True}
+
+
+def _format_pct(x, decimals=2):
+    return f"{'+' if x >= 0 else ''}{x:.{decimals}f}%" if x is not None else "—"
+
+
+def render_backtest_results_html(loaded):
+    """
+    Renders the Phase 7C dashboard section from whatever
+    load_backtest_results() returned. Deliberately verbose about
+    limitations — every one of survivorship bias, data revisions, the
+    missing News/Broker/AI reconstruction, pre-cost/pre-slippage
+    returns, sample-size limits, correlation-vs-causation, and
+    out-of-sample limits is stated EXPLICITLY and PROMINENTLY, not
+    buried in a single footnote, because a reader skimming straight to
+    a "beat the benchmark" number is exactly the failure mode this
+    section exists to prevent.
+    """
+    limitations_html = (
+        '<div class="disclaimer" style="margin-bottom:10px;">'
+        '<b>Read this before the numbers below:</b><ul style="margin:6px 0 0 18px;padding:0;">'
+        '<li><b>Survivorship bias</b> — this universe reflects TODAY\'s FTSE 100/250 membership only; '
+        'stocks that were delisted, acquired, or relegated during the tested period are invisible to this test.</li>'
+        '<li><b>No historical News/Broker/AI Evidence data</b> — this backtest covers ONLY the Technical/Market '
+        'dimensions and the RSI-overextension component of RISK. It says nothing about whether NEWS, BROKER, '
+        'or AI Evidence Review signals have ever worked.</li>'
+        '<li><b>Pre-cost, pre-slippage</b> — returns shown are raw price moves, not what a real trade would net.</li>'
+        '<li><b>Price returns, not total return</b> — not adjusted for dividends.</li>'
+        '<li><b>Data revisions</b> — historical prices can occasionally be revised by the data source after the fact; '
+        'this cannot be fully corrected for with a free data source.</li>'
+        '<li><b>Small samples are flagged, not hidden</b> — any result built from fewer than '
+        f'{BACKTEST_MIN_SAMPLE_SIZE} events is marked "insufficient data," not reported as a finding.</li>'
+        '<li><b>Multiple-testing corrected</b> — with many signals and horizons tested together, apparent '
+        '"significance" is checked against a Bonferroni-corrected threshold, not the usual 0.05.</li>'
+        '<li><b>Correlation, not causation</b> — even a result that clears every bar above only shows a historical '
+        'association, never a guarantee, explanation, or prediction of future performance.</li>'
+        '</ul></div>'
+    )
+    if loaded is None:
+        return limitations_html + '<span class="meta">No backtest has been run yet.</span>'
+
+    metadata = loaded.get("metadata", {})
+    results = loaded.get("results", {})
+    meta_line = (
+        f'<p class="meta">Tested {esc(str(metadata.get("stockCount", "?")))} stock(s), '
+        f'{esc(str(metadata.get("historyStartDate", "?")))} to {esc(str(metadata.get("historyEndDate", "?")))} '
+        f'· in-sample/out-of-sample split at {esc(str(metadata.get("inSampleCutoffDate", "?")))} '
+        f'· run {esc(str(metadata.get("runAt", "?")))}</p>'
+    )
+    bonferroni_alpha = results.get("bonferroniAlpha")
+    rows = []
+    for signal_id, signal_data in results.get("signals", {}).items():
+        for period in ("inSample", "outOfSample"):
+            period_label = "In-sample" if period == "inSample" else "Out-of-sample"
+            for horizon in BACKTEST_FORWARD_HORIZONS:
+                r = signal_data.get("horizons", {}).get(period, {}).get(str(horizon)) or signal_data.get("horizons", {}).get(period, {}).get(horizon)
+                if r is None:
+                    continue
+                if r.get("insufficientSample"):
+                    rows.append(
+                        f'<tr><td>{esc(signal_id)}</td><td>{period_label}</td><td>{horizon}d</td>'
+                        f'<td colspan="6" class="meta">Insufficient data (n={r.get("n", 0)} &lt; {BACKTEST_MIN_SAMPLE_SIZE})</td></tr>'
+                    )
+                    continue
+                significant = (bonferroni_alpha is not None and r.get("pValue") is not None
+                               and r["pValue"] < bonferroni_alpha)
+                rows.append(
+                    f'<tr><td>{esc(signal_id)}</td><td>{period_label}</td><td>{horizon}d</td>'
+                    f'<td>{r["n"]}</td><td>{_format_pct(r["meanReturn"])}</td><td>{_format_pct(r["medianReturn"])}</td>'
+                    f'<td>{r["winRate"]*100:.0f}%</td><td>{_format_pct(r["vsBenchmark"])}</td>'
+                    f'<td>{"✓ significant" if significant else "—"}</td></tr>'
+                )
+    table = (
+        '<table><tr><th>Signal</th><th>Period</th><th>Horizon</th><th>N</th><th>Mean</th><th>Median</th>'
+        '<th>Win rate</th><th>vs FTSE</th><th>After correction</th></tr>' + "".join(rows) + '</table>'
+    ) if rows else '<span class="meta">No signal events found in the tested history.</span>'
+    return limitations_html + meta_line + table
+
+
 if __name__ == "__main__":
+    if "--backtest" in sys.argv:
+        # Phase 7A/7C entry point — deliberately separate from the
+        # normal 5-minute poll cycle. Must be run somewhere with real
+        # network access to Yahoo Finance (this repo's own GitHub
+        # Actions runner already has this, proven by every successful
+        # Poller run) — see run_backtest_cli's own docstring.
+        _watchlist = load_json(WATCHLIST_FILE, [])
+        if not _watchlist:
+            print("watchlist.json is empty — nothing to backtest.", file=sys.stderr)
+            sys.exit(1)
+        run_backtest_cli(_watchlist)
+        sys.exit(0)
     try:
         main()
     except Exception as e:
