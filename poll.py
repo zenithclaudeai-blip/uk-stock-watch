@@ -3746,6 +3746,30 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
     return minutesSinceMidnight >= OPEN_MIN && minutesSinceMidnight < CLOSE_MIN;
   }}
 
+  function formatLondonAndUtc(dt) {{
+    // Client-side equivalent of the server-side format_london_and_utc() —
+    // every OTHER timestamp on this page shows London time first (with
+    // the correct BST/GMT label) then UTC in parens; this freshness banner
+    // was the one place still showing UTC only. Uses Intl with an explicit
+    // Europe/London zone (timeZoneName:'short' gives the correct BST/GMT
+    // abbreviation), so the DST switch is handled automatically here too,
+    // never a fixed UTC+1 assumption. Seconds are kept (unlike the
+    // server-side minute-only format) since this banner is specifically
+    // about freshness, where finer precision is more useful, not less.
+    var parts = new Intl.DateTimeFormat('en-GB', {{
+      timeZone: 'Europe/London', weekday: 'short', day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZoneName: 'short'
+    }}).formatToParts(dt);
+    var get = function(type) {{
+      var p = parts.find(function(x) {{ return x.type === type; }});
+      return p ? p.value : '';
+    }};
+    var londonStr = get('weekday') + ' ' + get('day') + ' ' + get('month') + ' ' + get('year') + ', ' +
+                    get('hour') + ':' + get('minute') + ':' + get('second') + ' ' + get('timeZoneName');
+    var utcStr = dt.toISOString().substr(11, 8) + ' UTC';
+    return londonStr + ' (' + utcStr + ')';
+  }}
+
   function update() {{
     if (!lastPollIso) {{
       el.textContent = '⚪ No successful poll has been recorded yet.';
@@ -3756,7 +3780,7 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
     var lastPoll = new Date(lastPollIso);
     var ageMinutes = (now - lastPoll) / 60000;
     var marketHours = isUkMarketHours(now);
-    var label = lastPoll.toUTCString().replace('GMT', 'UTC') + ' (' + ageMinutes.toFixed(0) + ' min ago)';
+    var label = formatLondonAndUtc(lastPoll) + ' (' + ageMinutes.toFixed(0) + ' min ago)';
     var cls, text;
     if (marketHours) {{
       if (ageMinutes <= GREEN_MIN) {{ cls = 'status-ok'; text = '✅ Up to date — last poll ' + label; }}
