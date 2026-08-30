@@ -1186,6 +1186,63 @@ def bare_ticker(symbol):
     return s.rstrip(".")
 
 
+def discover_radar_stocks(watchlist, big_movers, screener):
+    """
+    Scans every EXISTING discovery source — Watchlist, Heat Map
+    (big_movers), and Screener Volume/Gainers/Losers — and returns an
+    ordered dict, keyed by bare_ticker (so "GLEN" and "GLEN.L" merge
+    into one entry), of every stock any of them found. Each entry is
+    {"ticker": <the specific ticker string to use for lookups>, "name":
+    ..., "sources": [(label, reason_or_None), ...]}. A stock appearing
+    in multiple sources gets multiple (label, reason) pairs, never
+    duplicated into multiple entries.
+
+    Every "reason" is derived directly from data ALREADY computed
+    elsewhere for that exact source (the same changePct/volume numbers
+    the Heat Map or Screener sections already display) — never
+    invented, never a second, independent calculation.
+
+    This function only DISCOVERS which stocks and why — it renders
+    nothing and computes no evidence itself, keeping discovery cleanly
+    separate from the (existing, reused) evidence rendering that
+    happens elsewhere.
+    """
+    discoveries = {}
+
+    def add(ticker, name, label, reason):
+        if not ticker:
+            return
+        key = bare_ticker(ticker)
+        if key not in discoveries:
+            discoveries[key] = {"ticker": ticker, "name": name or ticker, "sources": []}
+        discoveries[key]["sources"].append((label, reason))
+
+    for stock in watchlist:
+        add(stock.get("ticker"), stock.get("name"), "Watchlist", None)
+
+    for entry in big_movers:
+        ticker = entry.get("ticker")
+        chg = entry.get("changePct")
+        reason = f"{'▲' if (chg or 0) >= 0 else '▼'}{abs(chg):.1f}% move today" if chg is not None else None
+        add(ticker, entry.get("name"), "Heat Map", reason)
+
+    screener_source_labels = {"volume": "LSE Volume", "gainers": "LSE Gainers", "losers": "LSE Losers"}
+    for section_key, label in screener_source_labels.items():
+        for entry in screener.get(section_key, []):
+            ticker = entry.get("symbol")
+            chg = entry.get("changePct")
+            vol = entry.get("volume")
+            if section_key == "volume":
+                reason = f"volume {vol:,}" if isinstance(vol, (int, float)) else None
+            elif chg is not None:
+                reason = f"{'▲' if chg >= 0 else '▼'}{abs(chg):.2f}% today"
+            else:
+                reason = None
+            add(ticker, entry.get("name"), label, reason)
+
+    return discoveries
+
+
 def yahoo_news_url(ticker):
     return "https://feeds.finance.yahoo.com/rss/2.0/headline?" + urllib.parse.urlencode(
         {"s": yahoo_symbol(ticker), "region": "UK", "lang": "en-GB"}
@@ -3924,6 +3981,85 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
         for row in screener.get(section, [])
     ]
 
+    # --- 📡 Radar Stocks -----------------------------------------------
+    # A discovery section, NOT a recommendation system: every stock any
+    # existing source has surfaced (Watchlist, Heat Map, Screener
+    # Volume/Gainers/Losers), merged once per stock, showing exactly the
+    # SAME evidence already computed and displayed elsewhere — never a
+    # new score, never a verdict, never invented data.
+    radar_discovery = discover_radar_stocks(watchlist, big_movers, screener)
+
+    # Screener rows carry their own quote-shaped data (keyed by "symbol",
+    # not present in the Watchlist-only `quotes` dict) — merged once here
+    # so a Screener-only radar stock can still be rendered, reusing the
+    # exact same fields Screener's own rendering already reads.
+    screener_quotes_by_ticker = {
+        row.get("symbol"): row
+        for section in ("volume", "gainers", "losers")
+        for row in screener.get(section, [])
+        if row.get("symbol")
+    }
+
+    def radar_quote_for(ticker):
+        return quotes.get(ticker) or screener_quotes_by_ticker.get(ticker) or {}
+
+    _SOURCE_ORDER = ("Watchlist", "Heat Map", "LSE Volume", "LSE Gainers", "LSE Losers")
+
+    def radar_found_via_html(sources):
+        by_label = {}
+        for label, reason in sources:
+            by_label.setdefault(label, []).append(reason)
+        ordered_labels = [l for l in _SOURCE_ORDER if l in by_label] + [l for l in by_label if l not in _SOURCE_ORDER]
+        found_via = " · ".join(esc(l) for l in ordered_labels)
+        reasons = [r for label in ordered_labels for r in by_label[label] if r]
+        why_line = f'<div class="meta">Why it appeared: {esc("; ".join(reasons))}</div>' if reasons else ""
+        return f'<div class="meta"><b>Found via:</b> {found_via}</div>{why_line}'
+
+    radar_summary_collector = []  # a THROWAWAY collector, used only to sort this
+    # section by existing Signal Quality/Confidence — never merged into the
+    # real scorecard_summaries, so no stock is ever double-counted in
+    # Strongest Agreeing Evidence, the daily snapshot, or evidence history
+    # just because it also appears here.
+    radar_entries = []
+    for key, disco in radar_discovery.items():
+        ticker = disco["ticker"]
+        q = radar_quote_for(ticker)
+        name = disco["name"] or watchlist_name_by_ticker.get(ticker, "") or q.get("name") or ticker
+        sector = q.get("sector")
+        sector_context = compute_sector_relative_context(ticker, sector, all_enriched_rows)
+        momentum = compute_broker_momentum(events_by_ticker.get(ticker, []) if events_by_ticker else [])
+        news_items = items_by_ticker.get(ticker) or screener_news.get(ticker) or []
+        before_len = len(radar_summary_collector)
+        html_block = render_stock_research_html(
+            ticker=ticker, name=name, price=q.get("price"), change_pct=q.get("changePct"), currency=q.get("currency"),
+            volume=q.get("volume"), average_volume=q.get("averageVolume"),
+            rsi14=q.get("rsi14"), ma20=q.get("ma20"), change_pct_5d=q.get("changePct5d"), above_ma20=q.get("aboveMA20"),
+            target=q.get("targetMeanPrice"), recommendation=q.get("recommendationKey"),
+            market_cap=q.get("marketCap"), wk_low=q.get("fiftyTwoWeekLow"), wk_high=q.get("fiftyTwoWeekHigh"), sector=sector,
+            ftse_change_pct=ftse_change_pct_val, sector_context=sector_context,
+            news_items=news_items,
+            latest_broker_event=latest_broker_events.get(ticker) if latest_broker_events else None,
+            broker_momentum=momentum, ma_crossover=q.get("maCrossover"),
+            ma50=q.get("ma50"), ma200=q.get("ma200"), atr14=q.get("atr14"),
+            support_resistance=q.get("supportResistance"), breakout_status=q.get("breakoutStatus"),
+            ai_evidence_confidence=q.get("aiEvidenceConfidence"), ai_evidence_caveat=q.get("aiEvidenceCaveat"),
+            include_header=True, show_stock_intelligence_label=True,
+            progressive_disclosure=True, suppress_extended_market_cap=True,
+            price_volume_series=q.get("priceVolumeSeries"),
+            scorecard_summary_collector=radar_summary_collector,
+        )
+        # A sort key even when the underlying scorecard couldn't be computed
+        # (e.g. a screener-only stock with genuinely too little data) — such
+        # entries sort last, never dropped from the section entirely.
+        summary = radar_summary_collector[before_len] if len(radar_summary_collector) > before_len else None
+        quality_rank = {"Strong": 0, "Mixed": 1, "Weak": 2}.get(summary["signalQuality"], 3) if summary else 3
+        sort_key = (quality_rank, -abs(summary["total"]) if summary else 0)
+        found_via_html = radar_found_via_html(disco["sources"])
+        radar_entries.append((sort_key, key, f'{found_via_html}{html_block}'))
+
+    radar_entries.sort(key=lambda e: (e[0], e[1]))
+    radar_stocks_html = "".join(e[2] for e in radar_entries) or '<span class="meta">Nothing on the radar right now.</span>'
+
     def quote_div(t, q):
         name = watchlist_name_by_ticker.get(t, "")
         sector = q.get("sector")
@@ -4147,6 +4283,11 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
                 support_resistance=q.get("supportResistance"), breakout_status=q.get("breakoutStatus"),
                 include_header=False, progressive_disclosure=True, suppress_extended_market_cap=True,
                 price_volume_series=q.get("priceVolumeSeries"),
+                # Extends this stock's own evidence capture (Strongest Agreeing
+                # Evidence / daily snapshot / evidence history) to Screener-
+                # discovered stocks too, not just Watchlist — the SAME
+                # collector Watchlist already feeds, one shared list either way.
+                scorecard_summary_collector=scorecard_summaries,
             )
 
             return (
@@ -4583,6 +4724,7 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 
 <nav aria-label="Section navigation" style="margin:14px 0;padding:12px;background:#161920;border-radius:6px;font-size:16px;line-height:2.4;">
 <b style="color:#9aa0a6;margin-right:8px;">Jump to:</b>
+<a href="#radar-stocks" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📡 Radar Stocks</a>
 <a href="#heatmap" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🗺️ Heat Map</a>
 <a href="#screener" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📊 Screener</a>
 <a href="#mover-news" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📰 Mover News</a>
@@ -4600,6 +4742,10 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 </nav>
 
 <main>
+<h2 id="radar-stocks">📡 Radar Stocks</h2>
+<p class="meta">Every stock any existing source has surfaced — Watchlist, Heat Map, and LSE Screener — merged once per stock. A discovery list, not a recommendation: this shows the same evidence already computed elsewhere, ranked by existing Signal Quality so the clearest-agreeing evidence appears first, without ranking, scoring, or calling anything a "buy" or "opportunity."</p>
+{radar_stocks_html}
+
 <h2 id="heatmap">🗺️ Heat Map (top movers, by size of move)</h2>
 <div class="heatmap-grid">{heatmap_cells or heatmap_empty_state_html()}</div>
 
@@ -4665,6 +4811,18 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
     os.makedirs(DOCS_DIR, exist_ok=True)
     with open(os.path.join(DOCS_DIR, DOCS_FILENAME), "w", encoding="utf-8") as f:
         f.write(html)
+
+    # Attaches each stock's Radar Stocks discovery sources (Watchlist,
+    # Heat Map, LSE Volume/Gainers/Losers) onto its scorecard_summaries
+    # entry, so Phase 7B's evidence-history persistence can save WHY a
+    # stock was on the radar alongside its evidence — a future audit
+    # trail, never touching the rendered HTML above (already written to
+    # disk by this point) and never adding a new scorecard/evidence
+    # computation of its own.
+    for s in scorecard_summaries:
+        disco = radar_discovery.get(bare_ticker(s["ticker"]))
+        s["discoveredVia"] = [label for label, _reason in disco["sources"]] if disco else []
+
     # Additive: exposes the per-Watchlist-stock scorecard summary (price,
     # TOTAL, Signal Quality, Confidence, Evidence label) built as a pure
     # side-effect above — every existing caller that ignores this return
@@ -6898,12 +7056,15 @@ def load_evidence_history(path=None):
 
 def capture_daily_evidence_snapshot(evidence_summaries, now=None, path=None):
     """
-    Appends today's FULL scorecard state for every watchlist stock —
-    all 8 dimensions, both subtotals, RISK, Signal Quality, Confidence,
-    Evidence label, and DON'T CHASE state — built entirely from
-    evidence_summaries, the SAME per-stock data render_dashboard already
-    produces as a side effect of its existing scorecard computation
-    (see that computation's own comments) — never a new calculation.
+    Appends today's FULL scorecard state for every watchlist AND
+    Radar-Stocks-discovered stock — all 8 dimensions, both subtotals,
+    RISK, Signal Quality, Confidence, Evidence label, DON'T CHASE
+    state, and discoveredVia (which Radar Stocks sources found this
+    stock — Watchlist, Heat Map, LSE Volume/Gainers/Losers, or a
+    combination) — built entirely from evidence_summaries, the SAME
+    per-stock data render_dashboard already produces as a side effect
+    of its existing scorecard computation (see that computation's own
+    comments) — never a new calculation.
 
     Deduplicated by London calendar date, same discipline as
     capture_daily_snapshot (Phase 6): a later run on the same day is a
@@ -6936,6 +7097,7 @@ def capture_daily_evidence_snapshot(evidence_summaries, now=None, path=None):
             "evidenceLabel": s.get("evidenceLabel"), "dimensions": s.get("dimensions"),
             "technicalMarket": s.get("technicalMarket"), "researchEvidence": s.get("researchEvidence"),
             "risk": s.get("risk"), "dontChase": s.get("dontChase"),
+            "discoveredVia": s.get("discoveredVia") or [],
         }
 
     store["days"].append({
