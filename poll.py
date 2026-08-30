@@ -1128,6 +1128,17 @@ def general_news_url(company_name):
     )
 
 
+# FT's own official RSS feeds — confirmed via a real captured feed file
+# (ft.com/rss/home/international), not just a third-party listing.
+# Deliberately just these two GENERAL feeds, not company-specific search
+# (FT doesn't offer one) and not sector feeds (which would systematically
+# under-cover the watchlist's actual sector spread). Headlines + summary
+# only, matching the same copyright-safe depth every other source here
+# already uses — never full paywalled article text.
+FT_MARKETS_URL = "https://www.ft.com/markets?format=rss"
+FT_INTERNATIONAL_URL = "https://www.ft.com/rss/home/international"
+
+
 def reuters_bloomberg_url(company_name):
     # Reuters dropped public RSS years ago and Bloomberg is subscription-walled, so
     # neither offers a free feed directly. This scopes the same free Google News search
@@ -2690,6 +2701,75 @@ NEWS_TYPE_LABELS = {
 }
 
 
+# =========================================================================
+# Source-type classification — a SEPARATE taxonomy from classify_news_type
+# above (which describes WHAT KIND of story a headline is: earnings, M&A,
+# etc). This describes WHERE it came from and how authoritative that
+# provenance is: company/RNS fact, formal broker data, financial
+# journalism, retail commentary, or genuinely unclassifiable. Same
+# discipline as classify_news_type: never guesses. A source is only ever
+# attributed with certainty determinable from HOW the item was fetched
+# (a structured feed, not a text search) or from the item's OWN real URL
+# (its actual publishing domain) — never inferred from search source,
+# title wording, or any other soft signal. Anything not confidently
+# determinable this way is honestly labelled "Unknown/Aggregated" rather
+# than assigned a specific attribution that might be wrong.
+# =========================================================================
+
+SOURCE_TYPE_DOMAIN_MAP = {
+    "reuters.com": ("financial_journalism", "Reuters"),
+    "bloomberg.com": ("financial_journalism", "Bloomberg"),
+    "ft.com": ("financial_journalism", "FT — Financial Times"),
+    "ii.co.uk": ("retail_commentary", "interactive investor"),
+}
+
+# A genuinely distinctive, well-documented RNS announcement title format
+# ("REG - RNS - Final Announcement Released", "RNS Number : 1234A") —
+# confirmed via real captured examples, not assumed. Matching on this
+# specific, narrow pattern (not just the word "RNS" anywhere, which could
+# appear in unrelated commentary) keeps this a genuine detection, not a
+# guess dressed up as one.
+_RNS_TITLE_RE = re.compile(r"^\s*REG\s*[-–]\s*RNS\s*[-–]", re.IGNORECASE)
+
+
+def classify_source_type(fetch_source, link=None, title=None):
+    """
+    Returns (source_type, source_label). source_type is one of:
+    "company_announcement", "broker_data", "financial_journalism",
+    "retail_commentary", "aggregated_unknown".
+
+    Structured, non-text-search sources are known with certainty from HOW
+    they were fetched (fetch_source itself, not the article content) —
+    the broker-ratings feed and Yahoo's structured analyst-history API are
+    never reached via a keyword search, so there's nothing to guess.
+    Everything else is judged from the item's own real link (its actual
+    publishing domain, via SOURCE_TYPE_DOMAIN_MAP) or a narrowly-matched
+    RNS title pattern — never from which search found it, since a Google
+    News search for "Barclays" can legitimately surface a Reuters
+    article, a company statement, or a retail blog, and only the
+    resulting item's OWN link says which.
+    """
+    if fetch_source in ("ratings", "analyst"):
+        return "broker_data", "Broker Data"
+    if fetch_source == "ft":
+        return "financial_journalism", "FT — Financial Times"
+
+    hostname = ""
+    if link:
+        try:
+            hostname = (urllib.parse.urlparse(link).hostname or "").replace("www.", "")
+        except Exception:
+            hostname = ""
+    for domain, (source_type, label) in SOURCE_TYPE_DOMAIN_MAP.items():
+        if domain in hostname:
+            return source_type, label
+
+    if title and _RNS_TITLE_RE.match(title):
+        return "company_announcement", "RNS — Company Announcement"
+
+    return "aggregated_unknown", "Unknown/Aggregated"
+
+
 def detect_contradictions(
     change_pct, change_pct_5d, above_ma20, rsi14, volume_ratio,
     evidence, broker_momentum, upside_pct, ma200,
@@ -3466,11 +3546,15 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
         # be re-classified on a later run than when the actual rating happened.
         normalized_at_display = format_normalized_at(it.get("normalizedAt"))
         classified_html = f'<br/><span class="meta">Classified: {esc(normalized_at_display)}</span>' if normalized_at_display else ""
+        # sourceLabel (e.g. "FT — Financial Times", "Reuters", "Broker Data",
+        # "Unknown/Aggregated") — falls back to the raw source/hostname for
+        # items persisted before this field existed, never blank.
+        source_display = it.get("sourceLabel") or it.get("source", "")
         return (
             f'<div class="item"><span class="badge {it.get("category","news")}">{it.get("category","news").upper()}</span> '
             f'<b>{ticker_label}</b> '
             f'{broker_html} '
-            f'<span class="meta">{esc(it.get("source",""))} · {esc(it.get("pubDate",""))}</span>{classified_html}<br/>'
+            f'<span class="meta">{esc(source_display)} · {esc(it.get("pubDate",""))}</span>{classified_html}<br/>'
             f'<a href="{esc(it.get("link","#"))}" target="_blank">{esc(it.get("title",""))}</a></div>'
         )
 
@@ -3594,10 +3678,11 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
         broker_html = f'<span class="broker">{esc(it["broker"])}</span>' if it.get("broker") and it.get("category") in ("upgrade", "downgrade", "target", "target_raise", "target_cut", "initiation", "reiteration") else ""
         normalized_at_display = format_normalized_at(it.get("normalizedAt"))
         classified_html = f'<br/><span class="meta">Classified: {esc(normalized_at_display)}</span>' if normalized_at_display else ""
+        source_display = it.get("sourceLabel") or it.get("source", "")
         return (
             f'<div class="item"><span class="badge {it.get("category","news")}">{it.get("category","news").upper()}</span> '
             f'<b>{esc(symbol)}</b> {broker_html} '
-            f'<span class="meta">{esc(it.get("source",""))} · {esc(it.get("pubDate",""))}</span>{classified_html}<br/>'
+            f'<span class="meta">{esc(source_display)} · {esc(it.get("pubDate",""))}</span>{classified_html}<br/>'
             f'<a href="{esc(it.get("link","#"))}" target="_blank">{esc(it.get("title",""))}</a></div>'
         )
 
@@ -4391,6 +4476,8 @@ def main():
     screener = {}
     screener_status = {"volume": "not_checked", "gainers": "not_checked", "losers": "not_checked"}
     ratings_fetch_failed = None  # None = not attempted this run (SKIP_MARKET_WIDE), True/False once it is
+    ft_fetch_failed = None
+    ft_items_pool = []
     market_wide_fetch_failed = None
     ratings_items = []
     screener_news = {}
@@ -4407,6 +4494,23 @@ def main():
     if not SKIP_MARKET_WIDE:
         ratings_items, ratings_fetch_failed = fetch_feed(ANALYST_RATINGS_FEED_URL)
         market_wide_items, market_wide_fetch_failed = fetch_feed(market_wide_broker_news_url())
+
+        # FT — fetched ONCE per run (both are general feeds, not per-company
+        # searches — FT offers no company-specific search endpoint), then
+        # text-matched against each watchlist/screener company below, the
+        # same way general_news_url-sourced items already are. Deduplicated
+        # between the two FT feeds specifically (a story can legitimately
+        # appear in both Markets and the International homepage).
+        ft_markets_items, ft_markets_failed = fetch_feed(FT_MARKETS_URL)
+        ft_international_items, ft_international_failed = fetch_feed(FT_INTERNATIONAL_URL)
+        ft_fetch_failed = ft_markets_failed and ft_international_failed  # only a genuine failure if BOTH broke
+        _ft_seen_links = set()
+        ft_items_pool = []
+        for it in ft_markets_items + ft_international_items:
+            if it["link"] in _ft_seen_links:
+                continue
+            _ft_seen_links.add(it["link"])
+            ft_items_pool.append(it)
 
         # Restrict the screener to genuine FTSE 100/250 constituents — Yahoo's raw LSE
         # screener includes the whole market (AIM micro-caps and all), which is why
@@ -4475,7 +4579,13 @@ def main():
             # searched stock. Requiring the (cleaned) company name to actually appear
             # in the item's own title before tagging it with this stock's ticker closes
             # that gap — same fix applied to the watchlist's own per-stock news loop.
-            items = [it for it in items if cleaned_name.lower() in it.get("title", "").lower()]
+            items = [("g", it) for it in items if cleaned_name.lower() in it.get("title", "").lower()]
+            # FT — matched against the shared FT pool fetched once above, same
+            # title-must-contain-company-name requirement as the Google-News
+            # path (FT has no company-specific search either).
+            ft_matched_mover = [("ft", it) for it in ft_items_pool if cleaned_name.lower() in it.get("title", "").lower()]
+            items = items + ft_matched_mover
+            items = [(src, it) for src, it in items if passes_relevance_filter(it.get("title", ""), cleaned_name, src)]
             # Built ONCE against the wider age ceiling, same restructuring
             # pattern as the other two news sections — the existing
             # same-day screener_news (which feeds evidence/scorecard via
@@ -4484,18 +4594,20 @@ def main():
             # while a separate recent-fallback pool becomes available
             # purely for the "News on Today's Top Movers" DISPLAY, never
             # passed into evidence.
-            items_wide = [it for it in items if passes_recency_filter_wide(it.get("pubDate"))]
-            items_today = [it for it in items_wide if is_today_in_london(it.get("pubDate"))]
+            items_wide = [(src, it) for src, it in items if passes_recency_filter_wide(it.get("pubDate"))]
+            items_today = [(src, it) for src, it in items_wide if is_today_in_london(it.get("pubDate"))]
             now_iso_sc = datetime.now(timezone.utc).isoformat()
 
             def _enrich_mover_items(raw_items):
                 out = []
-                for it in raw_items[:5]:  # cap per-stock to keep dashboard/message size sane
+                for fetch_source, it in raw_items[:5]:  # cap per-stock to keep dashboard/message size sane
                     category = classify(it["title"])
                     broker = detect_broker(it["title"]) if category in ("upgrade", "downgrade", "target", "target_raise", "target_cut", "initiation", "reiteration") else None
+                    source_type, source_label = classify_source_type(fetch_source, it.get("link"), it.get("title"))
                     out.append({**it, "ticker": symbol, "company": name, "category": category, "broker": broker,
                                 "detectedAt": now_iso_sc, "normalizedAt": now_iso_sc,
-                                "normalizedAction": CATEGORY_TO_NORMALIZED_ACTION.get(category)})
+                                "normalizedAction": CATEGORY_TO_NORMALIZED_ACTION.get(category),
+                                "fetchSource": fetch_source, "sourceType": source_type, "sourceLabel": source_label})
                 return out
 
             if items_today:
@@ -4676,7 +4788,7 @@ def main():
             if r_ticker:
                 confirmed_ratings_items.append(it)
                 ratings_resolved[it["link"]] = (r_ticker, r_company)
-        market_wide_pool = confirmed_ratings_items + market_wide_items
+        market_wide_pool = [("ratings", it) for it in confirmed_ratings_items] + [("g", it) for it in market_wide_items]
         # Built ONCE against the WIDER age ceiling (not same-day), then the
         # existing same-day subset is DERIVED from it below — guarantees
         # market_wide_enriched (which feeds alerts/seen-tracking/AI-digest,
@@ -4684,10 +4796,10 @@ def main():
         # change, while a new wider pool becomes available alongside it for
         # the "most recent available, not from today" display fallback —
         # without re-running the classification/enrichment logic twice.
-        market_wide_pool = [it for it in market_wide_pool if passes_recency_filter_wide(it.get("pubDate"))]
+        market_wide_pool = [(src, it) for src, it in market_wide_pool if passes_recency_filter_wide(it.get("pubDate"))]
         now_iso_mw = datetime.now(timezone.utc).isoformat()
         market_wide_enriched_wide = []
-        for it in market_wide_pool:
+        for mw_fetch_source, it in market_wide_pool:
             category = classify(it["title"])
             # "target" = a broker raising/cutting their price target — a genuine, already-
             # published broker action, same category of fact as an upgrade/downgrade, so it
@@ -4695,6 +4807,7 @@ def main():
             if category not in ("upgrade", "downgrade", "target", "target_raise", "target_cut", "initiation", "reiteration"):
                 continue
             resolved = ratings_resolved.get(it["link"])
+            source_type, source_label = classify_source_type(mw_fetch_source, it.get("link"), it.get("title"))
             market_wide_enriched_wide.append({
                 **it,
                 "ticker": resolved[0] if resolved else "MARKET",
@@ -4704,6 +4817,9 @@ def main():
                 "detectedAt": now_iso_mw,
                 "normalizedAt": now_iso_mw,
                 "normalizedAction": CATEGORY_TO_NORMALIZED_ACTION.get(category),
+                "sourceType": source_type,
+                "sourceLabel": source_label,
+                "fetchSource": mw_fetch_source,
             })
         market_wide_dedup_wide = {}
         for it in market_wide_enriched_wide:
@@ -4743,8 +4859,17 @@ def main():
         y_items = [it for it in y_items if passes_relevance_filter(it.get("title", ""), _cleaned_name, "y")]
         rb_items = [it for it in rb_items if passes_relevance_filter(it.get("title", ""), _cleaned_name, "rb")]
         matched_ratings = [it for it in ratings_items if passes_relevance_filter(it.get("title", ""), _cleaned_name, "ratings")]
+        # FT — matched against the ONE shared FT pool fetched above (not a
+        # per-ticker fetch), same title-must-contain-the-company-name
+        # requirement as general_news_url's own post-filter (FT offers no
+        # company-specific search, so its general feed needs the same
+        # tightening), THEN the same shared relevance gate as every other
+        # source — no separate, looser rule for FT.
+        ft_matched = [it for it in ft_items_pool if _cleaned_name.lower() in it.get("title", "").lower()]
+        ft_matched = [it for it in ft_matched if passes_relevance_filter(it.get("title", ""), _cleaned_name, "ft")]
         combined_tagged_all = [("g", it) for it in g_items] + [("y", it) for it in y_items] \
-            + [("rb", it) for it in rb_items] + [("ratings", it) for it in matched_ratings]
+            + [("rb", it) for it in rb_items] + [("ratings", it) for it in matched_ratings] \
+            + [("ft", it) for it in ft_matched]
         # Built ONCE against the wider age ceiling, same pattern as the
         # market-wide restructuring above — the existing same-day subset is
         # DERIVED from it, guaranteeing byte-identical behaviour for
@@ -4783,6 +4908,7 @@ def main():
                 # personnel/legal story about "Barclays") gets mislabeled as if that
                 # bank issued the rating.
                 broker = detect_broker(it["title"]) if category in ("upgrade", "downgrade", "target", "target_raise", "target_cut", "initiation", "reiteration") else None
+                source_type, source_label = classify_source_type(fetch_source, it.get("link"), it.get("title"))
                 out.append({
                     **it,
                     "ticker": ticker,
@@ -4796,6 +4922,8 @@ def main():
                     # relevance policy when this item is carried forward — see
                     # revalidate_stored_news_items().
                     "fetchSource": fetch_source,
+                    "sourceType": source_type,
+                    "sourceLabel": source_label,
                 })
             return out
 
@@ -4807,8 +4935,8 @@ def main():
         # this exact ticker), so relevance checking doesn't apply — tagged "analyst" so
         # carry-forward revalidation knows to exempt these too, not just this run.
         for it in analyst_items:
-            enriched.append({**it, "ticker": ticker, "company": name, "detectedAt": now_iso, "fetchSource": "analyst"})
-            enriched_wide.append({**it, "ticker": ticker, "company": name, "detectedAt": now_iso, "fetchSource": "analyst"})
+            enriched.append({**it, "ticker": ticker, "company": name, "detectedAt": now_iso, "fetchSource": "analyst", "sourceType": "broker_data", "sourceLabel": "Broker Data"})
+            enriched_wide.append({**it, "ticker": ticker, "company": name, "detectedAt": now_iso, "fetchSource": "analyst", "sourceType": "broker_data", "sourceLabel": "Broker Data"})
 
 
         # Re-validate PERSISTED items against TODAY's date filter AND today's relevance
@@ -4969,6 +5097,14 @@ def main():
         "marketWideAlertsStatus": (
             "not_checked" if ratings_fetch_failed is None and market_wide_fetch_failed is None
             else "failed" if (ratings_fetch_failed and market_wide_fetch_failed)
+            else "ok"
+        ),
+        # FT's own fetch status — separate from the per-ticker news
+        # aggregate below, since FT is ONE shared fetch for the whole run
+        # (not per-ticker), matching how marketWideAlertsStatus is tracked.
+        "ftFetchStatus": (
+            "not_checked" if ft_fetch_failed is None
+            else "failed" if ft_fetch_failed
             else "ok"
         ),
         # Aggregate across every per-ticker news fetch this run (3 feeds ×
