@@ -3659,14 +3659,18 @@ def render_stock_research_html(
     extended_lines = extended_lines + contradiction_lines + entry_exit_lines + scorecard_lines
 
     if scorecard_summary_collector is not None:
-        # Pure side-effect of the SAME scorecard/signal_quality computation
-        # already performed above for this stock's own detail lines — never
-        # a second call to compute_research_scorecard/compute_signal_quality.
-        # This is how Strongest Agreeing Evidence gets its ranking data
-        # without recalculating anything.
+        # Pure side-effect of the SAME scorecard/signal_quality/evidence
+        # computation already performed above for this stock's own detail
+        # lines — never a second call to compute_research_scorecard/
+        # compute_signal_quality/classify_evidence. Originally built for
+        # Strongest Agreeing Evidence (Phase 4); extended here (Phase 6)
+        # with price and evidenceLabel, both already computed above, for
+        # the daily "What Changed" snapshot — still zero duplicate
+        # computation, just two more already-known facts captured.
         scorecard_summary_collector.append({
             "ticker": ticker, "name": name, "total": scorecard["total"],
             "signalQuality": signal_quality, "confidence": scorecard["confidence"],
+            "price": price, "evidenceLabel": evidence["label"],
         })
 
     # Phase 5 chart — pure display, computed from the ALREADY-RETAINED
@@ -3716,7 +3720,7 @@ def render_stock_research_html(
     return f'<div{attr_str}>{header}{body}</div>'
 
 
-def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticker=None):
+def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticker=None, prior_snapshot=None):
     """
     latest_broker_events: optional dict of ticker -> latest non-superseded broker
     event within LATEST_BROKER_EVENT_MAX_AGE_DAYS (see get_latest_broker_event_per_
@@ -3959,6 +3963,43 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
 
     strongest_positive_html = "".join(_strongest_evidence_row(s) for s in strong_positive) or '<span class="meta">None currently.</span>'
     strongest_negative_html = "".join(_strongest_evidence_row(s) for s in strong_negative) or '<span class="meta">None currently.</span>'
+
+    # What Changed Since Last Snapshot — pure aggregation over
+    # scorecard_summaries (the SAME data Strongest Agreeing Evidence just
+    # used above) compared against prior_snapshot, which main() already
+    # loaded from state/daily_snapshots.json before calling this function.
+    # Never a new scorecard/evidence computation.
+    if prior_snapshot is None:
+        whats_changed_html = '<span class="meta">No prior snapshot available yet; comparison will appear from tomorrow\'s run.</span>'
+        whats_changed_intro = "Comparison will appear once a prior day's snapshot exists."
+    else:
+        changes = compute_whats_changed(scorecard_summaries, prior_snapshot)
+        since_label = format_since_label(prior_snapshot)
+        whats_changed_intro = (
+            f"Changed since {esc(since_label)}. Factual changes only — this does not imply "
+            f"that any change is good or bad, or a signal to act."
+        )
+        if not changes:
+            whats_changed_html = f'<span class="meta">No notable changes since {esc(since_label)}.</span>'
+        else:
+            rows = []
+            for c in changes:
+                parts = []
+                if c["priceChangePct"] is not None:
+                    cls = "up" if c["priceChangePct"] >= 0 else "down"
+                    sign = "+" if c["priceChangePct"] >= 0 else ""
+                    parts.append(f'price <span class="{cls}">{sign}{c["priceChangePct"]:.1f}%</span>')
+                if c["totalFrom"] is not None and c["totalTo"] is not None and c["totalFrom"] != c["totalTo"]:
+                    parts.append(f'TOTAL <span class="val">{c["totalFrom"]:+d} \u2192 {c["totalTo"]:+d}</span>')
+                if c["signalQualityFrom"] is not None:
+                    parts.append(f'Signal Quality: <span class="val">{esc(c["signalQualityFrom"])} \u2192 {esc(c["signalQualityTo"])}</span>')
+                if c["evidenceLabelFrom"] is not None:
+                    parts.append(f'Evidence: <span class="val">{esc(c["evidenceLabelFrom"])} \u2192 {esc(c["evidenceLabelTo"])}</span>')
+                rows.append(
+                    f'<div class="quote-row"><a href="#stock-{esc(c["ticker"])}" style="color:#e8eaed;text-decoration:none;">'
+                    f'<b>{esc(c["ticker"])}</b> ({esc(c["name"])})</a> — {" · ".join(parts)}</div>'
+                )
+            whats_changed_html = "".join(rows)
 
     def item_div(it):
         # Defense in depth: only render a broker badge for genuine rating/target items,
@@ -4533,6 +4574,7 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 <a href="#catalysts" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🗓️ Catalysts</a>
 <a href="#movers-today" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🔥 Moving Today</a>
 <a href="#strongest-evidence" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🏆 Strongest Evidence</a>
+<a href="#whats-changed" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📅 What Changed</a>
 <a href="#watchlist" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">👀 Watchlist</a>
 <a href="#market-research" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🔎 Market Research</a>
 <a href="#broker-alerts" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">⬆⬇🎯 Broker Alerts</a>
@@ -4578,6 +4620,10 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 <h3>Strongest agreeing-negative evidence</h3>
 <div class="quotes">{strongest_negative_html}</div>
 
+<h2 id="whats-changed">📅 What Changed Since Last Snapshot</h2>
+<p class="meta">{whats_changed_intro}</p>
+<div class="quotes">{whats_changed_html}</div>
+
 <h2 id="watchlist">👀 Your Watchlist</h2>
 <div class="quotes">{quote_rows or '<span class="meta">No quotes yet</span>'}</div>
 
@@ -4597,6 +4643,13 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
     os.makedirs(DOCS_DIR, exist_ok=True)
     with open(os.path.join(DOCS_DIR, DOCS_FILENAME), "w", encoding="utf-8") as f:
         f.write(html)
+    # Additive: exposes the per-Watchlist-stock scorecard summary (price,
+    # TOTAL, Signal Quality, Confidence, Evidence label) built as a pure
+    # side-effect above — every existing caller that ignores this return
+    # value (there was none before this) continues to work exactly as
+    # before. Used by main() to persist the daily "What Changed" snapshot
+    # without any duplicate scorecard/evidence computation.
+    return scorecard_summaries
 
 
 HEARTBEAT_INTERVAL_SECONDS = 6 * 3600  # confirmation ping every 6h, not every 5 min — a signal, not spam
@@ -5772,7 +5825,36 @@ def main():
         "pipelineHealth": compute_pipeline_health(_last_poll_str, _last_poll_now),
     }
     save_json(DATA_FILE, data)
-    render_dashboard(data, watchlist)
+
+    # --- Daily snapshot lookup for "What Changed" (Phase 6) — wrapped so
+    # ANY failure here (corrupt state/daily_snapshots.json, unexpected
+    # exception) can NEVER stop the dashboard from rendering. A missing/
+    # unreadable prior snapshot just means render_dashboard shows the
+    # honest "no prior snapshot yet" message, same as first-run.
+    prior_snapshot = None
+    try:
+        _now_for_snapshot = datetime.now(timezone.utc)
+        _today_london = _now_for_snapshot.astimezone(LONDON_TZ).strftime("%Y-%m-%d")
+        _snapshots_store = load_daily_snapshots()
+        prior_snapshot = find_prior_snapshot(_snapshots_store, _today_london)
+    except DailySnapshotsCorruptError as e:
+        print(f"  ! daily snapshots store CORRUPT — 'What Changed' will show as unavailable this run: {e}", file=sys.stderr)
+    except Exception as e:
+        print(f"  ! daily snapshots lookup failed — 'What Changed' will show as unavailable this run: {e}", file=sys.stderr)
+
+    scorecard_summaries = render_dashboard(data, watchlist, prior_snapshot=prior_snapshot)
+
+    # Captures TODAY's snapshot from the SAME scorecard_summaries
+    # render_dashboard just returned — never a second scorecard/evidence
+    # computation. Wrapped with the same fail-safe discipline as the
+    # broker-events block just below: a failure here can never stop the
+    # rest of this poll cycle.
+    try:
+        snapshot_result = capture_daily_snapshot(scorecard_summaries or [])
+        if not snapshot_result.get("written"):
+            print(f"Daily snapshot: not written this run (reason={snapshot_result.get('reason')})")
+    except Exception as e:
+        print(f"  ! Daily snapshot capture failed entirely — state/daily_snapshots.json left untouched: {e}", file=sys.stderr)
 
     # --- Broker-events pipeline (additive, isolated, separate from state/
     # data.json above) -------------------------------------------------
@@ -6538,6 +6620,186 @@ import tempfile
 
 EVENTS_STATE_FILE = os.path.join(STATE_DIR, "events.json")
 EVENTS_STORE_VERSION = 1
+
+
+# --- Daily snapshots (Phase 6: "What Changed") --------------------------
+# Same file/directory (state/), same reliability the events store has
+# already proven across many real GitHub Actions runs (broker momentum's
+# 90-day rolling history could not work at all if state/ weren't
+# persisting reliably between runs — this is direct, already-verified
+# evidence, not an assumption).
+DAILY_SNAPSHOTS_FILE = os.path.join(STATE_DIR, "daily_snapshots.json")
+DAILY_SNAPSHOTS_VERSION = 1
+DAILY_SNAPSHOTS_RETENTION_DAYS = 30
+WHATS_CHANGED_PRICE_THRESHOLD_PCT = 5.0
+# Every field this feature actually reads from a prior-snapshot stock
+# record — used to reject a partially-written or older-format record
+# before it can produce a misleading delta. Values MAY legitimately be
+# None (missing data at capture time); the KEYS must all be present.
+REQUIRED_SNAPSHOT_STOCK_FIELDS = {"ticker", "price", "total", "signalQuality", "evidenceLabel"}
+
+
+class DailySnapshotsCorruptError(Exception):
+    """Same discipline as EventsStoreCorruptError: a file that EXISTS but
+    fails to parse or doesn't match the expected shape must never be
+    silently treated as empty — that would destroy real history. Only a
+    genuinely MISSING file is a legitimate fresh-start case."""
+    pass
+
+
+def load_daily_snapshots(path=None):
+    """Loads the daily snapshots store. Mirrors load_events_store exactly:
+    a MISSING file is the only case that legitimately produces a fresh
+    empty store; a file that EXISTS but fails to parse or match the
+    expected shape raises DailySnapshotsCorruptError instead of silently
+    returning empty."""
+    path = path or DAILY_SNAPSHOTS_FILE
+    if not os.path.exists(path):
+        return {"version": DAILY_SNAPSHOTS_VERSION, "snapshots": []}
+    with open(path, "r", encoding="utf-8") as f:
+        raw = f.read()
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise DailySnapshotsCorruptError(f"{path} contains invalid JSON: {e}") from e
+    if not isinstance(data, dict) or not isinstance(data.get("snapshots"), list):
+        raise DailySnapshotsCorruptError(f"{path} does not match the expected {{version, snapshots}} shape")
+    return data
+
+
+def is_valid_snapshot_stock_entry(entry):
+    """A prior-snapshot stock record is only used for comparison when it
+    has every field this feature actually reads — guards against a
+    partially-written or older-format record silently producing a
+    misleading or wrong delta."""
+    return isinstance(entry, dict) and REQUIRED_SNAPSHOT_STOCK_FIELDS.issubset(entry.keys())
+
+
+def find_prior_snapshot(store, before_date):
+    """
+    Returns the most recent snapshot with a date STRICTLY BEFORE
+    before_date (today's London date), or None if none exists yet.
+    Never assumes "yesterday" specifically — this is what correctly
+    skips weekends/bank holidays by construction: whatever the latest
+    dated entry before today actually is, that's what gets returned and
+    later labelled with its REAL date.
+    """
+    candidates = [s for s in store.get("snapshots", []) if s.get("date") and s["date"] < before_date]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda s: s["date"])
+
+
+def capture_daily_snapshot(scorecard_summaries, now=None, path=None):
+    """
+    Appends today's snapshot, built entirely from scorecard_summaries —
+    the SAME per-stock data render_dashboard already produces as a side
+    effect of its existing scorecard/signal-quality/evidence computation
+    (see that computation's own comments) — never a new calculation.
+
+    Deduplicated by London calendar date: if today's date already has a
+    snapshot (a later run on the same day), this is a no-op. On a
+    corrupt existing store, this deliberately does NOT write — same
+    fail-safe-by-skipping discipline as collect_and_persist_broker_events,
+    so a parsing bug can never silently wipe real history. Retention:
+    keeps at most DAILY_SNAPSHOTS_RETENTION_DAYS most recent snapshots.
+    """
+    path = path or DAILY_SNAPSHOTS_FILE
+    now = now or datetime.now(timezone.utc)
+    today_london = now.astimezone(LONDON_TZ).strftime("%Y-%m-%d")
+
+    try:
+        store = load_daily_snapshots(path)
+    except DailySnapshotsCorruptError as e:
+        print(f"  ! daily snapshots store CORRUPT — skipping persistence this cycle to avoid data loss: {e}", file=sys.stderr)
+        return {"written": False, "reason": "existing_store_corrupt"}
+
+    if any(s.get("date") == today_london for s in store["snapshots"]):
+        return {"written": False, "reason": "already_captured_today"}
+
+    stocks = {}
+    for s in scorecard_summaries:
+        ticker = s.get("ticker")
+        if not ticker:
+            continue
+        stocks[ticker] = {
+            "ticker": ticker, "price": s.get("price"), "total": s.get("total"),
+            "signalQuality": s.get("signalQuality"), "evidenceLabel": s.get("evidenceLabel"),
+        }
+
+    store["snapshots"].append({
+        "date": today_london,
+        "capturedAt": now.astimezone(timezone.utc).isoformat(),
+        "stocks": stocks,
+    })
+    store["snapshots"].sort(key=lambda s: s["date"])
+    store["snapshots"] = store["snapshots"][-DAILY_SNAPSHOTS_RETENTION_DAYS:]
+
+    try:
+        atomic_write_json(path, store)
+    except Exception as e:
+        print(f"  ! daily snapshots write FAILED — previous file left untouched: {e}", file=sys.stderr)
+        return {"written": False, "reason": "write_failed"}
+
+    return {"written": True, "date": today_london, "stockCount": len(stocks)}
+
+
+def compute_whats_changed(scorecard_summaries, prior_snapshot):
+    """
+    Returns a list of per-stock changes for stocks with a MATERIAL
+    change — a price move past WHATS_CHANGED_PRICE_THRESHOLD_PCT, OR a
+    genuine Signal Quality or Evidence label CATEGORY change (always
+    surfaced regardless of price magnitude — a category changing is
+    inherently notable, not a matter of degree). Purely factual deltas;
+    never implies a change is good or bad.
+
+    Returns [] both when there's no prior snapshot at all AND when
+    nothing material changed — the caller distinguishes those two cases
+    using prior_snapshot itself (None vs not-None), not this return
+    value.
+    """
+    if prior_snapshot is None:
+        return []
+    prior_stocks = prior_snapshot.get("stocks", {})
+    changes = []
+    for s in scorecard_summaries:
+        ticker = s.get("ticker")
+        prior = prior_stocks.get(ticker)
+        if not is_valid_snapshot_stock_entry(prior):
+            continue  # no valid prior data for this specific stock — skip it, never guess
+        price_change_pct = None
+        if prior.get("price") and s.get("price") is not None:
+            price_change_pct = (s["price"] - prior["price"]) / prior["price"] * 100
+
+        signal_changed = prior.get("signalQuality") != s.get("signalQuality")
+        evidence_changed = prior.get("evidenceLabel") != s.get("evidenceLabel")
+        price_material = price_change_pct is not None and abs(price_change_pct) >= WHATS_CHANGED_PRICE_THRESHOLD_PCT
+
+        if not (price_material or signal_changed or evidence_changed):
+            continue
+
+        changes.append({
+            "ticker": ticker, "name": s.get("name"),
+            "priceChangePct": price_change_pct if price_material else None,
+            "totalFrom": prior.get("total"), "totalTo": s.get("total"),
+            "signalQualityFrom": prior.get("signalQuality") if signal_changed else None,
+            "signalQualityTo": s.get("signalQuality") if signal_changed else None,
+            "evidenceLabelFrom": prior.get("evidenceLabel") if evidence_changed else None,
+            "evidenceLabelTo": s.get("evidenceLabel") if evidence_changed else None,
+        })
+    return changes
+
+
+def format_since_label(prior_snapshot, now=None):
+    """'Fri 28 Aug (3 days ago)' — the REAL date of the prior snapshot,
+    never a hardcoded 'yesterday' that would be quietly wrong across a
+    weekend or bank holiday."""
+    now = now or datetime.now(timezone.utc)
+    today_london = now.astimezone(LONDON_TZ).date()
+    prior_date = datetime.strptime(prior_snapshot["date"], "%Y-%m-%d").date()
+    days_ago = (today_london - prior_date).days
+    day_word = "day" if days_ago == 1 else "days"
+    return f"{prior_date.strftime('%a %d %b')} ({days_ago} {day_word} ago)"
 
 
 class EventsStoreCorruptError(Exception):
