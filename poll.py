@@ -1166,6 +1166,26 @@ def yahoo_symbol(ticker):
     return t if t.endswith(".L") else f"{t.rstrip('.')}.L"
 
 
+def bare_ticker(symbol):
+    """
+    Normalizes a ticker to its bare, suffix-free form so the SAME
+    underlying stock can be recognized across different key formats —
+    e.g. a screener symbol "GLEN.L" and a watchlist ticker "GLEN" both
+    normalize to "GLEN". Strips a trailing ".L" LSE suffix, then any
+    leftover trailing dot — so "BP." (a real, literal trailing dot in
+    that specific ticker, not a stripped suffix) still compares equal to
+    "BP.L"'s bare form "BP", not to a literal "BP." Extracted from logic
+    that was previously duplicated inline in two places (both computing
+    the same bare form for the same reason) into one shared, tested
+    function — the exact match this project has consistently preferred
+    over risking the two copies drifting apart.
+    """
+    s = symbol.upper()
+    if s.endswith(".L"):
+        s = s.rsplit(".L", 1)[0]
+    return s.rstrip(".")
+
+
 def yahoo_news_url(ticker):
     return "https://feeds.finance.yahoo.com/rss/2.0/headline?" + urllib.parse.urlencode(
         {"s": yahoo_symbol(ticker), "region": "UK", "lang": "en-GB"}
@@ -3956,17 +3976,26 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
     mover_rows = "".join(mover_div(m) for m in big_movers)
 
     html = f"""<!DOCTYPE html>
-<html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
-<meta http-equiv="refresh" content="90">
+<html lang="en-GB"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta http-equiv="refresh" content="300">
+<!-- Reload interval matches the actual server-side poll cadence (~5 min) —
+     was 90s, which reloaded far more often than the underlying data could
+     genuinely change, and is also a real, documented accessibility concern
+     (WCAG 2.2.1: unannounced auto-refreshing content can disrupt someone
+     using a screen reader or with limited motor control mid-read). The
+     client-side freshness ticker just below already tells the reader
+     exactly how stale the page is without needing a reload to do it. -->
 <title>UK Stock Watch</title>
 <style>
-body{{background:#0f1115;color:#e8eaed;font-family:-apple-system,sans-serif;margin:0;padding:12px;font-size:17px;line-height:1.6}}
+body{{background:#0f1115;color:#e8eaed;font-family:-apple-system,sans-serif;margin:0 auto;padding:12px;font-size:17px;line-height:1.6;max-width:1200px;word-wrap:break-word;overflow-wrap:break-word}}
 h1{{font-size:26px;margin:4px 0;font-weight:800}}
 h2{{font-size:21px;margin:26px 0 10px;font-weight:800;border-left:4px solid #7fb3ff;padding-left:10px}}
 h3{{font-size:16px;margin:0 0 8px;color:#c2c7d0;font-weight:700}}
+a:focus-visible,summary:focus-visible,button:focus-visible{{outline:2px solid #7fb3ff;outline-offset:2px;border-radius:2px}}
 .screener-grid{{display:grid;grid-template-columns:1fr;gap:10px}}
 @media(min-width:600px){{.screener-grid{{grid-template-columns:1fr 1fr 1fr}}}}
 .heatmap-grid{{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:16px}}
+@media(max-width:380px){{.heatmap-grid{{grid-template-columns:repeat(3,1fr)}}}}
 @media(min-width:600px){{.heatmap-grid{{grid-template-columns:repeat(8,1fr)}}}}
 .heat-cell{{border-radius:4px;padding:8px 4px;text-align:center;color:#fff}}
 .heat-symbol{{font-size:14px;font-weight:700}}
@@ -3975,7 +4004,7 @@ h3{{font-size:16px;margin:0 0 8px;color:#c2c7d0;font-weight:700}}
 .quotes{{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}}
 .q{{background:#171a21;border:1px solid #2a2e37;border-radius:6px;padding:8px 12px;font-size:15px}}
 .up{{color:#50dc96;font-weight:800;font-size:17px}} .down{{color:#ff6b6b;font-weight:800;font-size:17px}}
-table{{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:16px}}
+table{{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;border-collapse:collapse;margin-bottom:16px;font-size:16px}}
 table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:left}}
 .item{{background:#171a21;border:1px solid #2a2e37;border-radius:8px;padding:12px;margin-bottom:8px}}
 .item a{{color:#e8eaed;text-decoration:none;font-size:17px;font-weight:600}}
@@ -4086,7 +4115,7 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 {ftse_html}
 <p class="disclaimer">LSE-listed stocks only. Informational only — not investment advice, not a guarantee of any outcome.</p>
 
-<nav style="margin:14px 0;padding:12px;background:#161920;border-radius:6px;font-size:16px;line-height:2.4;">
+<nav aria-label="Section navigation" style="margin:14px 0;padding:12px;background:#161920;border-radius:6px;font-size:16px;line-height:2.4;">
 <b style="color:#9aa0a6;margin-right:8px;">Jump to:</b>
 <a href="#heatmap" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🗺️ Heat Map</a>
 <a href="#screener" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📊 Screener</a>
@@ -4100,6 +4129,7 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 <a href="#news-feed" style="color:#7fb3ff;text-decoration:none;">📰 News Feed</a>
 </nav>
 
+<main>
 <h2 id="heatmap">🗺️ Heat Map (top movers, by size of move)</h2>
 <div class="heatmap-grid">{heatmap_cells or heatmap_empty_state_html()}</div>
 
@@ -4141,6 +4171,7 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 <h2 id="news-feed">📰 News &amp; Broker Feed (watchlist)</h2>
 {item_rows or news_empty_state_html(news_fetch_status, all_recent_items, "news")}
 <p class="lastpoll">Last checked: {esc(str(last_poll))}</p>
+</main>
 </body></html>"""
     os.makedirs(DOCS_DIR, exist_ok=True)
     with open(os.path.join(DOCS_DIR, DOCS_FILENAME), "w", encoding="utf-8") as f:
@@ -4630,6 +4661,7 @@ def main():
     mover_news_fetch_failures = 0
     uptrend_stocks = []
     screener_targets = {}
+    _bare_to_screener_key = {}
     ftse_universe_names = None
     ftse_universe_source = "not_checked"  # SKIP_MARKET_WIDE runs never touch FTSE universe status at all
     ftse_universe_status = "not_checked"
@@ -4793,20 +4825,27 @@ def main():
         uptrend_targets = {}
         _seen_bare_tickers = set()
         for symbol, name in ranked_stocks.items():
-            bare = symbol.upper().rsplit(".L", 1)[0] if symbol.upper().endswith(".L") else symbol.upper()
-            bare = bare.rstrip(".")  # matches yahoo_symbol()'s own normalization — a
-            # ticker like "BP." (a real, literal trailing dot, not a suffix to strip)
-            # must compare equal to the screener's "BP.L" -> bare "BP", not stay "BP."
-            # and silently fail to match, which was a real gap in an earlier version
-            # of this exact fix, caught by its own test.
+            bare = bare_ticker(symbol)
             if bare not in _seen_bare_tickers:
                 uptrend_targets[symbol] = name
                 _seen_bare_tickers.add(bare)
         for stock in watchlist:
-            bare = stock["ticker"].upper().rstrip(".")
+            bare = bare_ticker(stock["ticker"])
             if bare not in _seen_bare_tickers:
                 uptrend_targets[stock["ticker"]] = stock["name"]
                 _seen_bare_tickers.add(bare)
+        # Cross-reference index: bare ticker -> whichever key form actually
+        # WON the dedup above and is genuinely present in screener_targets.
+        # Fixes a real, confirmed bug (GLEN, screener-ranked AND watchlisted
+        # this run): the merge loop below looks up screener_targets by the
+        # WATCHLIST's own ticker form ("GLEN"), but when a stock is BOTH
+        # screener-ranked and watchlisted, the screener's form ("GLEN.L")
+        # is what actually won the dedup and is the only key present —
+        # "GLEN" was never added, so the lookup silently found nothing and
+        # skipped the whole merge, even though the technicals data was
+        # genuinely fetched (just under a different key). Built once here,
+        # after uptrend_targets is finalized, reused by that merge below.
+        _bare_to_screener_key = {bare_ticker(k): k for k in uptrend_targets}
         print(f"Checking price technicals, targets, earnings/dividend dates for {len(uptrend_targets)} stocks...")
         short_interest_map = fetch_short_interest()  # one fetch per run, not per ticker
         screener_targets = {}  # symbol -> {targetMeanPrice, recommendationKey, nextEarningsDate, exDividendDate, rsi14, ma20, aboveMA20}
@@ -5163,7 +5202,11 @@ def main():
         ticker = stock["ticker"]
         if ticker not in quotes:
             continue
-        extra = screener_targets.get(ticker)
+        # Falls back to the bare-ticker cross-reference when the watchlist's
+        # own ticker form isn't a key in screener_targets — see
+        # _bare_to_screener_key's own comment for exactly why this is
+        # needed (a screener-ranked-AND-watchlisted stock like GLEN).
+        extra = screener_targets.get(ticker) or screener_targets.get(_bare_to_screener_key.get(bare_ticker(ticker), ""))
         if not extra:
             continue
         for key, value in extra.items():
