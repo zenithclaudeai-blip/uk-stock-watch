@@ -3245,6 +3245,7 @@ def render_stock_research_html(
     show_stock_intelligence_label=False, progressive_disclosure=False,
     suppress_extended_market_cap=False,
     ai_evidence_confidence=None, ai_evidence_caveat=None,
+    scorecard_summary_collector=None,
 ):
     """
     THE single shared rendering function for a stock's full research
@@ -3560,6 +3561,17 @@ def render_stock_research_html(
     )
     extended_lines = extended_lines + contradiction_lines + entry_exit_lines + scorecard_lines
 
+    if scorecard_summary_collector is not None:
+        # Pure side-effect of the SAME scorecard/signal_quality computation
+        # already performed above for this stock's own detail lines — never
+        # a second call to compute_research_scorecard/compute_signal_quality.
+        # This is how Strongest Agreeing Evidence gets its ranking data
+        # without recalculating anything.
+        scorecard_summary_collector.append({
+            "ticker": ticker, "name": name, "total": scorecard["total"],
+            "signalQuality": signal_quality, "confidence": scorecard["confidence"],
+        })
+
     if progressive_disclosure and extended_lines:
         # Native <details>/<summary> — zero JavaScript, zero new dependency,
         # standard HTML with built-in expand/collapse in every modern
@@ -3798,9 +3810,35 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
             support_resistance=q.get("supportResistance"), breakout_status=q.get("breakoutStatus"),
             show_stock_intelligence_label=True,
             ai_evidence_confidence=q.get("aiEvidenceConfidence"), ai_evidence_caveat=q.get("aiEvidenceCaveat"),
+            scorecard_summary_collector=scorecard_summaries,
         )
 
+    scorecard_summaries = []  # filled as a pure side-effect of the quote_div calls below
     quote_rows = "".join(quote_div(t, q) for t, q in quotes.items())
+
+    # Strongest Agreeing Evidence — pure aggregation over scorecard_summaries,
+    # which was populated ABOVE by the exact same render_stock_research_html
+    # calls that already built quote_rows. Never a second scorecard/signal-
+    # quality computation for any stock.
+    strong_positive = sorted(
+        (s for s in scorecard_summaries if s["signalQuality"] == "Strong" and s["total"] > 0),
+        key=lambda s: -s["total"],
+    )
+    strong_negative = sorted(
+        (s for s in scorecard_summaries if s["signalQuality"] == "Strong" and s["total"] < 0),
+        key=lambda s: s["total"],
+    )
+
+    def _strongest_evidence_row(s):
+        sign = "+" if s["total"] > 0 else ""
+        return (
+            f'<div class="quote-row"><a href="#stock-{esc(s["ticker"])}" style="color:#e8eaed;text-decoration:none;">'
+            f'<b>{esc(s["ticker"])}</b> ({esc(s["name"])})</a> — TOTAL <span class="val">{sign}{s["total"]}</span> '
+            f'(Strong · {esc(s["confidence"])} confidence)</div>'
+        )
+
+    strongest_positive_html = "".join(_strongest_evidence_row(s) for s in strong_positive) or '<span class="meta">None currently.</span>'
+    strongest_negative_html = "".join(_strongest_evidence_row(s) for s in strong_negative) or '<span class="meta">None currently.</span>'
 
     def item_div(it):
         # Defense in depth: only render a broker badge for genuine rating/target items,
@@ -4372,6 +4410,7 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 <a href="#targets" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🎯 Target Prices</a>
 <a href="#catalysts" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🗓️ Catalysts</a>
 <a href="#movers-today" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🔥 Moving Today</a>
+<a href="#strongest-evidence" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🏆 Strongest Evidence</a>
 <a href="#watchlist" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">👀 Watchlist</a>
 <a href="#market-research" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🔎 Market Research</a>
 <a href="#broker-alerts" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">⬆⬇🎯 Broker Alerts</a>
@@ -4409,6 +4448,13 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 <h2 id="movers-today">🔥 Already Moving Today (watchlist, ±{BIG_MOVER_THRESHOLD_PCT:.0f}%+)</h2>
 <p class="meta">A fact about what already happened today — not a forecast of what happens next.</p>
 <div class="quotes">{mover_rows or '<span class="meta">Nothing past the threshold right now</span>'}</div>
+
+<h2 id="strongest-evidence">🏆 Strongest Agreeing Evidence</h2>
+<p class="meta">Stocks where the scored evidence dimensions agree most clearly right now — not a ranking of what to buy or sell, and not a prediction of future performance. See each stock's full Research Scorecard below for the underlying facts.</p>
+<h3>Strongest agreeing-positive evidence</h3>
+<div class="quotes">{strongest_positive_html}</div>
+<h3>Strongest agreeing-negative evidence</h3>
+<div class="quotes">{strongest_negative_html}</div>
 
 <h2 id="watchlist">👀 Your Watchlist</h2>
 <div class="quotes">{quote_rows or '<span class="meta">No quotes yet</span>'}</div>
