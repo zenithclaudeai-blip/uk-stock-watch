@@ -1266,6 +1266,11 @@ def compute_rsi(closes, period=14):
     return 100 - (100 / (1 + rs))
 
 
+CHART_HISTORY_DAYS = 30  # deliberately shorter than the 1y fetch range —
+# a compact glance, not a full trading chart. Retained from the SAME
+# fetch already happening for RSI/MA/ATR, never a second request.
+
+
 def fetch_price_technicals(ticker):
     """Real, already-happened price history — 5-day % change, RSI(14), moving
     averages (20/50/200-day, each only computed when enough real history exists),
@@ -1323,6 +1328,13 @@ def fetch_price_technicals(ticker):
         lows = [l for _c, _v, _h, l in paired]
         support_resistance = compute_support_resistance(highs, lows)
         breakout_status = compute_breakout_status(latest, highs[:-1], lows[:-1])
+        # Retains the LAST 30 trading days' close+volume from the SAME
+        # `paired` list already built above for RSI/MA/ATR — zero
+        # additional network calls, and every existing calculation above
+        # this line (rsi14/ma20/ma50/ma200/atr14/support_resistance/
+        # breakout_status) is completely untouched by this addition.
+        # Used only for the Phase 5 compact price/volume sparkline chart.
+        price_volume_series = [{"close": c, "volume": v} for c, v, _h, _l in paired[-CHART_HISTORY_DAYS:]]
         return {
             "changePct5d": change_pct,
             "price": latest,
@@ -1336,6 +1348,7 @@ def fetch_price_technicals(ticker):
             "breakoutStatus": breakout_status,
             "aboveMA20": (latest > ma20) if ma20 else None,
             "latestVolume": latest_volume,
+            "priceVolumeSeries": price_volume_series,
         }
     except Exception as e:
         print(f"  ! price technicals fetch failed: {ticker} ({e})", file=sys.stderr)
@@ -2035,6 +2048,89 @@ def format_market_cap(value):
     if value >= 1_000_000:
         return f"£{value / 1_000_000:.1f}m"
     return f"£{value:,.0f}"
+
+
+SPARKLINE_MIN_POINTS = 5  # fewer real data points than this isn't a meaningful chart
+SPARKLINE_WIDTH = 280
+SPARKLINE_PRICE_HEIGHT = 50
+SPARKLINE_VOLUME_HEIGHT = 20
+SPARKLINE_GAP = 4
+SPARKLINE_TOTAL_HEIGHT = SPARKLINE_PRICE_HEIGHT + SPARKLINE_GAP + SPARKLINE_VOLUME_HEIGHT
+
+
+def render_price_volume_sparkline(series, currency_suffix=""):
+    """
+    Compact server-side SVG sparkline — price line above, volume as a
+    thin comb of vertical lines below, visually distinguished by both
+    colour AND shape/position (never colour alone). Pure function of the
+    ALREADY-RETAINED series (see fetch_price_technicals's own
+    priceVolumeSeries field) — never fetches anything itself, never
+    computes RSI/MA/ATR/etc, which stay entirely untouched elsewhere.
+
+    Returns "" (never a broken/empty <svg> tag) when the series is
+    missing or has fewer than SPARKLINE_MIN_POINTS genuine closes — the
+    caller simply omits the chart in that case, same graceful-degradation
+    pattern used everywhere else in this codebase.
+
+    The <title> element is calculated from this SAME rendered series, so
+    a screen reader never gets a fact the visual chart doesn't also show
+    (and vice versa) — no information exists only visually.
+    """
+    if not series:
+        return ""
+    closes = [pt.get("close") for pt in series if pt.get("close") is not None]
+    if len(closes) < SPARKLINE_MIN_POINTS:
+        return ""
+    min_c, max_c = min(closes), max(closes)
+    c_range = (max_c - min_c) or 1  # avoid division by zero on a genuinely flat price
+    volumes = [pt.get("volume") or 0 for pt in series]
+    max_v = max(volumes) or 1
+
+    n = len(series)
+
+    def x_for(i):
+        return (i / (n - 1)) * SPARKLINE_WIDTH if n > 1 else 0
+
+    price_points = []
+    for i, pt in enumerate(series):
+        c = pt.get("close")
+        if c is None:
+            continue
+        x = x_for(i)
+        y = SPARKLINE_PRICE_HEIGHT - ((c - min_c) / c_range) * SPARKLINE_PRICE_HEIGHT
+        price_points.append(f"{x:.1f},{y:.1f}")
+    if len(price_points) < SPARKLINE_MIN_POINTS:
+        return ""
+    price_polyline = " ".join(price_points)
+
+    # Volume as ONE compact <path> (a comb of vertical strokes) rather
+    # than one <rect> per bar — meaningfully smaller output for the same
+    # visual result.
+    bar_width = max(SPARKLINE_WIDTH / n * 0.6, 1)
+    vol_path_parts = []
+    for i, pt in enumerate(series):
+        v = pt.get("volume") or 0
+        x = x_for(i)
+        h = (v / max_v) * SPARKLINE_VOLUME_HEIGHT
+        y_top = SPARKLINE_TOTAL_HEIGHT - h
+        vol_path_parts.append(f"M{x:.1f} {SPARKLINE_TOTAL_HEIGHT} L{x:.1f} {y_top:.1f}")
+    vol_path = " ".join(vol_path_parts)
+
+    first_close, last_close = closes[0], closes[-1]
+    title_text = (
+        f"{n}-day price chart: opened {first_close:.2f}{currency_suffix}, "
+        f"closed {last_close:.2f}{currency_suffix}, ranged {min_c:.2f}\u2013{max_c:.2f}{currency_suffix}. "
+        f"Volume bars shown below the price line."
+    )
+
+    return (
+        f'<svg viewBox="0 0 {SPARKLINE_WIDTH} {SPARKLINE_TOTAL_HEIGHT}" '
+        f'style="width:100%;max-width:320px;height:auto;display:block;" role="img" preserveAspectRatio="xMidYMid meet">'
+        f'<title>{esc(title_text)}</title>'
+        f'<path d="{vol_path}" stroke="#3a4150" stroke-width="{bar_width:.1f}" fill="none"/>'
+        f'<polyline points="{price_polyline}" fill="none" stroke="#7fb3ff" stroke-width="1.5"/>'
+        f'</svg>'
+    )
 
 
 def scale_bar_html(label, value_display, position_pct, lo_label, hi_label, color_lo, color_hi, zone_lo=33, zone_hi=66):
@@ -3246,6 +3342,7 @@ def render_stock_research_html(
     suppress_extended_market_cap=False,
     ai_evidence_confidence=None, ai_evidence_caveat=None,
     scorecard_summary_collector=None,
+    price_volume_series=None,
 ):
     """
     THE single shared rendering function for a stock's full research
@@ -3572,6 +3669,28 @@ def render_stock_research_html(
             "signalQuality": signal_quality, "confidence": scorecard["confidence"],
         })
 
+    # Phase 5 chart — pure display, computed from the ALREADY-RETAINED
+    # price_volume_series (see fetch_price_technicals's own docstring),
+    # never a new fetch, never touching any calculation above this point.
+    chart_svg = render_price_volume_sparkline(price_volume_series, currency_suffix)
+    watchlist_chart_html = ""
+    if chart_svg:
+        if progressive_disclosure:
+            # Screener/Moving Today: folds into the SAME shared "Full
+            # Stock Intelligence" collapse built below — no new mechanism.
+            extended_lines.append(f'<div class="meta" style="margin-top:4px;">{chart_svg}</div>')
+        else:
+            # Watchlist: its OWN narrow, separate collapse — a deliberate,
+            # scoped exception for the chart specifically. Everything
+            # else in a Watchlist entry stays exactly as visible as
+            # before; this never touches core_lines/extended_lines'
+            # existing concatenation below.
+            watchlist_chart_html = (
+                f'<details style="margin-top:4px;">'
+                f'<summary style="cursor:pointer;color:#7fb3ff;font-size:12px;">▸ Show chart</summary>'
+                f'<div class="meta" style="margin-top:4px;">{chart_svg}</div></details>'
+            )
+
     if progressive_disclosure and extended_lines:
         # Native <details>/<summary> — zero JavaScript, zero new dependency,
         # standard HTML with built-in expand/collapse in every modern
@@ -3586,7 +3705,7 @@ def render_stock_research_html(
             f'{extended_html}</details>'
         )
     else:
-        body = "".join(core_lines + extended_lines)
+        body = "".join(core_lines + extended_lines) + watchlist_chart_html
 
     attrs = []
     if anchor_id:
@@ -3811,6 +3930,7 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
             show_stock_intelligence_label=True,
             ai_evidence_confidence=q.get("aiEvidenceConfidence"), ai_evidence_caveat=q.get("aiEvidenceCaveat"),
             scorecard_summary_collector=scorecard_summaries,
+            price_volume_series=q.get("priceVolumeSeries"),
         )
 
     scorecard_summaries = []  # filled as a pure side-effect of the quote_div calls below
@@ -3968,6 +4088,7 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
                 ma50=q.get("ma50"), ma200=q.get("ma200"), atr14=q.get("atr14"),
                 support_resistance=q.get("supportResistance"), breakout_status=q.get("breakoutStatus"),
                 include_header=False, progressive_disclosure=True, suppress_extended_market_cap=True,
+                price_volume_series=q.get("priceVolumeSeries"),
             )
 
             return (
@@ -4257,6 +4378,7 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
             ma50=q.get("ma50"), ma200=q.get("ma200"), atr14=q.get("atr14"),
             support_resistance=q.get("supportResistance"), breakout_status=q.get("breakoutStatus"),
             css_class="q", progressive_disclosure=True,
+            price_volume_series=q.get("priceVolumeSeries"),
         )
 
     mover_rows = "".join(mover_div(m) for m in big_movers)
@@ -5208,6 +5330,7 @@ def main():
                     entry["atr14"] = hist.get("atr14")
                     entry["supportResistance"] = hist.get("supportResistance")
                     entry["breakoutStatus"] = hist.get("breakoutStatus")
+                    entry["priceVolumeSeries"] = hist.get("priceVolumeSeries")
                 si = match_short_interest(name, short_interest_map)
                 if si:
                     entry["shortInterestPct"] = si["pct"]
