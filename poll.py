@@ -464,6 +464,52 @@ def parse_rss(xml_bytes):
     return items
 
 
+def fetch_yahoo_broker_target(ticker):
+    """
+    Lightweight, dedicated broker-consensus lookup — requests ONLY the
+    financialData module (not the 8-module fetch_yahoo_analyst does for
+    the full watchlist research view), since this is used for a
+    genuinely separate purpose: enriching LSE-primary Screener rows
+    (Gainers/Losers/Volume) with the broker-target fields LSE's own
+    market-data response doesn't provide, never anything more.
+
+    This is Yahoo ENRICHMENT of LSE market data, not a replacement
+    source — callers must attach these fields alongside the existing
+    LSE price/changePct/volume, never overwrite them.
+
+    Returns {"targetMeanPrice", "targetHighPrice", "targetLowPrice",
+    "numberOfAnalystOpinions", "recommendationKey"} or None if
+    genuinely unavailable.
+    """
+    symbol = yahoo_symbol(ticker)
+    crumb = get_yahoo_crumb()
+    url = (
+        f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{urllib.parse.quote(symbol)}"
+        "?modules=financialData"
+    )
+    if crumb:
+        url += f"&crumb={urllib.parse.quote(crumb)}"
+    try:
+        data = json.loads(_yahoo_opener_get(url))
+        result = (((data.get("quoteSummary") or {}).get("result")) or [None])[0]
+        if not result:
+            return None
+        fin = result.get("financialData") or {}
+        target_mean = (fin.get("targetMeanPrice") or {}).get("raw")
+        if target_mean is None:
+            return None  # never fabricate a target that genuinely doesn't exist
+        return {
+            "targetMeanPrice": target_mean,
+            "targetHighPrice": (fin.get("targetHighPrice") or {}).get("raw"),
+            "targetLowPrice": (fin.get("targetLowPrice") or {}).get("raw"),
+            "numberOfAnalystOpinions": (fin.get("numberOfAnalystOpinions") or {}).get("raw"),
+            "recommendationKey": fin.get("recommendationKey"),
+        }
+    except Exception as e:
+        print(f"  ! yahoo broker-target enrichment failed: {ticker} ({e})", file=sys.stderr)
+        return None
+
+
 def fetch_yahoo_analyst(ticker):
     """
     Structured analyst ratings history via Yahoo Finance's quoteSummary endpoint —
@@ -6336,9 +6382,9 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
 <a href="strongest-evidence.html" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🏆 Strongest Evidence</a>
 <a href="screener.html" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📊 Screener</a>
 <a href="heatmap.html" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🗺️ Heat Map</a>
-<a href="screener.html#gainers" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🟢 Gainers</a>
-<a href="screener.html#losers" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🔴 Losers</a>
-<a href="screener.html#volume" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📊 Volume</a>
+<a href="gainers.html" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🟢 Gainers</a>
+<a href="losers.html" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🔴 Losers</a>
+<a href="volume.html" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📊 Volume</a>
 <a href="watchlist.html" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">👀 Watchlist</a>
 <a href="news-explorer.html" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📰 News Explorer</a>
 <a href="news-feed.html" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📰 News / Evidence</a>
@@ -6408,7 +6454,7 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
 </div>
 
 <h2 id="mover-news">📰 News on Today's Top Movers</h2>
-<p class="meta">Real, dated-today news for any stock currently in Volume/Gainers/Losers above — not limited to your watchlist.</p>
+<p class="meta">Real, dated-today news for any stock currently in Volume/Gainers/Losers or the Heat Map — not limited to your watchlist. Matched by company-name/headline keyword matching and classified by rule-based pattern detection (upgrade/downgrade/target-change etc.) — not AI-generated. See Market Research below for the one section that does use an AI-written summary.</p>
 <div>{screener_news_rows or news_empty_state_html(mover_news_status, all_recent_mover_news, "news for today's ranked stocks", render_fn=lambda it: screener_news_item(it.get("ticker", ""), it))}</div>
 
 <h2 id="uptrend">📈 5-Day Uptrend ({UPTREND_5DAY_THRESHOLD_PCT:.0f}%+, screener + watchlist)</h2>
@@ -6527,14 +6573,43 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
 <div class="quotes">{strongest_negative_html}</div>
 """, DOCS_DIR)
 
-    render_standalone_page("screener.html", "Screener", "📊 LSE Screener (Volume / Gainers / Losers)", f"""
+    render_standalone_page("screener.html", "Screener", "📊 LSE Screener Overview", f"""
+<p class="meta">A summary view of the LSE Risers/Fallers/Volume widget. For the full focused list of each category, use the dedicated Top Gainers, Top Losers, or Top Volume pages linked from Quick Navigation.</p>
 {universe_status_line}
 {screener_source_line}
 <div class="screener-grid">
-  <div><h2 id="volume">Top Volume</h2><table><tr><th>#</th><th>Symbol</th><th>Volume</th></tr>{vol_rows}</table></div>
-  <div><h2 id="gainers">Top Gainers</h2><table><tr><th>#</th><th>Symbol</th><th>Chg%</th></tr>{gain_rows}</table></div>
-  <div><h2 id="losers">Top Losers</h2><table><tr><th>#</th><th>Symbol</th><th>Chg%</th></tr>{lose_rows}</table></div>
+  <div><h2>Top Volume <a href="volume.html" style="color:#7fb3ff;font-size:13px;text-decoration:none;">(full page →)</a></h2><table><tr><th>#</th><th>Symbol</th><th>Volume</th></tr>{vol_rows}</table></div>
+  <div><h2>Top Gainers <a href="gainers.html" style="color:#7fb3ff;font-size:13px;text-decoration:none;">(full page →)</a></h2><table><tr><th>#</th><th>Symbol</th><th>Chg%</th></tr>{gain_rows}</table></div>
+  <div><h2>Top Losers <a href="losers.html" style="color:#7fb3ff;font-size:13px;text-decoration:none;">(full page →)</a></h2><table><tr><th>#</th><th>Symbol</th><th>Chg%</th></tr>{lose_rows}</table></div>
 </div>
+""", DOCS_DIR)
+
+    BROKER_ENRICHMENT_NOTE = ('<p class="meta">Price, % change, and volume above are LSE first-party data. '
+                               'Where a 🎯 target price appears within a stock\'s expanded evidence, that figure '
+                               'is separate Yahoo Finance broker-consensus enrichment, not LSE data.</p>')
+
+    render_standalone_page("gainers.html", "Top Gainers", "🟢 FTSE 100 Top Gainers", f"""
+<p class="meta">The stocks with the largest positive price movement today, from the LSE Risers/Fallers/Volume widget.</p>
+{universe_status_line}
+{screener_source_line}
+{BROKER_ENRICHMENT_NOTE}
+<table><tr><th>#</th><th>Symbol</th><th>Chg%</th></tr>{gain_rows}</table>
+""", DOCS_DIR)
+
+    render_standalone_page("losers.html", "Top Losers", "🔴 FTSE 100 Top Losers", f"""
+<p class="meta">The stocks with the largest negative price movement today, from the LSE Risers/Fallers/Volume widget.</p>
+{universe_status_line}
+{screener_source_line}
+{BROKER_ENRICHMENT_NOTE}
+<table><tr><th>#</th><th>Symbol</th><th>Chg%</th></tr>{lose_rows}</table>
+""", DOCS_DIR)
+
+    render_standalone_page("volume.html", "Top Volume", "📊 FTSE 100 Top Volume", f"""
+<p class="meta">The most heavily traded stocks by volume today, from the LSE Risers/Fallers/Volume widget.</p>
+{universe_status_line}
+{screener_source_line}
+{BROKER_ENRICHMENT_NOTE}
+<table><tr><th>#</th><th>Symbol</th><th>Volume</th></tr>{vol_rows}</table>
 """, DOCS_DIR)
 
     render_standalone_page("heatmap.html", "Heat Map", "🗺️ Heat Map (top movers, by size of move)", f"""
@@ -6581,7 +6656,7 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
 
     render_standalone_page("more-data.html", "More Data", "📚 More Data", f"""
 <h2 id="mover-news">📰 News on Today's Top Movers</h2>
-<p class="meta">Real, dated-today news for any stock currently in Volume/Gainers/Losers — not limited to your watchlist.</p>
+<p class="meta">Real, dated-today news for any stock currently in Volume/Gainers/Losers or the Heat Map — not limited to your watchlist. Matched by company-name/headline keyword matching and classified by rule-based pattern detection (upgrade/downgrade/target-change etc.) — not AI-generated. See Market Research below for the one section that does use an AI-written summary.</p>
 <div>{screener_news_rows or news_empty_state_html(mover_news_status, all_recent_mover_news, "news for today's ranked stocks", render_fn=lambda it: screener_news_item(it.get("ticker", ""), it))}</div>
 
 <h2 id="uptrend">📈 5-Day Uptrend ({UPTREND_5DAY_THRESHOLD_PCT:.0f}%+, screener + watchlist)</h2>
@@ -7279,15 +7354,75 @@ def main():
         # News for every stock ranked in Volume/Gainers/Losers, not just the watchlist —
         # deduped by symbol (a stock can appear in more than one list), one query each,
         # staggered to avoid the burst-triggered 503s seen earlier in this project.
-        screener_news = {}
-        screener_news_recent = data.get("screenerNewsRecent", {})
-        mover_news_fetch_attempts = 0
-        mover_news_fetch_failures = 0
+        #
+        # Heat Map is now ALSO included, since it can genuinely surface a stock
+        # that isn't in Volume/Gainers/Losers at all (confirmed: it's a broader,
+        # separately-fetched ~100-instrument pool, not merely derived from the
+        # other three). Deduped against symbols already covered above — a stock
+        # in both pools is fetched once, not twice.
+        #
+        # Heat Map alone can be up to ~100 instruments, and news-fetching has no
+        # batch API (confirmed: neither Yahoo function this project uses supports
+        # multiple symbols per request) — genuinely adding one request per
+        # Heat-Map-only stock would multiply this section's request count by
+        # roughly 4x every single run. Capped instead to the top N Heat-Map-only
+        # movers by |% change| (the same "biggest moves surface fastest"
+        # principle already used for the Heat Map's own cell ordering), so this
+        # stays a modest, bounded addition rather than an unmeasured explosion.
         ranked_stocks = {}
         for section in ("volume", "gainers", "losers"):
             for row in screener.get(section, []):
                 ranked_stocks[row["symbol"]] = row.get("name", row["symbol"])
-        print(f"Fetching news for {len(ranked_stocks)} screener-ranked stocks (volume/gainers/losers)...")
+        gvl_symbol_count = len(ranked_stocks)
+
+        # Broker-target enrichment (Yahoo) — a SEPARATE step from LSE market
+        # data, restoring the targetMeanPrice/targetHighPrice/targetLowPrice/
+        # analyst-count fields the LSE migration lost (LSE's own market-data
+        # response has no broker-consensus fields at all). Scoped to
+        # Volume/Gainers/Losers only — the SAME scope this feature already
+        # had before the LSE migration (never included Heat Map) — and
+        # deduped against watchlist symbols, which already get their own
+        # target price via the existing per-ticker quotes lookup elsewhere.
+        # This NEVER touches price/changePct/volume — those stay exactly as
+        # LSE supplied them; only the broker-consensus fields are attached.
+        watchlist_tickers_set = {stock["ticker"] for stock in watchlist}
+        broker_enrichment_symbols = [
+            s for s in ranked_stocks if s not in watchlist_tickers_set
+        ] if screener_source.get("gainers") == "LSE" else []
+        broker_enrichment_count = 0
+        broker_target_by_symbol = {}
+        for symbol in broker_enrichment_symbols:
+            enrichment = fetch_yahoo_broker_target(symbol)
+            broker_enrichment_count += 1
+            if enrichment:
+                broker_target_by_symbol[symbol] = enrichment
+        if broker_enrichment_symbols:
+            print(f"  > Broker-target enrichment (Yahoo): {broker_enrichment_count} request(s) for "
+                  f"{len(broker_enrichment_symbols)} Volume/Gainers/Losers symbol(s) not already on "
+                  f"the watchlist, {len(broker_target_by_symbol)} genuine target(s) found")
+        for section in ("volume", "gainers", "losers"):
+            for row in screener.get(section, []):
+                enrichment = broker_target_by_symbol.get(row["symbol"])
+                if enrichment:
+                    # Attached alongside, never replacing, the LSE-sourced
+                    # price/changePct/volume fields already on this row.
+                    row.update(enrichment)
+                    row["brokerTargetSource"] = "Yahoo Finance (enrichment)"
+
+        HEATMAP_NEWS_CAP = 15
+        heatmap_only_candidates = [
+            row for row in (heatmap_instruments or [])
+            if row.get("symbol") and row["symbol"] not in ranked_stocks
+        ]
+        heatmap_only_candidates.sort(key=lambda r: abs(r.get("changePct") or 0), reverse=True)
+        heatmap_added = 0
+        for row in heatmap_only_candidates[:HEATMAP_NEWS_CAP]:
+            ranked_stocks[row["symbol"]] = row.get("name", row["symbol"])
+            heatmap_added += 1
+
+        print(f"Fetching news for {len(ranked_stocks)} screener-ranked stocks "
+              f"({gvl_symbol_count} volume/gainers/losers + {heatmap_added} Heat-Map-only, "
+              f"capped at {HEATMAP_NEWS_CAP})...")
         for symbol, name in ranked_stocks.items():
             # Search using a cleaned name (see clean_company_name docstring) — the
             # dashboard still displays the full "name" as-is, only the search query
