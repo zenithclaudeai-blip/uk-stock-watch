@@ -17,6 +17,7 @@ import os
 import re
 import sys
 import time
+import uuid
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -2004,7 +2005,44 @@ def _parse_lse_components_refresh(data):
     return out
 
 
-def _fetch_lse_components_refresh_raw(path, parameters, component_id, timeout=LSE_MARKET_DATA_TIMEOUT_SECONDS):
+def _lse_log(run_id, message):
+    """
+    Single logging helper for every LSE-related event this project
+    logs — added specifically to fix a real, confirmed problem: a
+    production run showed a ~3 minute gap between when a fetch actually
+    happened (its own embedded "retrieved" timestamp) and when its log
+    line was actually written to the Actions log, strongly indicating
+    heavy stdout buffering that made the log's physical line order
+    unreliable for reconstructing true chronology - explaining an
+    apparent "duplicate" fetch and a heatmap message appearing before
+    a Yahoo crumb line that should have logged earlier.
+
+    Every call includes: an explicit wall-clock timestamp (so true
+    chronology is recoverable even if buffering reorders lines), a
+    run_id shared by every LSE call within ONE poll run (so a genuine
+    duplicate fetch - same run_id, same event, twice - is
+    distinguishable from output that merely LOOKS duplicated because
+    two separate runs' buffered output interleaved), and flush=True so
+    this specific line is written immediately rather than sitting in a
+    buffer that might never fully flush before the process exits.
+    Printed to stderr, which is unbuffered by Python's own default
+    (unlike stdout) - flush=True is added on top as a second guarantee,
+    not a replacement for choosing the right stream.
+    """
+    ts = datetime.now(timezone.utc).isoformat()
+    print(f"[{ts}] [{run_id}] {message}", file=sys.stderr, flush=True)
+
+
+def new_lse_run_id():
+    """A short, unique identifier for one poll run's worth of LSE calls
+    — generated once per main() execution and threaded through every
+    LSE fetch this run makes, so log lines can be grouped by run
+    unambiguously."""
+    return uuid.uuid4().hex[:8]
+
+
+def _fetch_lse_components_refresh_raw(path, parameters, component_id, timeout=LSE_MARKET_DATA_TIMEOUT_SECONDS,
+                                       label="components/refresh", run_id=None):
     """
     The single shared request/error-handling core for EVERY LSE
     components/refresh call this project makes — market data, heatmap,
@@ -2020,7 +2058,18 @@ def _fetch_lse_components_refresh_raw(path, parameters, component_id, timeout=LS
     just a generic exception message, since "which of the 4 LSE calls
     this run failed, and why" needs to be diagnosable from the log
     alone, not guessed at afterward.
+
+    label identifies which of the three LSE fetches this is
+    ("Screener", "Heatmap", "News Explorer") for logging only — never
+    affects the request itself. run_id ties every log line from this
+    call to the SAME poll run, so a genuine duplicate fetch (identical
+    run_id, same label, twice) is distinguishable from output that
+    merely looks duplicated due to buffered/reordered log lines from
+    different runs.
     """
+    if run_id is None:
+        run_id = new_lse_run_id()
+    _lse_log(run_id, f"LSE {label}: FETCH START (path={path!r}, parameters={parameters!r})")
     retrieved_at = datetime.now(timezone.utc).isoformat()
     body = json.dumps({
         "path": path,
@@ -2040,17 +2089,22 @@ def _fetch_lse_components_refresh_raw(path, parameters, component_id, timeout=LS
             error_detail = e.read().decode("utf-8", errors="replace")[:300]
         except Exception:
             pass
-        return None, retrieved_at, f"HTTP {e.code} {e.reason}" + (f" — {error_detail}" if error_detail else "")
+        error_msg = f"HTTP {e.code} {e.reason}" + (f" — {error_detail}" if error_detail else "")
+        _lse_log(run_id, f"LSE {label}: RESULT — FAILED — {error_msg}")
+        return None, retrieved_at, error_msg
     except Exception as e:
+        _lse_log(run_id, f"LSE {label}: RESULT — FAILED — {type(e).__name__}: {e}")
         return None, retrieved_at, str(e)
+    _lse_log(run_id, f"LSE {label}: RESULT — HTTP {resp.status}, {len(raw)} bytes")
     try:
         parsed = json.loads(raw)
     except Exception as e:
+        _lse_log(run_id, f"LSE {label}: PARSE FAILED — {type(e).__name__}: {e}")
         return None, retrieved_at, f"invalid JSON: {e}"
     return parsed, retrieved_at, None
 
 
-def fetch_lse_ftse100_market_data(tab, timeout=LSE_MARKET_DATA_TIMEOUT_SECONDS):
+def fetch_lse_ftse100_market_data(tab, timeout=LSE_MARKET_DATA_TIMEOUT_SECONDS, run_id=None):
     """
     Fetches genuine FTSE 100 market data directly from LSE's own
     first-party endpoint — the PRIMARY source for this data, not a
@@ -2065,9 +2119,12 @@ def fetch_lse_ftse100_market_data(tab, timeout=LSE_MARKET_DATA_TIMEOUT_SECONDS):
     """
     if tab not in LSE_TAB_CONFIG:
         raise ValueError(f"Unknown LSE tab '{tab}' - must be one of {list(LSE_TAB_CONFIG)}")
+    if run_id is None:
+        run_id = new_lse_run_id()
+    label = "Screener" if tab == "risersFallersVolume" else "Heatmap"
     cfg = LSE_TAB_CONFIG[tab]
     parsed, retrieved_at, error = _fetch_lse_components_refresh_raw(
-        "ftse-constituents", cfg["parameters"], cfg["componentId"], timeout)
+        "ftse-constituents", cfg["parameters"], cfg["componentId"], timeout, label=label, run_id=run_id)
 
     if error:
         print(f"  ! LSE market data fetch failed for tab={tab}: {error}", file=sys.stderr)
@@ -2076,11 +2133,14 @@ def fetch_lse_ftse100_market_data(tab, timeout=LSE_MARKET_DATA_TIMEOUT_SECONDS):
 
     instruments = _parse_lse_components_refresh(parsed)
     if not instruments:
+        _lse_log(run_id, f"LSE {label}: PARSED 0 instruments — no genuine instrument rows "
+                          f"found in an otherwise successful response — treating as a failure")
         print(f"  ! LSE market data for tab={tab}: response parsed but no genuine "
               f"instrument rows found — treating as a failure, not an empty-but-valid result", file=sys.stderr)
         return {"status": "failed", "source": "LSE", "retrievedAt": retrieved_at,
                 "instruments": [], "error": "no instrument rows found in response"}
 
+    _lse_log(run_id, f"LSE {label}: PARSED {len(instruments)} instruments")
     print(f"  > LSE market data for tab={tab}: {len(instruments)} instruments, retrieved {retrieved_at}")
     return {"status": "ok", "source": "LSE", "retrievedAt": retrieved_at,
             "instruments": instruments, "error": None}
@@ -2147,7 +2207,7 @@ def _parse_lse_news_explorer(data):
     }
 
 
-def fetch_lse_news_explorer(timeout=LSE_NEWS_TIMEOUT_SECONDS):
+def fetch_lse_news_explorer(timeout=LSE_NEWS_TIMEOUT_SECONDS, run_id=None):
     """
     Fetches genuine LSE News Explorer stories directly from LSE's own
     first-party endpoint — the PRIMARY source, not a fallback. There is
@@ -2159,23 +2219,41 @@ def fetch_lse_news_explorer(timeout=LSE_NEWS_TIMEOUT_SECONDS):
     Returns {"status": "ok"|"failed", "source": "LSE", "retrievedAt":
     iso timestamp, "stories": [...], "totalElements": int|None,
     "totalPages": int|None, "error": str|None}.
+
+    Guaranteed to log exactly one of a FETCH START line (via the
+    shared _fetch_lse_components_refresh_raw core) followed by either a
+    PARSED-stories line or a FAILED line — there is no path through
+    this function that returns without both having happened. This was
+    added specifically because a production run showed zero log
+    evidence, in either direction, of this function ever having run —
+    confirmed via static analysis to have no enclosing try/except that
+    could have swallowed an exception here, so the most likely
+    explanation was buffered output being lost, not a genuine silent
+    skip. These explicit, flushed lines close that gap for good.
     """
+    if run_id is None:
+        run_id = new_lse_run_id()
     parsed, retrieved_at, error = _fetch_lse_components_refresh_raw(
-        LSE_NEWS_PATH, LSE_NEWS_PARAMETERS, LSE_NEWS_COMPONENT_ID, timeout)
+        LSE_NEWS_PATH, LSE_NEWS_PARAMETERS, LSE_NEWS_COMPONENT_ID, timeout, label="News Explorer", run_id=run_id)
 
     if error:
+        _lse_log(run_id, f"LSE News Explorer: FAILED — {error}")
         print(f"  ! LSE News Explorer fetch failed: {error}", file=sys.stderr)
         return {"status": "failed", "source": "LSE", "retrievedAt": retrieved_at,
                 "stories": [], "totalElements": None, "totalPages": None, "error": error}
 
     parsed_news = _parse_lse_news_explorer(parsed)
     if parsed_news is None:
+        _lse_log(run_id, "LSE News Explorer: FAILED — response parsed but no newsexplorersearch "
+                          "block found")
         print(f"  ! LSE News Explorer: response parsed but no newsexplorersearch block "
               f"found — treating as a failure, not an empty-but-valid result", file=sys.stderr)
         return {"status": "failed", "source": "LSE", "retrievedAt": retrieved_at,
                 "stories": [], "totalElements": None, "totalPages": None,
                 "error": "no newsexplorersearch block found in response"}
 
+    _lse_log(run_id, f"LSE News Explorer: {len(parsed_news['stories'])} stories "
+                      f"(totalElements={parsed_news['totalElements']}, totalPages={parsed_news['totalPages']})")
     print(f"  > LSE News Explorer: {len(parsed_news['stories'])} stories "
           f"(totalElements={parsed_news['totalElements']}, totalPages={parsed_news['totalPages']}), "
           f"retrieved {retrieved_at}")
@@ -2186,7 +2264,7 @@ def fetch_lse_news_explorer(timeout=LSE_NEWS_TIMEOUT_SECONDS):
     }
 
 
-def fetch_lse_screener_primary(raw_count=10, display_count=10):
+def fetch_lse_screener_primary(raw_count=10, display_count=10, run_id=None):
     """
     LSE-primary replacement for fetch_lse_screener(): tries the genuine
     LSE first-party endpoint FIRST for Volume/Gainers/Losers (all three
@@ -2218,7 +2296,9 @@ def fetch_lse_screener_primary(raw_count=10, display_count=10):
     second POST to the same LSE endpoint within the same poll run,
     which is a real, avoidable rate-limiting risk factor.
     """
-    lse_result = fetch_lse_ftse100_market_data("risersFallersVolume")
+    if run_id is None:
+        run_id = new_lse_run_id()
+    lse_result = fetch_lse_ftse100_market_data("risersFallersVolume", run_id=run_id)
     source_dict = {"volume": "LSE", "gainers": "LSE", "losers": "LSE"}
 
     if lse_result["status"] == "ok":
@@ -2236,10 +2316,13 @@ def fetch_lse_screener_primary(raw_count=10, display_count=10):
     # LSE failed entirely for this run — fall back to the existing,
     # already-working Yahoo-based screener, clearly labeled as a
     # fallback rather than silently presented as if it were LSE data.
+    _lse_log(run_id, f"Yahoo fallback: START (reason: LSE market data unavailable — {lse_result['error']})")
     print(f"  ! LSE market data unavailable ({lse_result['error']}) — falling back to Yahoo "
           f"for Volume/Gainers/Losers this run", file=sys.stderr)
     screener, status = fetch_lse_screener(raw_count)
     source_dict = {"volume": "Yahoo (fallback)", "gainers": "Yahoo (fallback)", "losers": "Yahoo (fallback)"}
+    _lse_log(run_id, f"Yahoo fallback: END — volume={len(screener.get('volume', []))}, "
+                      f"gainers={len(screener.get('gainers', []))}, losers={len(screener.get('losers', []))}")
     return screener, status, source_dict, None
 
 
@@ -6711,8 +6794,15 @@ def main():
         # internally for its own liquidity filter.
         ftse_universe_names, ftse_universe_source = load_ftse_universe()
         ftse_universe_status = ftse_universe_status_label(ftse_universe_source)
+        # ONE run_id shared by every LSE call this poll run makes — added
+        # specifically so a genuine duplicate fetch (same run_id, same
+        # label, twice) is distinguishable from output that only LOOKS
+        # duplicated due to buffered/reordered log lines. See _lse_log's
+        # own docstring for the full reasoning.
+        lse_run_id = new_lse_run_id()
+        _lse_log(lse_run_id, "LSE poll sequence: START (Screener -> Heatmap -> News Explorer)")
         screener, screener_status, screener_source, screener_lse_result = fetch_lse_screener_primary(
-            raw_count=60 if ftse_universe_names is not None else 10, display_count=10)
+            raw_count=60 if ftse_universe_names is not None else 10, display_count=10, run_id=lse_run_id)
         # A genuine, logged-every-run coverage check — not an assumption
         # made once and never re-verified. Only meaningful when LSE was
         # actually the source this run; skipped (not fabricated) when we
@@ -6751,7 +6841,7 @@ def main():
         # failure — render_dashboard already knows how to build the
         # heatmap pool from screener[gainers]/[losers] alone when this
         # is absent, so nothing breaks, it's just a narrower pool.
-        heatmap_lse_result = fetch_lse_ftse100_market_data("heatmap")
+        heatmap_lse_result = fetch_lse_ftse100_market_data("heatmap", run_id=lse_run_id)
         if heatmap_lse_result["status"] == "ok":
             heatmap_instruments = heatmap_lse_result["instruments"]
             heatmap_source = "LSE"
@@ -6771,9 +6861,12 @@ def main():
         # (regulatory/company announcement data), so failure here means
         # an honest "unavailable" state, never a substitute silently
         # presented as if it were the same thing.
-        news_explorer_result = fetch_lse_news_explorer()
+        news_explorer_result = fetch_lse_news_explorer(run_id=lse_run_id)
         if news_explorer_result["status"] != "ok":
             print(f"!!! LSE NEWS EXPLORER FETCH FAILED this run: {news_explorer_result['error']}", file=sys.stderr)
+
+        _lse_log(lse_run_id, f"LSE poll sequence: END — Screener={screener_source.get('gainers')}, "
+                              f"Heatmap={heatmap_source}, News Explorer={news_explorer_result['status']}")
 
         # The FTSE-universe name filter below exists specifically to correct
         # Yahoo's broader GB-region screener down to genuine FTSE 100/250
@@ -7613,6 +7706,11 @@ def main():
         send_webhook(skip_msg)
 
     print(f"Done. {len(new_alerts)} new alert(s) found, {len(alerts_to_send)} sent to WhatsApp.")
+    # Explicit, immediately-flushed overall completion marker — not
+    # LSE-specific, but ties off the same chronology gap: confirms the
+    # whole poll run reached its natural end, not just that individual
+    # steps along the way logged successfully.
+    print(f"[{datetime.now(timezone.utc).isoformat()}] POLL RUN COMPLETE", file=sys.stderr, flush=True)
 
     if new_alerts:
         time.sleep(2)  # gap before heartbeat/digest, same reasoning as between alerts
