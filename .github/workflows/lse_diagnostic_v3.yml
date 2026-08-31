@@ -1,0 +1,32 @@
+name: LSE Data Source Diagnostic v3
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Playwright and browser
+        run: |
+          pip install playwright
+          playwright install chromium --with-deps
+
+      - name: Run diagnostic v3
+        run: python diagnose_lse_data_sources_v3.py
+
+      - name: Upload full report as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lse-diagnostic-report-v3
+          path: lse_diagnostic_report_v3.json
+          retention-days: 14
