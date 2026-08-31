@@ -2014,6 +2014,12 @@ def _fetch_lse_components_refresh_raw(path, parameters, component_id, timeout=LS
     Never raises — every failure mode (network, timeout, invalid JSON)
     is caught and returned as a clear error string, never silently
     swallowed and never partially-populated.
+
+    HTTP error responses (4xx/5xx — e.g. rate-limiting) are reported
+    with their actual status code explicitly in the error string, not
+    just a generic exception message, since "which of the 4 LSE calls
+    this run failed, and why" needs to be diagnosable from the log
+    alone, not guessed at afterward.
     """
     retrieved_at = datetime.now(timezone.utc).isoformat()
     body = json.dumps({
@@ -2028,6 +2034,13 @@ def _fetch_lse_components_refresh_raw(path, parameters, component_id, timeout=LS
     try:
         resp = urllib.request.urlopen(req, timeout=timeout)
         raw = resp.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as e:
+        error_detail = ""
+        try:
+            error_detail = e.read().decode("utf-8", errors="replace")[:300]
+        except Exception:
+            pass
+        return None, retrieved_at, f"HTTP {e.code} {e.reason}" + (f" — {error_detail}" if error_detail else "")
     except Exception as e:
         return None, retrieved_at, str(e)
     try:
@@ -2195,6 +2208,15 @@ def fetch_lse_screener_primary(raw_count=10, display_count=10):
     construction, so it's always trimmed straight to display_count.
     Passing raw_count's larger over-fetch value into the LSE path's own
     slice would silently return far more rows than intended for display.
+
+    Returns a 4th value, lse_result: the FULL fetch_lse_ftse100_market_data()
+    result dict (including "instruments" and "retrievedAt") when LSE
+    succeeded, or None when the Yahoo fallback was used. Callers that
+    need the raw instrument list or the exact retrieval timestamp (e.g.
+    the coverage check, or displaying "Retrieved: ...") should use this
+    rather than re-fetching — reusing it avoids an entirely redundant
+    second POST to the same LSE endpoint within the same poll run,
+    which is a real, avoidable rate-limiting risk factor.
     """
     lse_result = fetch_lse_ftse100_market_data("risersFallersVolume")
     source_dict = {"volume": "LSE", "gainers": "LSE", "losers": "LSE"}
@@ -2209,7 +2231,7 @@ def fetch_lse_screener_primary(raw_count=10, display_count=10):
                             key=lambda r: r["changePct"])[:display_count]
         screener = {"volume": by_volume, "gainers": by_gainers, "losers": by_losers}
         status = {"volume": "ok", "gainers": "ok", "losers": "ok"}
-        return screener, status, source_dict
+        return screener, status, source_dict, lse_result
 
     # LSE failed entirely for this run — fall back to the existing,
     # already-working Yahoo-based screener, clearly labeled as a
@@ -2218,22 +2240,30 @@ def fetch_lse_screener_primary(raw_count=10, display_count=10):
           f"for Volume/Gainers/Losers this run", file=sys.stderr)
     screener, status = fetch_lse_screener(raw_count)
     source_dict = {"volume": "Yahoo (fallback)", "gainers": "Yahoo (fallback)", "losers": "Yahoo (fallback)"}
-    return screener, status, source_dict
+    return screener, status, source_dict, None
 
 
-def check_lse_ftse100_coverage():
+def check_lse_ftse100_coverage(instruments=None):
     """
-    A genuine constituent-coverage check, not an assumption: fetches the
-    FULL LSE risersFallersVolume response (which — being a single
-    "risers and fallers" component — genuinely may not return all ~100
-    constituents; it's fundamentally a MOVERS list, not necessarily an
-    exhaustive constituent dump) and the independently-sourced FTSE 100
-    constituent list (yfiua's ticker+name JSON, already used elsewhere
-    in this project), then reports exactly how many of each were
-    matched, unmatched, or duplicated — by ticker, falling back to a
-    cleaned company-name comparison for any row whose extracted
-    "symbol" turned out to be an ISIN (this project's own honest
-    fallback when a genuine ticker field wasn't confirmed present).
+    A genuine constituent-coverage check, not an assumption: compares
+    the FULL LSE risersFallersVolume instrument list against the
+    independently-sourced FTSE 100 constituent list (yfiua's ticker+name
+    JSON, already used elsewhere in this project), then reports exactly
+    how many of each were matched, unmatched, or duplicated — by
+    ticker, falling back to a cleaned company-name comparison for any
+    row whose extracted "symbol" turned out to be an ISIN (this
+    project's own honest fallback when a genuine ticker field wasn't
+    confirmed present).
+
+    instruments, if provided, is the ALREADY-FETCHED instrument list
+    from this run's own fetch_lse_screener_primary() call — reusing it
+    here avoids a second, entirely redundant POST to the same LSE
+    endpoint within the same poll run. Multiple rapid back-to-back
+    requests to the same first-party endpoint is a real, avoidable risk
+    factor for rate-limiting, and this coverage check has no need to
+    re-fetch data this run already has. If instruments is None (e.g.
+    called standalone, outside the normal poll flow), it fetches fresh,
+    same as before.
 
     Returns a dict with the full breakdown. Logs a clear summary either
     way — this function's job is to report the truth, not to make LSE
@@ -2251,13 +2281,14 @@ def check_lse_ftse100_coverage():
     expected_tickers = {r["ticker"].upper() for r in ftse100_rows if r.get("ticker")}
     expected_names = {clean_company_name(r["name"]).lower() for r in ftse100_rows if r.get("name")}
 
-    lse_result = fetch_lse_ftse100_market_data("risersFallersVolume")
-    if lse_result["status"] != "ok":
-        print(f"  ! Coverage check: LSE fetch itself failed ({lse_result['error']}) — "
-              f"cannot verify coverage this run", file=sys.stderr)
-        return {"status": "failed", "error": lse_result["error"]}
+    if instruments is None:
+        lse_result = fetch_lse_ftse100_market_data("risersFallersVolume")
+        if lse_result["status"] != "ok":
+            print(f"  ! Coverage check: LSE fetch itself failed ({lse_result['error']}) — "
+                  f"cannot verify coverage this run", file=sys.stderr)
+            return {"status": "failed", "error": lse_result["error"]}
+        instruments = lse_result["instruments"]
 
-    instruments = lse_result["instruments"]
     seen_tickers = set()
     matched, unmatched, duplicates = [], [], []
     for row in instruments:
@@ -4590,6 +4621,9 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
 
     screener_status = data.get("screenerStatus", {})
     screener_source = data.get("screenerSource", {})
+    screener_retrieved_at = data.get("screenerRetrievedAt")
+    heatmap_retrieved_at = data.get("heatmapRetrievedAt")
+    lse_coverage_report = data.get("lseCoverageReport", {})
     news_explorer = data.get("newsExplorer", {})
 
     def screener_empty_state_html(section_key):
@@ -5618,33 +5652,64 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
             return '<span class="meta">No significant movers found this run (checked successfully, markets were open).</span>'
         return '<span class="meta">No significant movers found this run (checked successfully).</span>'
 
-    # Explicit, visible universe/source status — never let a drop from full FTSE
-    # 100+250 coverage down to FTSE-100-only, a stale cache, or fully unrestricted
-    # scoring stay invisible on the actual page just because the workflow log said so.
-    _universe_status_html = {
-        "healthy": ('status-ok', f'✅ Universe: FTSE 100 + FTSE 250 ({ftse_universe_count} constituents)'),
-        "degraded_ftse100_only": ('status-warn', f'⚠️ Universe: FTSE 100 ONLY — FTSE 250 source unavailable, no fallback data exists yet ({ftse_universe_count} constituents, screener coverage reduced)'),
-        "stale_cache": ('status-warn', f'⚠️ Universe: using last known-good cached list (source={esc_safe(ftse_universe_source)}, {ftse_universe_count} constituents) — today\'s refresh failed'),
-        "unavailable": ('status-bad', '🛑 Universe: UNAVAILABLE — screener showing the whole unrestricted LSE, no FTSE 100/250 filtering applied this run'),
-        "not_checked": ('status-warn', 'ℹ️ Universe: not checked this run (hourly-only cycle)'),
-        "unknown": ('status-warn', f'⚠️ Universe: unrecognized status (source={esc_safe(ftse_universe_source)})'),
-    }
-    _status_class, _status_text = _universe_status_html.get(ftse_universe_status, _universe_status_html["unknown"])
-    universe_status_line = f'<p class="{_status_class}">{_status_text}</p>'
-
     # Explicit, visible data-source line — Volume/Gainers/Losers are either
     # ALL genuinely from LSE's own first-party endpoint, or ALL from the
     # Yahoo fallback (never a silent per-row mix of the two) — this makes
     # which one happened this run impossible to miss.
     _screener_sources_seen = set(screener_source.values()) if screener_source else set()
+    _screener_retrieved_html = (
+        f' · Retrieved: {esc(format_london_and_utc(datetime.fromisoformat(screener_retrieved_at)))}'
+        if screener_retrieved_at else ""
+    )
     if not _screener_sources_seen or _screener_sources_seen == {"not_checked"}:
         screener_source_line = '<p class="status-warn">ℹ️ Data source: not checked this run</p>'
     elif _screener_sources_seen == {"LSE"}:
-        screener_source_line = '<p class="status-ok">✅ Data source: LSE (London Stock Exchange, first-party)</p>'
+        screener_source_line = f'<p class="status-ok">✅ Data source: LSE (London Stock Exchange, first-party){_screener_retrieved_html}</p>'
     elif _screener_sources_seen == {"Yahoo (fallback)"}:
         screener_source_line = '<p class="status-warn">⚠️ Data source: Yahoo Finance (fallback — LSE unavailable this run)</p>'
     else:
         screener_source_line = f'<p class="status-warn">⚠️ Data source: mixed this run ({dict(screener_source)})</p>'
+
+    # The universe/coverage line — its MEANING depends entirely on which
+    # source is actually active this run, never shown as a stale,
+    # unrelated description of a mechanism that isn't even in use. When
+    # LSE is the source, this describes LSE's own genuine FTSE 100
+    # coverage (real matched/unmatched counts from the coverage check,
+    # never assumed) — the OLD "FTSE 100 + FTSE 250 (350)" line
+    # describes the Yahoo-fallback's own filtering scope specifically,
+    # and is only meaningful/shown when Yahoo is actually what's running
+    # this cycle.
+    if _screener_sources_seen == {"LSE"}:
+        cov = lse_coverage_report or {}
+        if cov.get("status") == "ok":
+            expected, matched, unmatched = cov.get("ftse100Expected", 0), cov.get("matched", 0), cov.get("unmatched", 0)
+            cov_class = "status-ok" if expected and matched >= expected * 0.9 else "status-warn"
+            cov_icon = "✅" if cov_class == "status-ok" else "⚠️"
+            universe_status_line = (
+                f'<p class="{cov_class}">{cov_icon} Universe: FTSE 100 (LSE first-party) — '
+                f'{matched}/{expected} constituent(s) matched, {unmatched} unmatched, '
+                f'{cov.get("lseInstrumentsReturned", 0)} instrument(s) in this response</p>'
+            )
+        else:
+            universe_status_line = (
+                '<p class="status-warn">ℹ️ Universe: FTSE 100 (LSE first-party) — '
+                'coverage not verified this run</p>'
+            )
+    else:
+        # Explicit, visible universe/source status — never let a drop from full FTSE
+        # 100+250 coverage down to FTSE-100-only, a stale cache, or fully unrestricted
+        # scoring stay invisible on the actual page just because the workflow log said so.
+        # Only relevant/shown when Yahoo is genuinely the active fallback source.
+        _universe_status_html = {
+            "healthy": ('status-ok', f'✅ Universe (Yahoo fallback): FTSE 100 + FTSE 250 ({ftse_universe_count} constituents)'),
+            "degraded_ftse100_only": ('status-warn', f'⚠️ Universe (Yahoo fallback): FTSE 100 ONLY — FTSE 250 source unavailable, no fallback data exists yet ({ftse_universe_count} constituents, screener coverage reduced)'),
+            "stale_cache": ('status-warn', f'⚠️ Universe (Yahoo fallback): using last known-good cached list (source={esc_safe(ftse_universe_source)}, {ftse_universe_count} constituents) — today\'s refresh failed'),
+            "unavailable": ('status-bad', '🛑 Universe (Yahoo fallback): UNAVAILABLE — screener showing the whole unrestricted LSE, no FTSE 100/250 filtering applied this run'),
+            "not_checked": ('status-warn', 'ℹ️ Universe: not checked this run (hourly-only cycle)'),
+            "unknown": ('status-warn', f'⚠️ Universe (Yahoo fallback): unrecognized status (source={esc_safe(ftse_universe_source)})'),
+        }
+        _status_class, _status_text = _universe_status_html.get(ftse_universe_status, _universe_status_html["unknown"])
+        universe_status_line = f'<p class="{_status_class}">{_status_text}</p>'
 
     def research_card(stock):
         ticker, name = stock["ticker"], stock["name"]
@@ -6002,7 +6067,9 @@ nav[aria-label="Section navigation"] a{{white-space:nowrap}}
 {radar_stocks_html}
 
 <h2 id="heatmap">🗺️ Heat Map (top movers, by size of move)</h2>
-{'<p class="status-ok">✅ Data source: LSE (London Stock Exchange, first-party)</p>' if _heatmap_instruments else '<p class="status-warn">⚠️ Data source: derived from Screener Gainers/Losers (dedicated LSE heatmap unavailable this run)</p>'}
+{('<p class="status-ok">✅ Data source: LSE (London Stock Exchange, first-party)'
+  + (' · Retrieved: ' + esc(format_london_and_utc(datetime.fromisoformat(heatmap_retrieved_at))) if heatmap_retrieved_at else '')
+  + '</p>') if _heatmap_instruments else '<p class="status-warn">⚠️ Data source: derived from Screener Gainers/Losers (dedicated LSE heatmap unavailable this run)</p>'}
 <div class="heatmap-grid">{heatmap_cells or heatmap_empty_state_html()}</div>
 
 <h2 id="screener">📊 LSE Screener (Volume / Gainers / Losers)</h2>
@@ -6582,10 +6649,13 @@ def main():
     screener = {}
     screener_status = {"volume": "not_checked", "gainers": "not_checked", "losers": "not_checked"}
     screener_source = {"volume": "not_checked", "gainers": "not_checked", "losers": "not_checked"}
+    screener_lse_result = None
     heatmap_instruments = None
     heatmap_source = "not_checked"
+    heatmap_lse_result = None
     news_explorer_result = {"status": "not_checked", "source": "LSE", "retrievedAt": None,
                              "stories": [], "totalElements": None, "totalPages": None, "error": None}
+    lse_coverage_report = {"status": "not_checked"}
     ratings_fetch_failed = None  # None = not attempted this run (SKIP_MARKET_WIDE), True/False once it is
     ft_fetch_failed = None
     ft_items_pool = []
@@ -6641,20 +6711,37 @@ def main():
         # internally for its own liquidity filter.
         ftse_universe_names, ftse_universe_source = load_ftse_universe()
         ftse_universe_status = ftse_universe_status_label(ftse_universe_source)
-        screener, screener_status, screener_source = fetch_lse_screener_primary(
+        screener, screener_status, screener_source, screener_lse_result = fetch_lse_screener_primary(
             raw_count=60 if ftse_universe_names is not None else 10, display_count=10)
         # A genuine, logged-every-run coverage check — not an assumption
         # made once and never re-verified. Only meaningful when LSE was
         # actually the source this run; skipped (not fabricated) when we
         # fell back to Yahoo, since there's nothing LSE-specific to check.
-        if screener_source.get("gainers") == "LSE":
+        # Reuses screener_lse_result's OWN already-fetched instruments —
+        # this used to make a second, entirely redundant POST to the
+        # same LSE endpoint; that redundancy has been removed, both to
+        # cut needless load and to reduce the number of rapid
+        # back-to-back requests this run makes to the same first-party
+        # endpoint (a real, avoidable rate-limiting risk factor).
+        if screener_source.get("gainers") == "LSE" and screener_lse_result is not None:
             try:
-                lse_coverage_report = check_lse_ftse100_coverage()
+                lse_coverage_report = check_lse_ftse100_coverage(instruments=screener_lse_result["instruments"])
             except Exception as e:
                 print(f"  ! LSE coverage check itself failed unexpectedly: {e}", file=sys.stderr)
                 lse_coverage_report = {"status": "failed", "error": str(e)}
         else:
             lse_coverage_report = {"status": "skipped", "reason": "LSE was not the source this run"}
+
+        # A short, deliberate pause between separate LSE components/refresh
+        # calls within the same run. The pattern actually observed live
+        # (Screener's own call succeeding while Heatmap's and News
+        # Explorer's subsequent calls failed) is consistent with
+        # rate-limiting from rapid back-to-back requests to the same
+        # first-party endpoint — this doesn't attempt to defeat any
+        # anti-bot mechanism, it simply behaves less like a burst of
+        # automated requests, which is a legitimate, ordinary thing for
+        # any well-behaved client to do.
+        time.sleep(2)
 
         # Dedicated LSE heatmap fetch — a genuinely broader FTSE 100 pool
         # than just the top-10 gainers/losers already in screener (which
@@ -6672,8 +6759,13 @@ def main():
         else:
             heatmap_instruments = None
             heatmap_source = "unavailable"
-            print(f"  ! LSE heatmap fetch failed ({heatmap_lse_result['error']}) — heat map will use "
-                  f"the narrower gainers/losers pool instead", file=sys.stderr)
+            # Loud, unmistakable — this is exactly the failure mode that
+            # was previously silent-ish (a single "!" line easy to miss
+            # in a long log) while the live dashboard quietly fell back.
+            print(f"!!! LSE HEATMAP FETCH FAILED this run: {heatmap_lse_result['error']} "
+                  f"— heat map will use the narrower gainers/losers pool instead", file=sys.stderr)
+
+        time.sleep(2)
 
         # News Explorer — genuinely no Yahoo equivalent exists for this
         # (regulatory/company announcement data), so failure here means
@@ -6681,7 +6773,7 @@ def main():
         # presented as if it were the same thing.
         news_explorer_result = fetch_lse_news_explorer()
         if news_explorer_result["status"] != "ok":
-            print(f"  ! LSE News Explorer unavailable this run ({news_explorer_result['error']})", file=sys.stderr)
+            print(f"!!! LSE NEWS EXPLORER FETCH FAILED this run: {news_explorer_result['error']}", file=sys.stderr)
 
         # The FTSE-universe name filter below exists specifically to correct
         # Yahoo's broader GB-region screener down to genuine FTSE 100/250
@@ -7292,8 +7384,11 @@ def main():
         "screener": screener,
         "screenerStatus": screener_status,
         "screenerSource": screener_source,
+        "screenerRetrievedAt": screener_lse_result["retrievedAt"] if screener_lse_result else None,
+        "lseCoverageReport": lse_coverage_report,
         "heatmapInstruments": heatmap_instruments,
         "heatmapSource": heatmap_source,
+        "heatmapRetrievedAt": heatmap_lse_result["retrievedAt"] if heatmap_lse_result and heatmap_lse_result.get("status") == "ok" else None,
         "newsExplorer": news_explorer_result,
         "ftse100": ftse100,
         "screenerNews": screener_news,
