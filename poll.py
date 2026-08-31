@@ -5407,7 +5407,16 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
     # different layout system. Capped at a modest total (24, a small
     # increase from the prior flat 20) so this stays a quick visual scan,
     # not a wall of every sector fully expanded.
-    heatmap_pool = (screener.get("gainers", []) + screener.get("losers", []))
+    # Prefer the dedicated, broader LSE heatmap fetch (genuinely more of
+    # the FTSE 100, not just the 20 stocks already surfaced as top
+    # gainers/losers) — falls back to the narrower gainers+losers pool,
+    # unchanged from before, when the dedicated heatmap fetch wasn't
+    # available this run. Never silently mixes the two within one pool.
+    _heatmap_instruments = data.get("heatmapInstruments")
+    if _heatmap_instruments:
+        heatmap_pool = list(_heatmap_instruments)
+    else:
+        heatmap_pool = (screener.get("gainers", []) + screener.get("losers", []))
     heatmap_pool.sort(key=lambda q: abs(q.get("changePct") or 0), reverse=True)
     heatmap_pool = heatmap_pool[:24]
 
@@ -5831,6 +5840,7 @@ nav[aria-label="Section navigation"] a{{white-space:nowrap}}
 {radar_stocks_html}
 
 <h2 id="heatmap">🗺️ Heat Map (top movers, by size of move)</h2>
+{'<p class="status-ok">✅ Data source: LSE (London Stock Exchange, first-party)</p>' if _heatmap_instruments else '<p class="status-warn">⚠️ Data source: derived from Screener Gainers/Losers (dedicated LSE heatmap unavailable this run)</p>'}
 <div class="heatmap-grid">{heatmap_cells or heatmap_empty_state_html()}</div>
 
 <h2 id="screener">📊 LSE Screener (Volume / Gainers / Losers)</h2>
@@ -6399,6 +6409,8 @@ def main():
     screener = {}
     screener_status = {"volume": "not_checked", "gainers": "not_checked", "losers": "not_checked"}
     screener_source = {"volume": "not_checked", "gainers": "not_checked", "losers": "not_checked"}
+    heatmap_instruments = None
+    heatmap_source = "not_checked"
     ratings_fetch_failed = None  # None = not attempted this run (SKIP_MARKET_WIDE), True/False once it is
     ft_fetch_failed = None
     ft_items_pool = []
@@ -6468,6 +6480,25 @@ def main():
                 lse_coverage_report = {"status": "failed", "error": str(e)}
         else:
             lse_coverage_report = {"status": "skipped", "reason": "LSE was not the source this run"}
+
+        # Dedicated LSE heatmap fetch — a genuinely broader FTSE 100 pool
+        # than just the top-10 gainers/losers already in screener (which
+        # is what the heatmap grid fell back to before this). Uses the
+        # SAME proven fetch_lse_ftse100_market_data, just the "heatmap"
+        # tab specifically. Falls back to None (not a fabricated list) on
+        # failure — render_dashboard already knows how to build the
+        # heatmap pool from screener[gainers]/[losers] alone when this
+        # is absent, so nothing breaks, it's just a narrower pool.
+        heatmap_lse_result = fetch_lse_ftse100_market_data("heatmap")
+        if heatmap_lse_result["status"] == "ok":
+            heatmap_instruments = heatmap_lse_result["instruments"]
+            heatmap_source = "LSE"
+            print(f"  > LSE heatmap: {len(heatmap_instruments)} instruments for the full-coverage heat map pool")
+        else:
+            heatmap_instruments = None
+            heatmap_source = "unavailable"
+            print(f"  ! LSE heatmap fetch failed ({heatmap_lse_result['error']}) — heat map will use "
+                  f"the narrower gainers/losers pool instead", file=sys.stderr)
 
         # The FTSE-universe name filter below exists specifically to correct
         # Yahoo's broader GB-region screener down to genuine FTSE 100/250
@@ -7078,6 +7109,8 @@ def main():
         "screener": screener,
         "screenerStatus": screener_status,
         "screenerSource": screener_source,
+        "heatmapInstruments": heatmap_instruments,
+        "heatmapSource": heatmap_source,
         "ftse100": ftse100,
         "screenerNews": screener_news,
         "screenerNewsRecent": screener_news_recent,
