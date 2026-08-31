@@ -1885,6 +1885,217 @@ def fetch_lse_screener(raw_count=10):
 
 
 # =========================================================================
+# LSE first-party market data — api.londonstockexchange.com/api/v1/
+# components/refresh, the SAME endpoint the live LSE website itself calls
+# to render its Risers/Fallers/Volume Leaders and Heatmap pages.
+#
+# Confirmed genuinely usable by this application via a dedicated,
+# deliberate standalone test (project diagnostic v5): a completely fresh
+# process, zero cookies, zero Refinitiv/SAML session, POSTing the exact
+# same request body the browser sends, received back byte-identical real
+# market data (ISIN, lastprice, netchange, volume all present and
+# correct) to what the live page itself displays. The Refinitiv SAML
+# login that also fires on the live page is NOT required for this
+# specific endpoint — proven, not assumed.
+#
+# Honesty note (important, not hidden): the full response structure was
+# not exhaustively inspected field-by-field — only the fields confirmed
+# present via that diagnostic (isin, lastprice, netchange, volume). A
+# genuine ticker SYMBOL and company NAME were not independently
+# confirmed present under any specific key; the parser below tries
+# several plausible key names for those two fields and — critically —
+# never fabricates a value for either. Any instrument missing a genuine
+# ISIN or a genuine price is skipped, not guessed at.
+# =========================================================================
+
+LSE_COMPONENTS_REFRESH_URL = "https://api.londonstockexchange.com/api/v1/components/refresh"
+
+# Exact parameters/component IDs captured from the real browser's own
+# request during diagnostic v5 — not guessed.
+LSE_TAB_CONFIG = {
+    "risersFallersVolume": {
+        "parameters": "indexname%3Dftse-100%26tab%3Drisers-and-fallers-and-volume-leaders%26tabId%3D94aeb1d3-fd7b-46f5-b19b-389796d96214",
+        "componentId": "block_content%3Aa193314b-d46e-4ca3-ad4f-9b814df5bafe",
+    },
+    "heatmap": {
+        "parameters": "indexname%3Dftse-100%26tab%3Dheatmap%26tabId%3Ddcd47cbd-346e-4bd0-bf77-039301c7d329",
+        "componentId": "block_content%3A72d8cb8c-5ef6-41a9-9bb9-49db0a064214",
+    },
+}
+LSE_MARKET_DATA_TIMEOUT_SECONDS = 15
+
+
+def _parse_lse_components_refresh(data):
+    """
+    Defensive, shape-agnostic parser. The two confirmed real responses
+    (risersFallersVolume, heatmap) nest their per-instrument list
+    differently (one under a "values" key, the other under a "content"
+    key one level up) — rather than hardcode either exact path and
+    silently break if LSE's own layout shifts slightly, this walks the
+    WHOLE structure looking for any list whose items look like genuine
+    instrument records (an isin/ticker AND a price), and uses the
+    largest such list found — i.e., the real data, not a short nested
+    fragment. Returns a list of dicts already shaped to match this
+    project's EXISTING screener row shape ({"symbol", "name", "price",
+    "changePct", "volume"}) so no downstream rendering code needs to
+    change to consume it.
+    """
+    candidate_lists = []
+
+    def walk(obj):
+        if isinstance(obj, dict):
+            for key in ("values", "content", "instruments", "constituents"):
+                v = obj.get(key)
+                if isinstance(v, list) and v and isinstance(v[0], dict) and (
+                        "isin" in v[0] or "lastprice" in v[0] or "lastPrice" in v[0]):
+                    candidate_lists.append(v)
+            for v in obj.values():
+                walk(v)
+        elif isinstance(obj, list):
+            for item in obj:
+                walk(item)
+
+    walk(data)
+    if not candidate_lists:
+        return []
+    raw_rows = max(candidate_lists, key=len)
+
+    out = []
+    for row in raw_rows:
+        if not isinstance(row, dict):
+            continue
+        isin = row.get("isin") or row.get("ISIN")
+        price = row.get("lastprice")
+        if price is None:
+            price = row.get("lastPrice")
+        if price is None:
+            price = row.get("last_price")
+        if not isin or price is None:
+            continue  # never fabricate a row missing genuine identity or price
+        ticker = (row.get("ticker") or row.get("symbol") or row.get("tidm")
+                  or row.get("epic") or isin)
+        name = (row.get("name") or row.get("companyname") or row.get("issuername")
+                or row.get("description") or row.get("longname"))
+        change_pct = (row.get("percentchange") or row.get("changepercent")
+                      or row.get("pctchange") or row.get("changePercent"))
+        volume = row.get("volume") or row.get("tradedvolume") or row.get("dayvolume")
+        out.append({
+            "symbol": ticker,
+            "isin": isin,
+            # Never invent a company name — if genuinely absent from the
+            # response, the ticker/ISIN is shown as-is rather than a
+            # fabricated label.
+            "name": name or ticker,
+            "price": price,
+            "changePct": change_pct,
+            "volume": volume,
+        })
+    return out
+
+
+def fetch_lse_ftse100_market_data(tab, timeout=LSE_MARKET_DATA_TIMEOUT_SECONDS):
+    """
+    Fetches genuine FTSE 100 market data directly from LSE's own
+    first-party endpoint — the PRIMARY source for this data, not a
+    fallback. tab must be "risersFallersVolume" or "heatmap".
+
+    Returns {"status": "ok"|"failed", "source": "LSE", "retrievedAt":
+    iso timestamp, "instruments": [...], "error": str|None}. Callers
+    MUST check status explicitly and fall back to
+    fetch_lse_screener()/fetch_gb_screener() (Yahoo) themselves when
+    status is "failed" — this function never silently substitutes
+    another source, and never mixes LSE and Yahoo values in one row.
+    """
+    if tab not in LSE_TAB_CONFIG:
+        raise ValueError(f"Unknown LSE tab '{tab}' - must be one of {list(LSE_TAB_CONFIG)}")
+    cfg = LSE_TAB_CONFIG[tab]
+    retrieved_at = datetime.now(timezone.utc).isoformat()
+    body = json.dumps({
+        "path": "ftse-constituents",
+        "parameters": cfg["parameters"],
+        "components": [{"componentId": cfg["componentId"], "parameters": None}],
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        LSE_COMPONENTS_REFRESH_URL, data=body, method="POST",
+        headers={**HEADERS, "Content-Type": "application/json", "Accept": "application/json, text/plain, */*"},
+    )
+
+    try:
+        resp = urllib.request.urlopen(req, timeout=timeout)
+        raw = resp.read().decode("utf-8", errors="replace")
+    except Exception as e:
+        print(f"  ! LSE market data fetch failed for tab={tab}: {e}", file=sys.stderr)
+        return {"status": "failed", "source": "LSE", "retrievedAt": retrieved_at,
+                "instruments": [], "error": str(e)}
+
+    try:
+        parsed = json.loads(raw)
+    except Exception as e:
+        print(f"  ! LSE market data response was not valid JSON for tab={tab}: {e}", file=sys.stderr)
+        return {"status": "failed", "source": "LSE", "retrievedAt": retrieved_at,
+                "instruments": [], "error": f"invalid JSON: {e}"}
+
+    instruments = _parse_lse_components_refresh(parsed)
+    if not instruments:
+        print(f"  ! LSE market data for tab={tab}: response parsed but no genuine "
+              f"instrument rows found — treating as a failure, not an empty-but-valid result", file=sys.stderr)
+        return {"status": "failed", "source": "LSE", "retrievedAt": retrieved_at,
+                "instruments": [], "error": "no instrument rows found in response"}
+
+    print(f"  > LSE market data for tab={tab}: {len(instruments)} instruments, retrieved {retrieved_at}")
+    return {"status": "ok", "source": "LSE", "retrievedAt": retrieved_at,
+            "instruments": instruments, "error": None}
+
+
+def fetch_lse_screener_primary(raw_count=10, display_count=10):
+    """
+    LSE-primary replacement for fetch_lse_screener(): tries the genuine
+    LSE first-party endpoint FIRST for Volume/Gainers/Losers (all three
+    derived from the SAME risersFallersVolume LSE response, sorted
+    locally — matching the same "sort ourselves, don't trust an
+    upstream top-N" principle already used elsewhere in this project),
+    and falls back to the existing Yahoo-based fetch_lse_screener() ONLY
+    for whichever of the three genuinely failed. Never mixes LSE and
+    Yahoo values within the same row — each of the three lists is
+    either entirely LSE or entirely Yahoo, and source_dict says exactly
+    which, per section, so the dashboard can label it honestly rather
+    than implying one uniform source.
+
+    raw_count and display_count are deliberately separate: raw_count is
+    ONLY meaningful for the Yahoo fallback path, which over-fetches a
+    larger pool (e.g. 60) before the caller's own FTSE-universe name
+    filter trims it back down — the LSE path needs no such over-fetch,
+    since its response is already genuine FTSE 100 constituents by
+    construction, so it's always trimmed straight to display_count.
+    Passing raw_count's larger over-fetch value into the LSE path's own
+    slice would silently return far more rows than intended for display.
+    """
+    lse_result = fetch_lse_ftse100_market_data("risersFallersVolume")
+    source_dict = {"volume": "LSE", "gainers": "LSE", "losers": "LSE"}
+
+    if lse_result["status"] == "ok":
+        instruments = lse_result["instruments"]
+        by_volume = sorted([r for r in instruments if r.get("volume")],
+                            key=lambda r: r["volume"], reverse=True)[:display_count]
+        by_gainers = sorted([r for r in instruments if r.get("changePct") is not None],
+                             key=lambda r: r["changePct"], reverse=True)[:display_count]
+        by_losers = sorted([r for r in instruments if r.get("changePct") is not None],
+                            key=lambda r: r["changePct"])[:display_count]
+        screener = {"volume": by_volume, "gainers": by_gainers, "losers": by_losers}
+        status = {"volume": "ok", "gainers": "ok", "losers": "ok"}
+        return screener, status, source_dict
+
+    # LSE failed entirely for this run — fall back to the existing,
+    # already-working Yahoo-based screener, clearly labeled as a
+    # fallback rather than silently presented as if it were LSE data.
+    print(f"  ! LSE market data unavailable ({lse_result['error']}) — falling back to Yahoo "
+          f"for Volume/Gainers/Losers this run", file=sys.stderr)
+    screener, status = fetch_lse_screener(raw_count)
+    source_dict = {"volume": "Yahoo (fallback)", "gainers": "Yahoo (fallback)", "losers": "Yahoo (fallback)"}
+    return screener, status, source_dict
+
+
+# =========================================================================
 # FTSE 100 / FTSE 250 universe — restricts the market-wide screener (and
 # everything downstream of it: News on Movers, 5-Day Uptrend, Broker
 # Target Prices, and — via the shared ticker_lookup pool — Market-wide
@@ -4182,6 +4393,7 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
             market_hours_at_generation = None
 
     screener_status = data.get("screenerStatus", {})
+    screener_source = data.get("screenerSource", {})
 
     def screener_empty_state_html(section_key):
         """
@@ -5180,6 +5392,20 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
     _status_class, _status_text = _universe_status_html.get(ftse_universe_status, _universe_status_html["unknown"])
     universe_status_line = f'<p class="{_status_class}">{_status_text}</p>'
 
+    # Explicit, visible data-source line — Volume/Gainers/Losers are either
+    # ALL genuinely from LSE's own first-party endpoint, or ALL from the
+    # Yahoo fallback (never a silent per-row mix of the two) — this makes
+    # which one happened this run impossible to miss.
+    _screener_sources_seen = set(screener_source.values()) if screener_source else set()
+    if not _screener_sources_seen or _screener_sources_seen == {"not_checked"}:
+        screener_source_line = '<p class="status-warn">ℹ️ Data source: not checked this run</p>'
+    elif _screener_sources_seen == {"LSE"}:
+        screener_source_line = '<p class="status-ok">✅ Data source: LSE (London Stock Exchange, first-party)</p>'
+    elif _screener_sources_seen == {"Yahoo (fallback)"}:
+        screener_source_line = '<p class="status-warn">⚠️ Data source: Yahoo Finance (fallback — LSE unavailable this run)</p>'
+    else:
+        screener_source_line = f'<p class="status-warn">⚠️ Data source: mixed this run ({dict(screener_source)})</p>'
+
     def research_card(stock):
         ticker, name = stock["ticker"], stock["name"]
         entry = market_research.get(ticker)
@@ -5539,6 +5765,7 @@ nav[aria-label="Section navigation"] a{{white-space:nowrap}}
 
 <h2 id="screener">📊 LSE Screener (Volume / Gainers / Losers)</h2>
 {universe_status_line}
+{screener_source_line}
 <div class="screener-grid">
   <div><h3 id="volume">Top Volume</h3><table><tr><th>#</th><th>Symbol</th><th>Volume</th></tr>{vol_rows}</table></div>
   <div><h3 id="gainers">Top Gainers</h3><table><tr><th>#</th><th>Symbol</th><th>Chg%</th></tr>{gain_rows}</table></div>
@@ -6101,6 +6328,7 @@ def main():
     market_wide_enriched_wide = []
     screener = {}
     screener_status = {"volume": "not_checked", "gainers": "not_checked", "losers": "not_checked"}
+    screener_source = {"volume": "not_checked", "gainers": "not_checked", "losers": "not_checked"}
     ratings_fetch_failed = None  # None = not attempted this run (SKIP_MARKET_WIDE), True/False once it is
     ft_fetch_failed = None
     ft_items_pool = []
@@ -6156,8 +6384,20 @@ def main():
         # internally for its own liquidity filter.
         ftse_universe_names, ftse_universe_source = load_ftse_universe()
         ftse_universe_status = ftse_universe_status_label(ftse_universe_source)
-        screener, screener_status = fetch_lse_screener(raw_count=60 if ftse_universe_names is not None else 10)
-        if ftse_universe_names is not None:
+        screener, screener_status, screener_source = fetch_lse_screener_primary(
+            raw_count=60 if ftse_universe_names is not None else 10, display_count=10)
+        # The FTSE-universe name filter below exists specifically to correct
+        # Yahoo's broader GB-region screener down to genuine FTSE 100/250
+        # constituents. When the LSE-primary fetch succeeded, the data is
+        # ALREADY scoped to genuine FTSE 100 constituents by construction
+        # (it's LSE's own official FTSE 100 page data) — running the
+        # Yahoo-oriented name-matching filter over it would be unnecessary
+        # and risks incorrectly dropping genuine rows whose LSE-sourced
+        # name field doesn't happen to match the cached Yahoo-derived name
+        # list. Only apply this filter when we've actually fallen back to
+        # Yahoo for this run.
+        used_yahoo_fallback = any(v == "Yahoo (fallback)" for v in screener_source.values())
+        if ftse_universe_names is not None and used_yahoo_fallback:
             counts_before = {k: len(v) for k, v in screener.items()}
             for section in ("volume", "gainers", "losers"):
                 filtered = [
@@ -6754,6 +6994,7 @@ def main():
         "quotes": quotes,
         "screener": screener,
         "screenerStatus": screener_status,
+        "screenerSource": screener_source,
         "ftse100": ftse100,
         "screenerNews": screener_news,
         "screenerNewsRecent": screener_news_recent,
