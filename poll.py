@@ -1924,6 +1924,17 @@ LSE_TAB_CONFIG = {
 }
 LSE_MARKET_DATA_TIMEOUT_SECONDS = 15
 
+# News Explorer's own path/parameters/componentId — confirmed via
+# diagnostic v10's direct extraction from a genuinely captured real
+# response (project diagnostic history: v4 through v8 all captured this
+# same request naturally on every page load; v9's screenshots proved
+# the default response already contains 14 real, populated stories —
+# no filter interaction is required at all).
+LSE_NEWS_PATH = "news"
+LSE_NEWS_PARAMETERS = "tab%3Dnews-explorer"
+LSE_NEWS_COMPONENT_ID = "block_content%3A431d02ac-09b8-40c9-aba6-04a72a4f2e49"
+LSE_NEWS_TIMEOUT_SECONDS = 15
+
 
 def _parse_lse_components_refresh(data):
     """
@@ -1993,6 +2004,39 @@ def _parse_lse_components_refresh(data):
     return out
 
 
+def _fetch_lse_components_refresh_raw(path, parameters, component_id, timeout=LSE_MARKET_DATA_TIMEOUT_SECONDS):
+    """
+    The single shared request/error-handling core for EVERY LSE
+    components/refresh call this project makes — market data, heatmap,
+    and News Explorer all build on this one function, so the request
+    construction, timeout handling, and error handling only exist in
+    one place. Returns (parsed_json_or_None, retrieved_at_iso, error_or_None).
+    Never raises — every failure mode (network, timeout, invalid JSON)
+    is caught and returned as a clear error string, never silently
+    swallowed and never partially-populated.
+    """
+    retrieved_at = datetime.now(timezone.utc).isoformat()
+    body = json.dumps({
+        "path": path,
+        "parameters": parameters,
+        "components": [{"componentId": component_id, "parameters": None}],
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        LSE_COMPONENTS_REFRESH_URL, data=body, method="POST",
+        headers={**HEADERS, "Content-Type": "application/json", "Accept": "application/json, text/plain, */*"},
+    )
+    try:
+        resp = urllib.request.urlopen(req, timeout=timeout)
+        raw = resp.read().decode("utf-8", errors="replace")
+    except Exception as e:
+        return None, retrieved_at, str(e)
+    try:
+        parsed = json.loads(raw)
+    except Exception as e:
+        return None, retrieved_at, f"invalid JSON: {e}"
+    return parsed, retrieved_at, None
+
+
 def fetch_lse_ftse100_market_data(tab, timeout=LSE_MARKET_DATA_TIMEOUT_SECONDS):
     """
     Fetches genuine FTSE 100 market data directly from LSE's own
@@ -2009,31 +2053,13 @@ def fetch_lse_ftse100_market_data(tab, timeout=LSE_MARKET_DATA_TIMEOUT_SECONDS):
     if tab not in LSE_TAB_CONFIG:
         raise ValueError(f"Unknown LSE tab '{tab}' - must be one of {list(LSE_TAB_CONFIG)}")
     cfg = LSE_TAB_CONFIG[tab]
-    retrieved_at = datetime.now(timezone.utc).isoformat()
-    body = json.dumps({
-        "path": "ftse-constituents",
-        "parameters": cfg["parameters"],
-        "components": [{"componentId": cfg["componentId"], "parameters": None}],
-    }).encode("utf-8")
-    req = urllib.request.Request(
-        LSE_COMPONENTS_REFRESH_URL, data=body, method="POST",
-        headers={**HEADERS, "Content-Type": "application/json", "Accept": "application/json, text/plain, */*"},
-    )
+    parsed, retrieved_at, error = _fetch_lse_components_refresh_raw(
+        "ftse-constituents", cfg["parameters"], cfg["componentId"], timeout)
 
-    try:
-        resp = urllib.request.urlopen(req, timeout=timeout)
-        raw = resp.read().decode("utf-8", errors="replace")
-    except Exception as e:
-        print(f"  ! LSE market data fetch failed for tab={tab}: {e}", file=sys.stderr)
+    if error:
+        print(f"  ! LSE market data fetch failed for tab={tab}: {error}", file=sys.stderr)
         return {"status": "failed", "source": "LSE", "retrievedAt": retrieved_at,
-                "instruments": [], "error": str(e)}
-
-    try:
-        parsed = json.loads(raw)
-    except Exception as e:
-        print(f"  ! LSE market data response was not valid JSON for tab={tab}: {e}", file=sys.stderr)
-        return {"status": "failed", "source": "LSE", "retrievedAt": retrieved_at,
-                "instruments": [], "error": f"invalid JSON: {e}"}
+                "instruments": [], "error": error}
 
     instruments = _parse_lse_components_refresh(parsed)
     if not instruments:
@@ -2045,6 +2071,106 @@ def fetch_lse_ftse100_market_data(tab, timeout=LSE_MARKET_DATA_TIMEOUT_SECONDS):
     print(f"  > LSE market data for tab={tab}: {len(instruments)} instruments, retrieved {retrieved_at}")
     return {"status": "ok", "source": "LSE", "retrievedAt": retrieved_at,
             "instruments": instruments, "error": None}
+
+
+def _find_newsexplorersearch_block(obj):
+    """Recursively locates the "newsexplorersearch" DATATYPE block
+    within a components/refresh response — confirmed (diagnostic v10,
+    verified directly against a genuinely captured real response) to
+    sit alongside the filter-configuration data in the SAME response,
+    not a separate request. Returns the block's "value" dict (with
+    "content"/"totalElements"/"totalPages"/etc) or None if genuinely
+    absent — never fabricates a placeholder structure."""
+    if isinstance(obj, dict):
+        if obj.get("name") == "newsexplorersearch" and isinstance(obj.get("value"), dict):
+            return obj["value"]
+        for v in obj.values():
+            result = _find_newsexplorersearch_block(v)
+            if result is not None:
+                return result
+    elif isinstance(obj, list):
+        for item in obj:
+            result = _find_newsexplorersearch_block(item)
+            if result is not None:
+                return result
+    return None
+
+
+def _parse_lse_news_explorer(data):
+    """
+    Parses the confirmed newsexplorersearch block into this project's
+    own clean story shape. Defensive about individual story rows —
+    skips (never fabricates) any row genuinely missing a title, since a
+    headline-less "story" isn't a real displayable result.
+    """
+    block = _find_newsexplorersearch_block(data)
+    if block is None:
+        return None
+    raw_stories = block.get("content", [])
+    stories = []
+    for row in raw_stories:
+        if not isinstance(row, dict) or not row.get("title"):
+            continue
+        stories.append({
+            "id": row.get("id"),
+            "headline": row.get("title"),
+            "companyCode": row.get("companycode"),
+            "companyName": row.get("companyname"),
+            "source": row.get("source"),
+            "newsSource": row.get("newssource"),
+            "rnsNumber": row.get("rnsnumber"),
+            "datetime": row.get("datetime"),
+            "price": row.get("lastprice"),
+            "percentChange": row.get("percentualchange"),
+            "url": row.get("url"),
+        })
+    return {
+        "stories": stories,
+        "totalElements": block.get("totalElements"),
+        "totalPages": block.get("totalPages"),
+        "pageNumber": block.get("number"),
+        "pageSize": block.get("size"),
+        "isLastPage": block.get("last"),
+    }
+
+
+def fetch_lse_news_explorer(timeout=LSE_NEWS_TIMEOUT_SECONDS):
+    """
+    Fetches genuine LSE News Explorer stories directly from LSE's own
+    first-party endpoint — the PRIMARY source, not a fallback. There is
+    no Yahoo equivalent for this specific data (regulatory/company
+    announcements), so a failure here means an honest "unavailable"
+    state on the dashboard, never a substitute source silently
+    presented as if it were the same thing.
+
+    Returns {"status": "ok"|"failed", "source": "LSE", "retrievedAt":
+    iso timestamp, "stories": [...], "totalElements": int|None,
+    "totalPages": int|None, "error": str|None}.
+    """
+    parsed, retrieved_at, error = _fetch_lse_components_refresh_raw(
+        LSE_NEWS_PATH, LSE_NEWS_PARAMETERS, LSE_NEWS_COMPONENT_ID, timeout)
+
+    if error:
+        print(f"  ! LSE News Explorer fetch failed: {error}", file=sys.stderr)
+        return {"status": "failed", "source": "LSE", "retrievedAt": retrieved_at,
+                "stories": [], "totalElements": None, "totalPages": None, "error": error}
+
+    parsed_news = _parse_lse_news_explorer(parsed)
+    if parsed_news is None:
+        print(f"  ! LSE News Explorer: response parsed but no newsexplorersearch block "
+              f"found — treating as a failure, not an empty-but-valid result", file=sys.stderr)
+        return {"status": "failed", "source": "LSE", "retrievedAt": retrieved_at,
+                "stories": [], "totalElements": None, "totalPages": None,
+                "error": "no newsexplorersearch block found in response"}
+
+    print(f"  > LSE News Explorer: {len(parsed_news['stories'])} stories "
+          f"(totalElements={parsed_news['totalElements']}, totalPages={parsed_news['totalPages']}), "
+          f"retrieved {retrieved_at}")
+    return {
+        "status": "ok", "source": "LSE", "retrievedAt": retrieved_at,
+        "stories": parsed_news["stories"], "totalElements": parsed_news["totalElements"],
+        "totalPages": parsed_news["totalPages"], "error": None,
+    }
 
 
 def fetch_lse_screener_primary(raw_count=10, display_count=10):
@@ -4464,6 +4590,7 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
 
     screener_status = data.get("screenerStatus", {})
     screener_source = data.get("screenerSource", {})
+    news_explorer = data.get("newsExplorer", {})
 
     def screener_empty_state_html(section_key):
         """
@@ -5334,6 +5461,40 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
     # collect_catalyst_events() so this rendering code stays purely
     # presentational, matching how every other section here separates
     # data-gathering from display.
+    # News Explorer — genuine LSE regulatory/company announcements, no
+    # Yahoo equivalent exists so an honest "unavailable" state is used
+    # rather than a substitute. format_london_and_utc reused for
+    # consistent BST/GMT-correct timestamps, same as everywhere else.
+    def news_explorer_row(story):
+        try:
+            dt = datetime.fromisoformat(story["datetime"]) if story.get("datetime") else None
+            when = format_london_and_utc(dt.replace(tzinfo=timezone.utc)) if dt else "—"
+        except (ValueError, TypeError):
+            when = esc(str(story.get("datetime") or "—"))
+        price = f'{story["price"]:.2f}' if story.get("price") is not None else "—"
+        if story.get("percentChange") is not None:
+            pct = story["percentChange"]
+            pct_cls = "up" if pct >= 0 else "down"
+            pct_html = f'<span class="{pct_cls}">{"+" if pct >= 0 else ""}{pct:.2f}%</span>'
+        else:
+            pct_html = "—"
+        headline_html = (
+            f'<a href="{esc(story["url"])}" target="_blank" style="color:#7fb3ff;">{esc(story["headline"])}</a>'
+            if story.get("url") else esc(story["headline"])
+        )
+        return (
+            f'<tr><td>{headline_html}</td>'
+            f'<td>{esc(story.get("companyName") or story.get("companyCode") or "—")}</td>'
+            f'<td>{esc(story.get("source") or "—")}</td>'
+            f'<td>{when}</td>'
+            f'<td>{esc(story.get("rnsNumber") or "—")}</td>'
+            f'<td>{price}</td>'
+            f'<td>{pct_html}</td></tr>'
+        )
+
+    news_explorer_stories = news_explorer.get("stories", [])
+    news_explorer_rows = "".join(news_explorer_row(s) for s in news_explorer_stories)
+
     catalyst_events = collect_catalyst_events(quotes, screener, watchlist)
     EVENT_TYPE_LABELS = {"earnings": "📊 Earnings", "ex_dividend": "💰 Ex-dividend"}
     catalyst_rows = "".join(
@@ -5788,6 +5949,7 @@ nav[aria-label="Section navigation"] a{{white-space:nowrap}}
 <a href="#losers" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🔴 Losers</a>
 <a href="#volume" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📊 Volume</a>
 <a href="#watchlist" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">👀 Watchlist</a>
+<a href="#news-explorer" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📰 News Explorer</a>
 <a href="#news-feed" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📰 News / Evidence</a>
 <a href="#catalysts" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📅 Catalysts</a>
 <a href="#warnings" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">⚠️ Warnings</a>
@@ -5893,6 +6055,17 @@ nav[aria-label="Section navigation"] a{{white-space:nowrap}}
 <h2 id="broker-alerts">⬆⬇🎯 Market-wide Broker Alerts (all LSE, not just watchlist)</h2>
 <p class="meta">Upgrades/downgrades from anywhere on the LSE, not limited to your watchlist below.</p>
 {market_wide_rows or news_empty_state_html(market_wide_alerts_status, recent_market_wide_filtered, "market-wide alerts")}
+
+<h2 id="news-explorer">📰 News Explorer (LSE regulatory &amp; company announcements)</h2>
+<p class="meta">Genuine LSE first-party data — regulatory news and company announcements across the whole market, not limited to your watchlist. No equivalent exists via any other source used on this page, so this section shows an honest "unavailable" state rather than a substitute when the LSE source can't be reached.</p>
+{('<p class="status-ok">✅ Data source: London Stock Exchange (first-party) · Retrieved: '
+  + esc(format_london_and_utc(datetime.fromisoformat(news_explorer['retrievedAt']))) + ' · '
+  + str(news_explorer.get('totalElements', 0)) + ' total result(s), showing '
+  + str(len(news_explorer_stories)) + '</p>')
+ if news_explorer.get('status') == 'ok' else
+ ('<p class="status-warn">⚠️ News Explorer unavailable this run'
+  + (' (' + esc(news_explorer['error']) + ')' if news_explorer.get('error') else '') + '</p>')}
+{f'<table><tr><th>Headline</th><th>Company</th><th>Source</th><th>Date / Time</th><th>RNS Number</th><th>Price</th><th>Change %</th></tr>{news_explorer_rows}</table>' if news_explorer_stories else '<span class="meta">No stories available this run.</span>'}
 
 <h2 id="news-feed">📰 News &amp; Broker Feed (watchlist)</h2>
 {item_rows or news_empty_state_html(news_fetch_status, all_recent_items, "news")}
@@ -6411,6 +6584,8 @@ def main():
     screener_source = {"volume": "not_checked", "gainers": "not_checked", "losers": "not_checked"}
     heatmap_instruments = None
     heatmap_source = "not_checked"
+    news_explorer_result = {"status": "not_checked", "source": "LSE", "retrievedAt": None,
+                             "stories": [], "totalElements": None, "totalPages": None, "error": None}
     ratings_fetch_failed = None  # None = not attempted this run (SKIP_MARKET_WIDE), True/False once it is
     ft_fetch_failed = None
     ft_items_pool = []
@@ -6499,6 +6674,14 @@ def main():
             heatmap_source = "unavailable"
             print(f"  ! LSE heatmap fetch failed ({heatmap_lse_result['error']}) — heat map will use "
                   f"the narrower gainers/losers pool instead", file=sys.stderr)
+
+        # News Explorer — genuinely no Yahoo equivalent exists for this
+        # (regulatory/company announcement data), so failure here means
+        # an honest "unavailable" state, never a substitute silently
+        # presented as if it were the same thing.
+        news_explorer_result = fetch_lse_news_explorer()
+        if news_explorer_result["status"] != "ok":
+            print(f"  ! LSE News Explorer unavailable this run ({news_explorer_result['error']})", file=sys.stderr)
 
         # The FTSE-universe name filter below exists specifically to correct
         # Yahoo's broader GB-region screener down to genuine FTSE 100/250
@@ -7111,6 +7294,7 @@ def main():
         "screenerSource": screener_source,
         "heatmapInstruments": heatmap_instruments,
         "heatmapSource": heatmap_source,
+        "newsExplorer": news_explorer_result,
         "ftse100": ftse100,
         "screenerNews": screener_news,
         "screenerNewsRecent": screener_news_recent,
