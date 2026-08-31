@@ -31,6 +31,28 @@ STATE_DIR = os.environ.get("STATE_DIR", "state")
 DOCS_DIR = os.environ.get("DOCS_DIR", "docs")
 DOCS_FILENAME = os.environ.get("DOCS_FILENAME", "index.html")
 
+# Opportunity Scanner module - deliberately isolated: a missing/broken
+# scanner directory (e.g. a fresh checkout before it's deployed, or a
+# genuine bug in a new feature) must NEVER take down the main
+# dashboard, which has run reliably every 5 minutes all session. If
+# this import fails, SCANNER_AVAILABLE stays False and main() skips
+# the scanner step entirely, logging why, while everything else -
+# index.html and every existing dedicated page - continues exactly as
+# before.
+SCANNER_AVAILABLE = False
+try:
+    _scanner_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scanner")
+    if _scanner_dir not in sys.path:
+        sys.path.insert(0, _scanner_dir)
+    import orchestrator as opportunity_orchestrator
+    import opportunities_page as opportunity_page_renderer
+    SCANNER_AVAILABLE = True
+except Exception as _scanner_import_error:
+    print(f"  ! Opportunity Scanner module unavailable this run: {_scanner_import_error}", file=sys.stderr)
+
+SCANNER_STATE_FILE = os.path.join(STATE_DIR, "scanner_state.json")
+SCANNER_HISTORY_FILE = os.path.join(STATE_DIR, "scanner_history.json")
+
 # Shared CSS - extracted once so the main dashboard and every dedicated
 # standalone page (screener.html, heatmap.html, etc.) use the EXACT SAME
 # styling from one single source, rather than independent copies that
@@ -467,26 +489,33 @@ def parse_rss(xml_bytes):
 
 def fetch_yahoo_broker_target(ticker):
     """
-    Lightweight, dedicated broker-consensus lookup — requests ONLY the
-    financialData module (not the 8-module fetch_yahoo_analyst does for
-    the full watchlist research view), since this is used for a
-    genuinely separate purpose: enriching LSE-primary Screener rows
-    (Gainers/Losers/Volume) with the broker-target fields LSE's own
-    market-data response doesn't provide, never anything more.
+    Lightweight, dedicated broker-consensus + average-volume + next-
+    earnings-date lookup — requests financialData, summaryDetail, AND
+    calendarEvents in ONE call (still not the 8-module fetch_yahoo_analyst
+    does for the full watchlist research view), since this is used for a
+    genuinely separate purpose: enriching LSE-primary Screener/Heatmap
+    rows with fields LSE's own market-data response doesn't provide,
+    never anything more. calendarEvents added for the Opportunity
+    Scanner's Risk engine (earnings-imminent flag) - same request, no
+    additional network cost, just parsing more of what's already
+    returned.
 
     This is Yahoo ENRICHMENT of LSE market data, not a replacement
     source — callers must attach these fields alongside the existing
     LSE price/changePct/volume, never overwrite them.
 
-    Returns {"targetMeanPrice", "targetHighPrice", "targetLowPrice",
-    "numberOfAnalystOpinions", "recommendationKey"} or None if
-    genuinely unavailable.
+    Returns a dict with whichever of {"targetMeanPrice",
+    "targetHighPrice", "targetLowPrice", "numberOfAnalystOpinions",
+    "recommendationKey", "averageVolume", "currentVolume",
+    "nextEarningsDate"} were genuinely available — fields with no real
+    data are simply absent from the dict, not fabricated as None-valued
+    keys. Returns None only when NOTHING at all was available.
     """
     symbol = yahoo_symbol(ticker)
     crumb = get_yahoo_crumb()
     url = (
         f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{urllib.parse.quote(symbol)}"
-        "?modules=financialData"
+        "?modules=financialData,summaryDetail,calendarEvents"
     )
     if crumb:
         url += f"&crumb={urllib.parse.quote(crumb)}"
@@ -496,16 +525,26 @@ def fetch_yahoo_broker_target(ticker):
         if not result:
             return None
         fin = result.get("financialData") or {}
+        summary = result.get("summaryDetail") or {}
+        cal = result.get("calendarEvents") or {}
+        out = {}
         target_mean = (fin.get("targetMeanPrice") or {}).get("raw")
-        if target_mean is None:
-            return None  # never fabricate a target that genuinely doesn't exist
-        return {
-            "targetMeanPrice": target_mean,
-            "targetHighPrice": (fin.get("targetHighPrice") or {}).get("raw"),
-            "targetLowPrice": (fin.get("targetLowPrice") or {}).get("raw"),
-            "numberOfAnalystOpinions": (fin.get("numberOfAnalystOpinions") or {}).get("raw"),
-            "recommendationKey": fin.get("recommendationKey"),
-        }
+        if target_mean is not None:
+            out["targetMeanPrice"] = target_mean
+            out["targetHighPrice"] = (fin.get("targetHighPrice") or {}).get("raw")
+            out["targetLowPrice"] = (fin.get("targetLowPrice") or {}).get("raw")
+            out["numberOfAnalystOpinions"] = (fin.get("numberOfAnalystOpinions") or {}).get("raw")
+            out["recommendationKey"] = fin.get("recommendationKey")
+        avg_volume = (summary.get("averageVolume") or {}).get("raw")
+        if avg_volume is not None:
+            out["averageVolume"] = avg_volume
+        current_volume = (summary.get("volume") or {}).get("raw")
+        if current_volume is not None:
+            out["currentVolume"] = current_volume
+        earnings_dates = ((cal.get("earnings") or {}).get("earningsDate")) or []
+        if earnings_dates and earnings_dates[0].get("raw") is not None:
+            out["nextEarningsDate"] = earnings_dates[0]["raw"]
+        return out or None  # never fabricate a fully-empty dict as if it were real data
     except Exception as e:
         print(f"  ! yahoo broker-target enrichment failed: {ticker} ({e})", file=sys.stderr)
         return None
@@ -1533,6 +1572,56 @@ class RadarHistoryCorruptError(Exception):
     pass
 
 
+def load_scanner_state():
+    """Missing file -> fresh empty state (legitimate first-run case) -
+    same contract as load_radar_history. Corrupt file -> logs and
+    starts fresh rather than crashing the whole poll run, since the
+    scanner is an additive feature that must never take down the
+    proven, reliable core dashboard."""
+    if not os.path.exists(SCANNER_STATE_FILE):
+        return {"persistedStore": {}, "analystRefreshState": {}, "providerHealth": {}}
+    try:
+        with open(SCANNER_STATE_FILE, "r", encoding="utf-8") as f:
+            data = json.loads(f.read())
+        if not isinstance(data, dict):
+            raise ValueError("scanner_state.json does not contain a JSON object")
+        return {
+            "persistedStore": data.get("persistedStore", {}),
+            "analystRefreshState": data.get("analystRefreshState", {}),
+            "providerHealth": data.get("providerHealth", {}),
+        }
+    except Exception as e:
+        print(f"  ! scanner_state.json corrupt or unreadable, starting fresh this run: {e}", file=sys.stderr)
+        return {"persistedStore": {}, "analystRefreshState": {}, "providerHealth": {}}
+
+
+def save_scanner_state(persisted_store, analyst_refresh_state, provider_health):
+    atomic_write_json(SCANNER_STATE_FILE, {
+        "persistedStore": persisted_store, "analystRefreshState": analyst_refresh_state,
+        "providerHealth": provider_health,
+    })
+
+
+def load_scanner_history():
+    """{ticker: [snapshot_dict, ...]} - same missing-file/corrupt-file
+    contract as the other state loaders above."""
+    if not os.path.exists(SCANNER_HISTORY_FILE):
+        return {}
+    try:
+        with open(SCANNER_HISTORY_FILE, "r", encoding="utf-8") as f:
+            data = json.loads(f.read())
+        if not isinstance(data, dict):
+            raise ValueError("scanner_history.json does not contain a JSON object")
+        return data
+    except Exception as e:
+        print(f"  ! scanner_history.json corrupt or unreadable, starting fresh this run: {e}", file=sys.stderr)
+        return {}
+
+
+def save_scanner_history(history_dict):
+    atomic_write_json(SCANNER_HISTORY_FILE, history_dict)
+
+
 def load_radar_history(path=None):
     """Missing file -> fresh empty store (legitimate first-run case).
     Existing-but-corrupt file -> raises, never silently treated as
@@ -2138,6 +2227,14 @@ def _parse_lse_instrument_row(row):
                   or row.get("percentualchange"))
     net_change = row.get("netchange") or row.get("netChange")
     volume = row.get("volume") or row.get("tradedvolume") or row.get("dayvolume")
+    # Additive fields — genuinely present in LSE's Heatmap response
+    # (confirmed directly against the real captured data) but never
+    # extracted before now. Free: no new request, just parsing more of
+    # what LSE already returns. None (never fabricated) when genuinely
+    # absent — e.g. risersFallersVolume's rows don't include these.
+    fifty_two_week_low = row.get("fiftyTwoWeeksMin") or row.get("fiftyTwoWeeksLow")
+    fifty_two_week_high = row.get("fiftyTwoWeeksMax") or row.get("fiftyTwoWeeksHigh")
+    market_cap = row.get("marketcapitalization") or row.get("marketCap")
     return {
         "symbol": ticker,
         "isin": isin,  # None if genuinely absent - never fabricated from tidm
@@ -2150,6 +2247,9 @@ def _parse_lse_instrument_row(row):
         "price": price,
         "changePct": change_pct,
         "netChange": net_change,
+        "fiftyTwoWeekLow": fifty_two_week_low,
+        "fiftyTwoWeekHigh": fifty_two_week_high,
+        "marketCap": market_cap,
         "volume": volume,
     }
 
@@ -6496,6 +6596,7 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
 <a href="catalysts.html" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📅 Catalysts</a>
 <a href="warnings.html" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">⚠️ Warnings</a>
 <a href="data-freshness.html" style="color:#7fb3ff;text-decoration:none;white-space:nowrap;">ℹ️ Data&nbsp;/&nbsp;Freshness</a>
+<a href="opportunities.html" style="color:#7fb3ff;margin-left:14px;text-decoration:none;white-space:nowrap;">🔥 Opportunity Scanner</a>
 <details class="nav-more" style="margin-top:4px;">
 <summary style="cursor:pointer;color:#5a6072;font-size:13px;list-style:none;">More navigation ▾</summary>
 <div style="margin-top:4px;font-size:13px;line-height:2;">
@@ -8228,6 +8329,76 @@ def main():
         data, watchlist, prior_snapshot=prior_snapshot, backtest_results=backtest_results,
         radar_lifecycle=radar_lifecycle,
     )
+
+    # Opportunity Scanner - a fully separate, additive step. Wrapped
+    # entirely in its own try/except: any failure here is logged and
+    # skipped, never propagated to break the main dashboard, which has
+    # already rendered successfully above by this point.
+    if SCANNER_AVAILABLE:
+        try:
+            _scanner_state = load_scanner_state()
+            _scanner_history = load_scanner_history()
+            _scan_result = opportunity_orchestrator.run_scan(
+                sys.modules[__name__], items_by_ticker,
+                analyst_refresh_state=_scanner_state["analystRefreshState"],
+                provider_health_state=_scanner_state["providerHealth"],
+                persisted_store=_scanner_state["persistedStore"],
+            )
+            print(f"  > Opportunity Scanner: {_scan_result.coverage['eligibleUniverse']} stocks, "
+                  f"{_scan_result.coverage['scoreable']} scoreable, "
+                  f"{_scan_result.coverage['fullyCovered']} fully covered, "
+                  f"{len(_scan_result.tier_90_plus())} at 90+, {len(_scan_result.tier_80_89())} at 80-89, "
+                  f"{len(_scan_result.tier_70_79())} at 70-79")
+
+            # Append today's snapshot to history for every scoreable
+            # stock - real, reproducible, model-versioned, per the
+            # explicit historical-integrity requirement. Never
+            # overwrites prior snapshots, only appends.
+            import history as _scanner_history_module
+            for _ticker, _breakdown in _scan_result.breakdowns.items():
+                _snapshot = _scanner_history_module.ScoreSnapshot.from_breakdown(_breakdown)
+                _scanner_history = _scanner_history_module.append_snapshot(_scanner_history, _snapshot)
+
+            opportunity_page_renderer.render_opportunities_page(
+                _scan_result, _scanner_history, DASHBOARD_CSS, DOCS_DIR, render_standalone_page,
+            )
+
+            save_scanner_state(_scan_result.updated_persisted_store, _scan_result.updated_analyst_refresh_state,
+                                _scan_result.provider_health)
+            save_scanner_history(_scanner_history)
+
+            # Dashboard summary badge - inserted into the ALREADY-WRITTEN
+            # index.html (via a targeted string replacement, not a
+            # restructure of render_dashboard's own massive template)
+            # since the scan only completes AFTER render_dashboard has
+            # already run and saved the file. Kept deliberately small
+            # and safe: if the expected nav link text isn't found for
+            # any reason, this is skipped entirely rather than risking
+            # a malformed dashboard.
+            try:
+                _index_path = os.path.join(DOCS_DIR, DOCS_FILENAME)
+                with open(_index_path, "r", encoding="utf-8") as f:
+                    _index_html = f.read()
+                _nav_anchor = '<a href="opportunities.html" style="color:#7fb3ff;margin-left:14px;text-decoration:none;white-space:nowrap;">🔥 Opportunity Scanner</a>'
+                if _nav_anchor in _index_html:
+                    _n90 = len(_scan_result.tier_90_plus())
+                    _n80 = len(_scan_result.tier_80_89())
+                    _n70 = len(_scan_result.tier_70_79())
+                    _summary_badge = (
+                        f' <span style="color:#5a6072;font-size:12px;white-space:nowrap;">'
+                        f'({_n90} at 90+ · {_n80} at 80-89 · {_n70} at 70-79)</span>'
+                    )
+                    _index_html = _index_html.replace(_nav_anchor, _nav_anchor + _summary_badge, 1)
+                    with open(_index_path, "w", encoding="utf-8") as f:
+                        f.write(_index_html)
+            except Exception as e:
+                print(f"  ! Opportunity Scanner dashboard summary badge failed (non-critical, dashboard still valid): {e}", file=sys.stderr)
+        except Exception as e:
+            import traceback
+            print(f"  ! Opportunity Scanner FAILED this run (main dashboard unaffected): {e}", file=sys.stderr)
+            traceback.print_exc()
+    else:
+        print("  > Opportunity Scanner module not available this run - skipped.", file=sys.stderr)
 
     # Saved only once rendering has succeeded — a render failure never
     # persists a lifecycle update whose corresponding HTML was never

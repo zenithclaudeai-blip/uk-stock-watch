@@ -1,0 +1,20 @@
+name: Yahoo .L Capability Audit v1
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run Yahoo .L audit
+        run: python scanner/diagnostics/yahoo_l_audit_v1.py
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: yahoo-l-audit-results
+          path: yahoo_l_audit_*.json
