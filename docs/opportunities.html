@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en-GB"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>News Explorer — UK Stock Watch</title>
+<title>Opportunity Scanner — UK Stock Watch</title>
 <style>
 body{background:#0f1115;color:#e8eaed;font-family:-apple-system,sans-serif;margin:0 auto;padding:12px;font-size:17px;line-height:1.6;max-width:1200px;word-wrap:break-word;overflow-wrap:break-word}
 h1{font-size:26px;margin:4px 0;font-weight:800}
@@ -84,12 +84,75 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </head>
 <body>
 <p style="margin:0 0 10px;"><a href="index.html" style="color:#7fb3ff;text-decoration:none;font-size:15px;">← Back to Dashboard</a></p>
-<h1>📰 News Explorer (LSE regulatory &amp; company announcements)</h1>
+<h1>🔥 LSE Opportunity Scanner</h1>
 <main>
 
-<p class="meta">Genuine LSE first-party data — regulatory news and company announcements across the whole market, not limited to your watchlist. No equivalent exists via any other source used on this page, so this section shows an honest "unavailable" state rather than a substitute when the LSE source can't be reached.</p>
-<p class="status-ok">✅ Data source: London Stock Exchange (first-party) · Retrieved: Tue 01 Sep 2026, 00:54 BST (23:54 UTC) · 0 total result(s), showing 0</p>
-<span class="meta">No stories available this run.</span>
+<p class="meta">Genuine, periodically-refreshed opportunity discovery — not real-time. Refreshed every 5 minutes during UK market hours, same schedule as the rest of this dashboard.</p>
+
+<div class="opp-model-status">
+  <p><b>🟡 PROVISIONAL — LIMITED FUNDAMENTAL DATA</b></p>
+  <p class="opp-meta">Universe: FTSE 100 (100 stocks) — not the full LSE. Currently supported model dimensions: Momentum, Market Confirmation, Catalyst, Analyst Evidence. Not yet connected: Quality, Valuation, Growth, Timing.</p>
+</div>
+
+<div class="opp-scan-health">
+  <h3>Scan Health</h3>
+  <p class="opp-meta">Last scan: 2026-08-31T23:56:26.988246+00:00 · Universe: 100 ·
+  Scoreable: 100 · Fully covered: 19 ·
+  Partially covered: 81 · Unscoreable: 0 ·
+  Data coverage: 100.0%</p>
+  <p class="opp-meta">Analyst data refreshed this run: 20 of 20 cap ·
+  Stocks with insufficient history for momentum tracking: 100 (expected — history accumulates over multiple runs)</p>
+</div>
+
+<div class="opp-provider-health">
+  <h3>Provider Health</h3>
+  <p class="opp-meta">LSE Heatmap (FTSE 100): available · 1 request(s) · 0% error rate</p><p class="opp-meta">Yahoo Finance (enrichment): available · 20 request(s) · 0% error rate</p>
+</div>
+
+<h2>🔥 Best Opportunities Now</h2>
+<h3>Exceptional Setups (90+)</h3><p class="opp-empty">No stocks currently score 90 or above.</p>
+<h3>Strong Setups (80-89)</h3><p class="opp-empty">No stocks currently score 80-89.</p>
+<h3>Promising (70-79) (2)</h3><div class="opp-list"><div class="opp-row">
+  <div class="opp-ticker">SVT</div>
+  <div class="opp-score">71</div>
+  <div class="opp-conf">Confidence: 100 · Coverage: 100%</div>
+  <span class="opp-meta">Momentum: insufficient history</span>
+  
+  
+</div><div class="opp-row">
+  <div class="opp-ticker">CCC</div>
+  <div class="opp-score">71</div>
+  <div class="opp-conf">Confidence: 65 · Coverage: 65%</div>
+  <span class="opp-meta">Momentum: insufficient history</span>
+  
+  <span class="opp-missing">Missing: Volume/Liquidity, Analyst Evidence</span>
+</div></div>
+
+<h2>📈 Rising Fast</h2>
+<h3>Rapidly improving (7d change ≥ +8)</h3><p class="opp-empty">No stocks are currently rising rapidly — or insufficient history exists yet to measure this.</p>
+
+<h2>📉 Deteriorating</h2>
+<h3>Meaningful decline (7d change ≤ -8)</h3><p class="opp-empty">No stocks are currently deteriorating meaningfully — or insufficient history exists yet.</p>
+
+<h2>🆕 New Today</h2>
+<h3>Newly qualified (first-ever snapshot, score 70+) (2)</h3><div class="opp-list"><div class="opp-row">
+  <div class="opp-ticker">SVT</div>
+  <div class="opp-score">71</div>
+  <div class="opp-conf">Confidence: 100 · Coverage: 100%</div>
+  <span class="opp-meta">Momentum: insufficient history</span>
+  
+  
+</div><div class="opp-row">
+  <div class="opp-ticker">CCC</div>
+  <div class="opp-score">71</div>
+  <div class="opp-conf">Confidence: 65 · Coverage: 65%</div>
+  <span class="opp-meta">Momentum: insufficient history</span>
+  
+  <span class="opp-missing">Missing: Volume/Liquidity, Analyst Evidence</span>
+</div></div>
+
+<h2>📊 Backtesting Status</h2>
+<p class="opp-meta">🟡 BACKTESTING NOT YET STATISTICALLY VALID — Reason: insufficient point-in-time historical data. Score history only began accumulating this session; a real backtest requires many weeks of genuine daily snapshots to avoid look-ahead bias. The framework exists (history.py) and will produce honest results once sufficient data exists — never a fabricated performance figure in the meantime.</p>
 
 </main>
 <p style="text-align:center;margin-top:18px;"><a href="index.html" style="color:#7fb3ff;text-decoration:none;font-size:14px;">← Back to Dashboard</a></p>
