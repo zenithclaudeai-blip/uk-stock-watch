@@ -29,6 +29,91 @@ from zoneinfo import ZoneInfo
 STATE_DIR = os.environ.get("STATE_DIR", "state")
 DOCS_DIR = os.environ.get("DOCS_DIR", "docs")
 DOCS_FILENAME = os.environ.get("DOCS_FILENAME", "index.html")
+
+# Shared CSS - extracted once so the main dashboard and every dedicated
+# standalone page (screener.html, heatmap.html, etc.) use the EXACT SAME
+# styling from one single source, rather than independent copies that
+# could silently drift apart over future edits.
+DASHBOARD_CSS = """<style>
+body{background:#0f1115;color:#e8eaed;font-family:-apple-system,sans-serif;margin:0 auto;padding:12px;font-size:17px;line-height:1.6;max-width:1200px;word-wrap:break-word;overflow-wrap:break-word}
+h1{font-size:26px;margin:4px 0;font-weight:800}
+h2{font-size:21px;margin:26px 0 10px;font-weight:800;border-left:4px solid #7fb3ff;padding-left:10px}
+h3{font-size:16px;margin:0 0 8px;color:#c2c7d0;font-weight:700}
+a:focus-visible,summary:focus-visible,button:focus-visible{outline:2px solid #7fb3ff;outline-offset:2px;border-radius:2px}
+.screener-grid{display:grid;grid-template-columns:1fr;gap:10px}
+@media(min-width:600px){.screener-grid{grid-template-columns:1fr 1fr 1fr}}
+.heatmap-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:16px}
+@media(max-width:380px){.heatmap-grid{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:600px){.heatmap-grid{grid-template-columns:repeat(8,1fr)}}
+.heat-cell{border-radius:4px;padding:8px 4px;text-align:center;color:#fff}
+.heat-symbol{font-size:14px;font-weight:700}
+.heat-pct{font-size:13px;opacity:0.9}
+.disclaimer{background:#1c2b25;border:1px solid #274235;color:#9aa0a6;border-radius:6px;padding:10px;font-size:14px;margin-bottom:10px}
+.quotes{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.q{background:#171a21;border:1px solid #2a2e37;border-radius:6px;padding:8px 12px;font-size:15px}
+.up{color:#50dc96;font-weight:800;font-size:17px} .down{color:#ff6b6b;font-weight:800;font-size:17px}
+.radar-card{background:#171a21;border:1px solid #2a2e37;border-radius:8px;padding:14px 16px;margin-bottom:14px}
+.radar-compact-wrap{margin-bottom:10px}
+.radar-compact{background:#141821;border-left:3px solid #ffb454;border-radius:6px;padding:10px 14px}
+.radar-compact .meta{line-height:1.7;margin:2px 0}
+.radar-header{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin-bottom:6px}
+.radar-ticker{font-size:20px;font-weight:800;color:#e8eaed}
+.radar-freshness{font-size:13px;padding:2px 8px;border-radius:10px;background:#20242d;display:inline-block}
+.radar-multi{font-size:12px;font-weight:700;color:#0f1115;background:#7fb3ff;padding:2px 8px;border-radius:10px;display:inline-block}
+.radar-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:10px 0}
+.radar-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:10px 0}
+.radar-col{background:#12141a;border:1px solid #22262f;border-radius:6px;padding:10px 12px}
+.radar-col-label{font-size:13px;font-weight:800;letter-spacing:0.6px;color:#7fb3ff;margin-bottom:6px;text-transform:uppercase}
+.radar-col-warn .radar-col-label{color:#e8918a}
+.radar-col-target{border-left:3px solid #7fb3ff}
+@media (max-width:800px){
+  .radar-grid, .radar-grid-2{grid-template-columns:1fr}
+  .radar-ticker{font-size:18px}
+  nav[aria-label="Section navigation"] a{font-size:14px !important}
+}
+table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;border-collapse:collapse;margin-bottom:16px;font-size:16px}
+table td, table th{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:left}
+.radar-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:8px;border:1px solid #2a2e37;margin-bottom:16px}
+nav[aria-label="Section navigation"] a{white-space:nowrap}
+.radar-table{display:table;border-collapse:collapse;width:100%;min-width:1100px;margin-bottom:0}
+.radar-table thead th{background:#171a21;color:#7fb3ff;text-align:left;padding:12px 14px;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;border-bottom:2px solid #2a2e37;white-space:nowrap;position:sticky;top:0;z-index:1}
+.radar-table tbody td{padding:14px;border-bottom:1px solid #22262f;font-size:15px;vertical-align:top}
+.radar-table tbody tr:hover{background:#161920}
+.radar-table th:first-child, .radar-table td:first-child{position:sticky;left:0;background:#0f1115;z-index:2;border-right:1px solid #2a2e37}
+.radar-table thead th:first-child{background:#171a21;z-index:3}
+.source-pill{display:inline-block;background:#20242d;color:#9aa0a6;font-size:12px;padding:2px 8px;border-radius:10px;margin:1px 3px 1px 0}
+.signal{font-weight:800;font-size:15px;letter-spacing:0.3px}
+.signal-strong{color:#50dc96} .signal-mixed{color:#e0b84a} .signal-weak{color:#9aa0a6}
+.confidence{font-size:14px;font-weight:700;color:#c7cad1}
+.evidence-list{margin:0;padding-left:16px;font-size:13.5px;color:#8fd6b4}
+.evidence-list li{margin-bottom:3px}
+.dont-chase-badge{display:inline-block;background:#3a1f1f;color:#ff8f87;font-size:11px;font-weight:800;padding:2px 7px;border-radius:4px;letter-spacing:0.4px}
+@media (max-width:800px){
+  .radar-table{font-size:13px}
+}
+.item{background:#171a21;border:1px solid #2a2e37;border-radius:8px;padding:12px;margin-bottom:8px}
+.item a{color:#e8eaed;text-decoration:none;font-size:17px;font-weight:600}
+.item a:hover{text-decoration:underline}
+.meta{color:#9aa0a6;font-size:15px;line-height:2.0}
+.status-ok{color:#50dc96;font-size:15px;font-weight:600}
+.status-warn{color:#f0b429;font-size:15px;font-weight:700}
+.status-bad{color:#ff6b6b;font-size:15px;font-weight:700}
+.val{color:#e8eaed;font-weight:700}
+.badge{border-radius:4px;padding:2px 8px;font-size:12px;font-weight:700;margin-right:4px}
+.badge.upgrade{background:#163a2a;color:#50dc96}
+.badge.downgrade{background:#3a1919;color:#ff6b6b}
+.badge.target{background:#2a2a17;color:#e0d267}
+.badge.target_raise{background:#1c3a1c;color:#7bd97b}
+.badge.target_cut{background:#3a2317;color:#e0977f}
+.badge.initiation{background:#1f2a3a;color:#8fb8ff}
+.badge.reiteration{background:#2a2532;color:#b8a0d9}
+.badge.director_dealing{background:#1a2a3a;color:#7fb3ff}
+.badge.event{background:#1c2a3a;color:#6ab6ff}
+.badge.news{background:#22262f;color:#9aa0a6}
+.broker{background:#2a1c3a;color:#c69bf0;border-radius:4px;padding:2px 8px;font-size:12px;font-weight:700;margin-right:4px}
+.lastpoll{color:#9aa0a6;font-size:11px;text-align:right}
+.status-neutral{color:#9aa0a6;font-size:15px;font-weight:600}
+</style>"""
 WATCHLIST_FILE = os.environ.get("WATCHLIST_FILE", "watchlist.json")
 SEEN_FILE = os.path.join(STATE_DIR, "seen.json")
 DATA_FILE = os.path.join(STATE_DIR, "data.json")
@@ -4811,6 +4896,40 @@ def render_stock_research_html(
     return f'<div{attr_str}>{header}{body}</div>'
 
 
+def render_standalone_page(page_filename, title, heading_emoji_title, content_html, docs_dir):
+    """
+    Wraps a section's already-rendered content HTML (the exact same
+    strings used on the main dashboard, not a re-render) in a minimal
+    standalone page — same shared CSS, a clear back-to-dashboard link,
+    and the same footer. Used for the 11 dedicated per-section pages
+    (screener.html, heatmap.html, etc.) generated alongside index.html
+    from the SAME poll run's data — never a separate fetch, never a
+    separate poll.
+
+    content_html should already contain everything below the page's own
+    <h1> — including any "Data source"/"Retrieved"/freshness lines,
+    since those already exist as part of the section's own rendered
+    HTML on the main dashboard and are reused here unchanged.
+    """
+    page_html = f"""<!DOCTYPE html>
+<html lang="en-GB"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>{esc(title)} — UK Stock Watch</title>
+{DASHBOARD_CSS}
+</head>
+<body>
+<p style="margin:0 0 10px;"><a href="index.html" style="color:#7fb3ff;text-decoration:none;font-size:15px;">← Back to Dashboard</a></p>
+<h1>{heading_emoji_title}</h1>
+<main>
+{content_html}
+</main>
+<p style="text-align:center;margin-top:18px;"><a href="index.html" style="color:#7fb3ff;text-decoration:none;font-size:14px;">← Back to Dashboard</a></p>
+</body></html>"""
+    os.makedirs(docs_dir, exist_ok=True)
+    with open(os.path.join(docs_dir, page_filename), "w", encoding="utf-8") as f:
+        f.write(page_html)
+    return page_html
+
+
 def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticker=None, prior_snapshot=None, backtest_results=None, radar_lifecycle=None):
     """
     latest_broker_events: optional dict of ticker -> latest non-superseded broker
@@ -6120,86 +6239,8 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
      client-side freshness ticker just below already tells the reader
      exactly how stale the page is without needing a reload to do it. -->
 <title>UK Stock Watch</title>
-<style>
-body{{background:#0f1115;color:#e8eaed;font-family:-apple-system,sans-serif;margin:0 auto;padding:12px;font-size:17px;line-height:1.6;max-width:1200px;word-wrap:break-word;overflow-wrap:break-word}}
-h1{{font-size:26px;margin:4px 0;font-weight:800}}
-h2{{font-size:21px;margin:26px 0 10px;font-weight:800;border-left:4px solid #7fb3ff;padding-left:10px}}
-h3{{font-size:16px;margin:0 0 8px;color:#c2c7d0;font-weight:700}}
-a:focus-visible,summary:focus-visible,button:focus-visible{{outline:2px solid #7fb3ff;outline-offset:2px;border-radius:2px}}
-.screener-grid{{display:grid;grid-template-columns:1fr;gap:10px}}
-@media(min-width:600px){{.screener-grid{{grid-template-columns:1fr 1fr 1fr}}}}
-.heatmap-grid{{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:16px}}
-@media(max-width:380px){{.heatmap-grid{{grid-template-columns:repeat(3,1fr)}}}}
-@media(min-width:600px){{.heatmap-grid{{grid-template-columns:repeat(8,1fr)}}}}
-.heat-cell{{border-radius:4px;padding:8px 4px;text-align:center;color:#fff}}
-.heat-symbol{{font-size:14px;font-weight:700}}
-.heat-pct{{font-size:13px;opacity:0.9}}
-.disclaimer{{background:#1c2b25;border:1px solid #274235;color:#9aa0a6;border-radius:6px;padding:10px;font-size:14px;margin-bottom:10px}}
-.quotes{{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}}
-.q{{background:#171a21;border:1px solid #2a2e37;border-radius:6px;padding:8px 12px;font-size:15px}}
-.up{{color:#50dc96;font-weight:800;font-size:17px}} .down{{color:#ff6b6b;font-weight:800;font-size:17px}}
-.radar-card{{background:#171a21;border:1px solid #2a2e37;border-radius:8px;padding:14px 16px;margin-bottom:14px}}
-.radar-compact-wrap{{margin-bottom:10px}}
-.radar-compact{{background:#141821;border-left:3px solid #ffb454;border-radius:6px;padding:10px 14px}}
-.radar-compact .meta{{line-height:1.7;margin:2px 0}}
-.radar-header{{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin-bottom:6px}}
-.radar-ticker{{font-size:20px;font-weight:800;color:#e8eaed}}
-.radar-freshness{{font-size:13px;padding:2px 8px;border-radius:10px;background:#20242d;display:inline-block}}
-.radar-multi{{font-size:12px;font-weight:700;color:#0f1115;background:#7fb3ff;padding:2px 8px;border-radius:10px;display:inline-block}}
-.radar-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:10px 0}}
-.radar-grid-2{{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:10px 0}}
-.radar-col{{background:#12141a;border:1px solid #22262f;border-radius:6px;padding:10px 12px}}
-.radar-col-label{{font-size:13px;font-weight:800;letter-spacing:0.6px;color:#7fb3ff;margin-bottom:6px;text-transform:uppercase}}
-.radar-col-warn .radar-col-label{{color:#e8918a}}
-.radar-col-target{{border-left:3px solid #7fb3ff}}
-@media (max-width:800px){{
-  .radar-grid, .radar-grid-2{{grid-template-columns:1fr}}
-  .radar-ticker{{font-size:18px}}
-  nav[aria-label="Section navigation"] a{{font-size:14px !important}}
-}}
-table{{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;border-collapse:collapse;margin-bottom:16px;font-size:16px}}
-table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:left}}
-.radar-table-wrap{{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:8px;border:1px solid #2a2e37;margin-bottom:16px}}
-nav[aria-label="Section navigation"] a{{white-space:nowrap}}
-.radar-table{{display:table;border-collapse:collapse;width:100%;min-width:1100px;margin-bottom:0}}
-.radar-table thead th{{background:#171a21;color:#7fb3ff;text-align:left;padding:12px 14px;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;border-bottom:2px solid #2a2e37;white-space:nowrap;position:sticky;top:0;z-index:1}}
-.radar-table tbody td{{padding:14px;border-bottom:1px solid #22262f;font-size:15px;vertical-align:top}}
-.radar-table tbody tr:hover{{background:#161920}}
-.radar-table th:first-child, .radar-table td:first-child{{position:sticky;left:0;background:#0f1115;z-index:2;border-right:1px solid #2a2e37}}
-.radar-table thead th:first-child{{background:#171a21;z-index:3}}
-.source-pill{{display:inline-block;background:#20242d;color:#9aa0a6;font-size:12px;padding:2px 8px;border-radius:10px;margin:1px 3px 1px 0}}
-.signal{{font-weight:800;font-size:15px;letter-spacing:0.3px}}
-.signal-strong{{color:#50dc96}} .signal-mixed{{color:#e0b84a}} .signal-weak{{color:#9aa0a6}}
-.confidence{{font-size:14px;font-weight:700;color:#c7cad1}}
-.evidence-list{{margin:0;padding-left:16px;font-size:13.5px;color:#8fd6b4}}
-.evidence-list li{{margin-bottom:3px}}
-.dont-chase-badge{{display:inline-block;background:#3a1f1f;color:#ff8f87;font-size:11px;font-weight:800;padding:2px 7px;border-radius:4px;letter-spacing:0.4px}}
-@media (max-width:800px){{
-  .radar-table{{font-size:13px}}
-}}
-.item{{background:#171a21;border:1px solid #2a2e37;border-radius:8px;padding:12px;margin-bottom:8px}}
-.item a{{color:#e8eaed;text-decoration:none;font-size:17px;font-weight:600}}
-.item a:hover{{text-decoration:underline}}
-.meta{{color:#9aa0a6;font-size:15px;line-height:2.0}}
-.status-ok{{color:#50dc96;font-size:15px;font-weight:600}}
-.status-warn{{color:#f0b429;font-size:15px;font-weight:700}}
-.status-bad{{color:#ff6b6b;font-size:15px;font-weight:700}}
-.val{{color:#e8eaed;font-weight:700}}
-.badge{{border-radius:4px;padding:2px 8px;font-size:12px;font-weight:700;margin-right:4px}}
-.badge.upgrade{{background:#163a2a;color:#50dc96}}
-.badge.downgrade{{background:#3a1919;color:#ff6b6b}}
-.badge.target{{background:#2a2a17;color:#e0d267}}
-.badge.target_raise{{background:#1c3a1c;color:#7bd97b}}
-.badge.target_cut{{background:#3a2317;color:#e0977f}}
-.badge.initiation{{background:#1f2a3a;color:#8fb8ff}}
-.badge.reiteration{{background:#2a2532;color:#b8a0d9}}
-.badge.director_dealing{{background:#1a2a3a;color:#7fb3ff}}
-.badge.event{{background:#1c2a3a;color:#6ab6ff}}
-.badge.news{{background:#22262f;color:#9aa0a6}}
-.broker{{background:#2a1c3a;color:#c69bf0;border-radius:4px;padding:2px 8px;font-size:12px;font-weight:700;margin-right:4px}}
-.lastpoll{{color:#9aa0a6;font-size:11px;text-align:right}}
-.status-neutral{{color:#9aa0a6;font-size:15px;font-weight:600}}
-</style></head>
+{DASHBOARD_CSS}
+</head>
 <body>
 <h1>UK Stock Watch — Live Feed</h1>
 <p id="pipeline-status" class="status-neutral" style="text-align:left;font-size:13px;margin:0 0 10px;">🕐 Last successful poll: {esc(str(last_poll))} — checking freshness…</p>
@@ -6288,33 +6329,33 @@ nav[aria-label="Section navigation"] a{{white-space:nowrap}}
 
 <nav aria-label="Section navigation" style="margin:14px 0;padding:12px;background:#161920;border-radius:6px;font-size:16px;line-height:2.4;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.4);">
 <b style="color:#9aa0a6;margin-right:8px;">Quick Navigation:</b>
-<a href="#top-radar" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🔥 Top Radar</a>
-<a href="#radar-now" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📡 Radar Now</a>
-<a href="#radar-stocks" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🛰️ Radar Stocks</a>
-<a href="#radar-summary" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📋 Radar Summary</a>
-<a href="#strongest-evidence" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🏆 Strongest Evidence</a>
-<a href="#screener" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📊 Screener</a>
-<a href="#heatmap" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🗺️ Heat Map</a>
-<a href="#gainers" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🟢 Gainers</a>
-<a href="#losers" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🔴 Losers</a>
-<a href="#volume" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📊 Volume</a>
-<a href="#watchlist" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">👀 Watchlist</a>
-<a href="#news-explorer" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📰 News Explorer</a>
-<a href="#news-feed" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📰 News / Evidence</a>
-<a href="#catalysts" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📅 Catalysts</a>
-<a href="#warnings" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">⚠️ Warnings</a>
-<a href="#data-freshness" style="color:#7fb3ff;text-decoration:none;white-space:nowrap;">ℹ️ Data&nbsp;/&nbsp;Freshness</a>
+<a href="radar.html#top-radar" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🔥 Top Radar</a>
+<a href="radar.html#radar-now" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📡 Radar Now</a>
+<a href="radar.html#radar-stocks" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🛰️ Radar Stocks</a>
+<a href="radar.html#radar-summary" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📋 Radar Summary</a>
+<a href="strongest-evidence.html" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🏆 Strongest Evidence</a>
+<a href="screener.html" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📊 Screener</a>
+<a href="heatmap.html" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🗺️ Heat Map</a>
+<a href="screener.html#gainers" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🟢 Gainers</a>
+<a href="screener.html#losers" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🔴 Losers</a>
+<a href="screener.html#volume" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📊 Volume</a>
+<a href="watchlist.html" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">👀 Watchlist</a>
+<a href="news-explorer.html" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📰 News Explorer</a>
+<a href="news-feed.html" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📰 News / Evidence</a>
+<a href="catalysts.html" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📅 Catalysts</a>
+<a href="warnings.html" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">⚠️ Warnings</a>
+<a href="data-freshness.html" style="color:#7fb3ff;text-decoration:none;white-space:nowrap;">ℹ️ Data&nbsp;/&nbsp;Freshness</a>
 <details class="nav-more" style="margin-top:4px;">
 <summary style="cursor:pointer;color:#5a6072;font-size:13px;list-style:none;">More navigation ▾</summary>
 <div style="margin-top:4px;font-size:13px;line-height:2;">
-<a href="#mover-news" style="color:#5a80a8;margin-right:12px;text-decoration:none;">Mover News</a>
-<a href="#uptrend" style="color:#5a80a8;margin-right:12px;text-decoration:none;">5-Day Uptrend</a>
-<a href="#targets" style="color:#5a80a8;margin-right:12px;text-decoration:none;">Target Prices</a>
-<a href="#movers-today" style="color:#5a80a8;margin-right:12px;text-decoration:none;">Moving Today</a>
-<a href="#whats-changed" style="color:#5a80a8;margin-right:12px;text-decoration:none;">What Changed</a>
-<a href="#market-research" style="color:#5a80a8;margin-right:12px;text-decoration:none;">Market Research</a>
-<a href="#broker-alerts" style="color:#5a80a8;margin-right:12px;text-decoration:none;">Broker Alerts</a>
-<a href="#backtest" style="color:#5a80a8;text-decoration:none;">Signal Backtest</a>
+<a href="more-data.html#mover-news" style="color:#5a80a8;margin-right:12px;text-decoration:none;">Mover News</a>
+<a href="more-data.html#uptrend" style="color:#5a80a8;margin-right:12px;text-decoration:none;">5-Day Uptrend</a>
+<a href="more-data.html#targets" style="color:#5a80a8;margin-right:12px;text-decoration:none;">Target Prices</a>
+<a href="more-data.html#movers-today" style="color:#5a80a8;margin-right:12px;text-decoration:none;">Moving Today</a>
+<a href="more-data.html#whats-changed" style="color:#5a80a8;margin-right:12px;text-decoration:none;">What Changed</a>
+<a href="more-data.html#market-research" style="color:#5a80a8;margin-right:12px;text-decoration:none;">Market Research</a>
+<a href="more-data.html#broker-alerts" style="color:#5a80a8;margin-right:12px;text-decoration:none;">Broker Alerts</a>
+<a href="more-data.html#backtest" style="color:#5a80a8;text-decoration:none;">Signal Backtest</a>
 </div>
 </details>
 </nav>
@@ -6440,6 +6481,136 @@ nav[aria-label="Section navigation"] a{{white-space:nowrap}}
     os.makedirs(DOCS_DIR, exist_ok=True)
     with open(os.path.join(DOCS_DIR, DOCS_FILENAME), "w", encoding="utf-8") as f:
         f.write(html)
+
+    # Dedicated standalone pages — built from the EXACT SAME already-computed
+    # section variables used just above for index.html, within this same
+    # function call. No re-fetch, no second poll, no separate data path:
+    # whatever index.html shows for a section is byte-identical to what its
+    # dedicated page shows, because both come from the same strings.
+    render_standalone_page("radar.html", "Radar", "📡 Radar", f"""
+<h2 id="radar-now">📡 Radar Now</h2>
+<div style="background:#161920;border-radius:6px;padding:12px 14px;margin-bottom:14px;border-left:3px solid #7fb3ff;">
+{at_a_glance_html}
+</div>
+
+<h2 id="top-radar">🔥 Top Radar</h2>
+<p class="meta">The strongest current Radar evidence, ranked by the same existing Signal Quality/Confidence ordering used throughout — not a new score, not a recommendation. Click any ticker's evidence below to jump straight to it, or scroll to Radar Summary for every currently detected stock.</p>
+{top_radar_html}
+
+<h2 id="radar-stocks">📡 Radar Stocks</h2>
+<p class="meta">Every stock any existing source has surfaced — Watchlist, Heat Map, and LSE Screener — merged once per stock. A discovery list, not a recommendation: this shows the same evidence already computed elsewhere, ranked by existing Signal Quality so the clearest-agreeing evidence appears first, without ranking, scoring, or calling anything a "buy" or "opportunity."</p>
+<div class="disclaimer" style="margin-bottom:10px;"><b>Discovery sources (find NEW stocks):</b> Watchlist, Heat Map, LSE Screener (Volume/Gainers/Losers), and market-wide Broker Research (rating/target changes across the whole LSE, not just watchlist stocks). <b>Evidence sources (enrich stocks already discovered, but cannot discover a stock on their own):</b> Google/Yahoo/Reuters/Bloomberg/FT news feeds and the existing AI Evidence Review — these are per-ticker lookups, not a whole-market scan, so they can only add evidence to a stock some other source already surfaced. <b>Not available, shown honestly rather than invented:</b> genuine insider buy/sell transaction data (only static insider ownership % exists, which is never presented as trading activity) and any web source beyond the news feeds listed above.</div>
+
+<h3 id="radar-summary" style="margin-top:14px;">📋 Radar Summary — all current radar stocks at a glance</h3>
+<p class="meta">One row per stock — scan Signal, Confidence, target, discovery source, evidence, warnings and freshness in seconds. Technical/Market/Research/Risk sub-scores remain in the full evidence cards below.</p>
+<div class="radar-table-wrap">
+<table class="radar-table">
+<thead><tr>
+<th>Stock</th><th>Signal</th><th>Confidence</th><th>Price / Target</th><th>Why On Radar</th>
+<th>Evidence For</th><th>Warnings</th><th>News / Research</th><th>Freshness</th>
+</tr></thead>
+<tbody>
+{radar_summary_html}
+</tbody>
+</table>
+</div>
+
+<h3 style="margin-top:18px;">🔬 Full Radar Stocks evidence</h3>
+{radar_stocks_html}
+""", DOCS_DIR)
+
+    render_standalone_page("strongest-evidence.html", "Strongest Evidence", "🏆 Strongest Agreeing Evidence", f"""
+<p class="meta">Stocks where the scored evidence dimensions agree most clearly right now — not a ranking of what to buy or sell, and not a prediction of future performance. See each stock's full Research Scorecard on the main dashboard for the underlying facts.</p>
+<h3>Strongest agreeing-positive evidence</h3>
+<div class="quotes">{strongest_positive_html}</div>
+<h3>Strongest agreeing-negative evidence</h3>
+<div class="quotes">{strongest_negative_html}</div>
+""", DOCS_DIR)
+
+    render_standalone_page("screener.html", "Screener", "📊 LSE Screener (Volume / Gainers / Losers)", f"""
+{universe_status_line}
+{screener_source_line}
+<div class="screener-grid">
+  <div><h2 id="volume">Top Volume</h2><table><tr><th>#</th><th>Symbol</th><th>Volume</th></tr>{vol_rows}</table></div>
+  <div><h2 id="gainers">Top Gainers</h2><table><tr><th>#</th><th>Symbol</th><th>Chg%</th></tr>{gain_rows}</table></div>
+  <div><h2 id="losers">Top Losers</h2><table><tr><th>#</th><th>Symbol</th><th>Chg%</th></tr>{lose_rows}</table></div>
+</div>
+""", DOCS_DIR)
+
+    render_standalone_page("heatmap.html", "Heat Map", "🗺️ Heat Map (top movers, by size of move)", f"""
+{('<p class="status-ok">✅ Data source: LSE (London Stock Exchange, first-party)'
+  + (' · Retrieved: ' + esc(format_london_and_utc(datetime.fromisoformat(heatmap_retrieved_at))) if heatmap_retrieved_at else '')
+  + '</p>') if _heatmap_instruments else '<p class="status-warn">⚠️ Data source: derived from Screener Gainers/Losers (dedicated LSE heatmap unavailable this run)</p>'}
+<div class="heatmap-grid">{heatmap_cells or heatmap_empty_state_html()}</div>
+""", DOCS_DIR)
+
+    render_standalone_page("watchlist.html", "Watchlist", "👀 Your Watchlist", f"""
+<div class="quotes">{quote_rows or '<span class="meta">No quotes yet</span>'}</div>
+""", DOCS_DIR)
+
+    render_standalone_page("news-explorer.html", "News Explorer", "📰 News Explorer (LSE regulatory &amp; company announcements)", f"""
+<p class="meta">Genuine LSE first-party data — regulatory news and company announcements across the whole market, not limited to your watchlist. No equivalent exists via any other source used on this page, so this section shows an honest "unavailable" state rather than a substitute when the LSE source can't be reached.</p>
+{('<p class="status-ok">✅ Data source: London Stock Exchange (first-party) · Retrieved: '
+  + esc(format_london_and_utc(datetime.fromisoformat(news_explorer['retrievedAt']))) + ' · '
+  + str(news_explorer.get('totalElements', 0)) + ' total result(s), showing '
+  + str(len(news_explorer_stories)) + '</p>')
+ if news_explorer.get('status') == 'ok' else
+ ('<p class="status-warn">⚠️ News Explorer unavailable this run'
+  + (' (' + esc(news_explorer['error']) + ')' if news_explorer.get('error') else '') + '</p>')}
+{f'<table><tr><th>Headline</th><th>Company</th><th>Source</th><th>Date / Time</th><th>RNS Number</th><th>Price</th><th>Change %</th></tr>{news_explorer_rows}</table>' if news_explorer_stories else '<span class="meta">No stories available this run.</span>'}
+""", DOCS_DIR)
+
+    render_standalone_page("news-feed.html", "News / Evidence", "📰 News &amp; Broker Feed (watchlist)", f"""
+{item_rows or news_empty_state_html(news_fetch_status, all_recent_items, "news")}
+""", DOCS_DIR)
+
+    render_standalone_page("catalysts.html", "Catalysts", "🗓️ Upcoming Catalysts", f"""
+<p class="meta">Real, already-published earnings and ex-dividend dates from Yahoo's calendar data — informational only, not a suggestion to act around any of these dates. Covers both your watchlist and today's screener-ranked stocks.</p>
+<table><tr><th>Stock</th><th>Event</th><th>Date</th><th>Days until</th><th>Timing</th></tr>{catalyst_rows or '<tr><td colspan="5" class="meta">No known upcoming earnings or ex-dividend dates right now.</td></tr>'}</table>
+""", DOCS_DIR)
+
+    render_standalone_page("warnings.html", "Warnings", "⚠️ Warnings / Contradictions", f"""
+<p class="meta">Every stock currently on Radar with a flagged contradiction or an active DON'T CHASE warning, gathered here from the same evidence shown on each stock's own card — nothing new calculated.</p>
+<div class="quotes">{warnings_html}</div>
+""", DOCS_DIR)
+
+    render_standalone_page("data-freshness.html", "Data / Freshness", "ℹ️ Data / Freshness", f"""
+<p class="meta">A quick summary of how current each data source is right now, gathered from the same status checks already shown on the main dashboard.</p>
+{data_freshness_html}
+""", DOCS_DIR)
+
+    render_standalone_page("more-data.html", "More Data", "📚 More Data", f"""
+<h2 id="mover-news">📰 News on Today's Top Movers</h2>
+<p class="meta">Real, dated-today news for any stock currently in Volume/Gainers/Losers — not limited to your watchlist.</p>
+<div>{screener_news_rows or news_empty_state_html(mover_news_status, all_recent_mover_news, "news for today's ranked stocks", render_fn=lambda it: screener_news_item(it.get("ticker", ""), it))}</div>
+
+<h2 id="uptrend">📈 5-Day Uptrend ({UPTREND_5DAY_THRESHOLD_PCT:.0f}%+, screener + watchlist)</h2>
+<p class="meta">Real closing-price history over the last 5 trading days — a fact about the past, not a forecast of what happens next.</p>
+<div class="quotes">{uptrend_rows or '<span class="meta">Nothing has met the 5-day threshold right now</span>'}</div>
+
+<h2 id="targets">🎯 Broker Target Prices</h2>
+<p class="meta">Real, already-published broker consensus targets from Yahoo's aggregation — not generated by this tool. Covers both your watchlist and today's screener-ranked stocks (Volume/Gainers/Losers).</p>
+<div class="quotes">{target_price_rows or '<span class="meta">No target price data available yet.</span>'}</div>
+
+<h2 id="movers-today">🔥 Already Moving Today (watchlist, ±{BIG_MOVER_THRESHOLD_PCT:.0f}%+)</h2>
+<p class="meta">A fact about what already happened today — not a forecast of what happens next.</p>
+<div class="quotes">{mover_rows or '<span class="meta">Nothing past the threshold right now</span>'}</div>
+
+<h2 id="whats-changed">📅 What Changed Since Last Snapshot</h2>
+<p class="meta">{whats_changed_intro}</p>
+<div class="quotes">{whats_changed_html}</div>
+
+<h2 id="market-research">🔎 Market Research</h2>
+<p class="meta">Real broker targets, recent news, and consensus ratings, already gathered by this tool — free, always live, no AI or API cost involved. If an ANTHROPIC_API_KEY is configured, a short AI-written summary appears too (🤖), synthesised only from these same facts — never fresh web research, never a recommendation. Always cross-check anything here against primary sources before acting on it.</p>
+{research_rows or '<p class="meta">No watchlist stocks to show yet.</p>'}
+
+<h2 id="broker-alerts">⬆⬇🎯 Market-wide Broker Alerts (all LSE, not just watchlist)</h2>
+<p class="meta">Upgrades/downgrades from anywhere on the LSE, not limited to your watchlist below.</p>
+{market_wide_rows or news_empty_state_html(market_wide_alerts_status, recent_market_wide_filtered, "market-wide alerts")}
+
+<h2 id="backtest">📊 Signal Backtest (Technical Signals Only)</h2>
+{backtest_html}
+""", DOCS_DIR)
 
     # Attaches each stock's Radar Stocks discovery sources (Watchlist,
     # Heat Map, LSE Volume/Gainers/Losers) onto its scorecard_summaries
