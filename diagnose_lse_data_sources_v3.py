@@ -91,7 +91,7 @@ def inspect_page(name, url):
 
     result = {
         "url": url, "status": None, "error": None,
-        "componentsRefresh": None, "allJsonEndpoints": [],
+        "componentsRefresh": None, "allJsonEndpoints": [], "captureErrors": [],
     }
 
     try:
@@ -102,6 +102,7 @@ def inspect_page(name, url):
                             "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
             )
             captured = {}
+            capture_errors = []
 
             def on_response(response):
                 try:
@@ -113,11 +114,14 @@ def inspect_page(name, url):
                         "status": response.status,
                         "method": req.method,
                         "requestPostData": req.post_data,
-                        "responseHeaders": dict(response.headers()),
+                        "responseHeaders": dict(response.headers),
                         "body": response.text(),
                     }
-                except Exception:
-                    pass
+                except Exception as e:
+                    # Loud, not swallowed: a v3 predecessor hid a real bug
+                    # behind a bare "except: pass" here, producing a
+                    # misleadingly empty (not honestly failed) result.
+                    capture_errors.append(f"{response.url}: {type(e).__name__}: {e}")
 
             page.on("response", on_response)
             resp = page.goto(url, timeout=30000, wait_until="networkidle")
@@ -133,6 +137,7 @@ def inspect_page(name, url):
 
             time.sleep(3)
             browser.close()
+            result["captureErrors"] = capture_errors
 
             # Record EVERY json endpoint seen (minus obvious tracking/consent
             # noise) - broadens News Explorer coverage specifically, in case
@@ -190,6 +195,12 @@ def main():
         if result.get("error"):
             print(f"  ERROR: {result['error']}")
             continue
+
+        if result.get("captureErrors"):
+            print(f"  WARNING: {len(result['captureErrors'])} response(s) failed to capture "
+                  f"(shown here instead of silently hidden):")
+            for ce in result["captureErrors"][:10]:
+                print(f"    - {ce}")
 
         print(f"\n  All JSON endpoints seen (excluding tracking/consent noise):")
         for e in result["allJsonEndpoints"]:
