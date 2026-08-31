@@ -1,0 +1,50 @@
+name: LSE Diagnostic v11 - Evidence Gathering
+
+on:
+  workflow_dispatch:
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Heatmap - isolated request, full body capture
+        run: python diagnose_lse_v11_evidence.py heatmap
+
+      # Each News Explorer attempt runs as its OWN, separate step - a
+      # genuinely fresh OS process every time, not a loop inside one
+      # process, matching "completely fresh Python process" exactly.
+      - name: News Explorer - isolated attempt 1
+        run: python diagnose_lse_v11_evidence.py news 1
+
+      - name: Wait 30s before attempt 2
+        run: sleep 30
+
+      - name: News Explorer - isolated attempt 2
+        run: python diagnose_lse_v11_evidence.py news 2
+
+      - name: Wait 30s before attempt 3
+        run: sleep 30
+
+      - name: News Explorer - isolated attempt 3
+        run: python diagnose_lse_v11_evidence.py news 3
+
+      - name: Upload all evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lse-v11-evidence
+          path: |
+            lse_heatmap_production_shape_response.json
+            lse_heatmap_structural_shape.json
+            lse_heatmap_full_result.json
+            lse_news_isolated_attempt_*_response.json
+            lse_news_isolated_all_attempts.json
+          retention-days: 14
