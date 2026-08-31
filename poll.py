@@ -910,6 +910,35 @@ def compute_pipeline_health(last_poll_str, now_utc=None):
     }
 
 
+def format_news_timestamp(pub_date_str):
+    """
+    Converts a raw RSS pubDate string (e.g. "Mon, 31 Aug 2026 14:23:00 GMT" —
+    always labeled GMT by the feeds regardless of actual season) into a
+    genuinely correct, consistently-formatted display timestamp, matching
+    the same BST/UTC convention used everywhere else on the dashboard.
+
+    Confirmed real problem this fixes: showing the raw RSS string directly
+    is misleading during British Summer Time (the feed always says "GMT"
+    even in August, when the real local time is BST, one hour later) and
+    is visually inconsistent with every other timestamp on the page.
+
+    Returns "HH:MM BST (HH:MM UTC)" for today's items (matches the
+    same-day-only guarantee this project already enforces via
+    NEWS_SAME_LONDON_DAY_ONLY), or "DD Mon, HH:MM BST" for the rare
+    older fallback item (never presented as if it were today's). Falls
+    back to the raw string, never blank, if genuinely unparseable.
+    """
+    dt = _parse_pub_date(pub_date_str)
+    if dt is None:
+        return esc(pub_date_str or "")
+    dt_london = dt.astimezone(LONDON_TZ)
+    dt_utc = dt.astimezone(timezone.utc)
+    is_today = dt_london.date() == datetime.now(timezone.utc).astimezone(LONDON_TZ).date()
+    if is_today:
+        return f'{dt_london.strftime("%H:%M")} {dt_london.strftime("%Z")} ({dt_utc.strftime("%H:%M")} UTC)'
+    return f'{dt_london.strftime("%d %b, %H:%M")} {dt_london.strftime("%Z")}'
+
+
 def _parse_pub_date(pub_date_str):
     """
     Shared date parser — tries RFC 822 (standard RSS: "Wed, 31 Jul 2024 07:00:00 GMT")
@@ -5354,7 +5383,7 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
             news_bits.append(
                 f'<a href="{esc(top_news.get("link", "#"))}" target="_blank" style="color:#7fb3ff;">{esc(top_news["title"])}</a>'
                 f'<br/><span style="opacity:0.6;font-size:12px;">{esc(top_news.get("source") or "?")}'
-                f'{" · " + esc(top_news["pubDate"]) if top_news.get("pubDate") else ""}</span>'
+                f'{" · " + format_news_timestamp(top_news["pubDate"]) if top_news.get("pubDate") else ""}</span>'
             )
         else:
             news_bits.append('<span style="opacity:0.6;">No relevant recent news found</span>')
@@ -5478,7 +5507,7 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
             f'<div class="meta" style="font-size:14px;">📰 <a href="{esc(top_news.get("link", "#"))}" '
             f'target="_blank" style="color:#7fb3ff;">{esc(top_news["title"])}</a> '
             f'<span style="opacity:0.6;">({esc(top_news.get("source") or "?")}'
-            f'{" · " + esc(top_news["pubDate"]) if top_news.get("pubDate") else ""})</span></div>'
+            f'{" · " + format_news_timestamp(top_news["pubDate"]) if top_news.get("pubDate") else ""})</span></div>'
             if top_news else '<div class="meta" style="font-size:14px;">📰 No relevant recent news found</div>'
         )
 
@@ -5730,7 +5759,7 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
             f'<div class="item"><span class="badge {it.get("category","news")}">{it.get("category","news").upper()}</span> '
             f'<b>{ticker_label}</b> '
             f'{broker_html} '
-            f'<span class="meta">{esc(source_display)} · {esc(it.get("pubDate",""))}</span>{classified_html}<br/>'
+            f'<span class="meta">{esc(source_display)} · {format_news_timestamp(it.get("pubDate",""))}</span>{classified_html}<br/>'
             f'<a href="{esc(it.get("link","#"))}" target="_blank">{esc(it.get("title",""))}</a></div>'
         )
 
@@ -5864,7 +5893,7 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
         return (
             f'<div class="item"><span class="badge {it.get("category","news")}">{it.get("category","news").upper()}</span> '
             f'<b>{esc(symbol)}</b> {broker_html} '
-            f'<span class="meta">{esc(source_display)} · {esc(it.get("pubDate",""))}</span>{classified_html}<br/>'
+            f'<span class="meta">{esc(source_display)} · {format_news_timestamp(it.get("pubDate",""))}</span>{classified_html}<br/>'
             f'<a href="{esc(it.get("link","#"))}" target="_blank">{esc(it.get("title",""))}</a></div>'
         )
 
@@ -6177,7 +6206,7 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
         headlines_html = ""
         if recent_items:
             headlines_html = '<ul style="margin:6px 0 0;padding-left:18px;font-size:12px;line-height:1.7;">' + "".join(
-                f'<li><span class="meta">{esc(it.get("pubDate",""))} — {esc(it.get("source",""))}</span><br/>'
+                f'<li><span class="meta">{format_news_timestamp(it.get("pubDate",""))} — {esc(it.get("source",""))}</span><br/>'
                 f'<a href="{esc(it.get("link","#"))}" target="_blank" style="color:#e8eaed;">{esc(it.get("title",""))}</a></li>'
                 for it in recent_items
             ) + '</ul>'
