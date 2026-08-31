@@ -15,6 +15,7 @@ import http.cookiejar
 import json
 import os
 import re
+import difflib
 import sys
 import time
 import uuid
@@ -4311,6 +4312,81 @@ def classify_source_type(fetch_source, link=None, title=None):
     return "aggregated_unknown", "Unknown/Aggregated"
 
 
+# Priority order for resolving near-duplicate headlines from DIFFERENT
+# sources (different links, same underlying story) — reuses the SAME
+# authoritativeness ordering classify_source_type's own docstring
+# already documents, rather than inventing a separate ranking.
+SOURCE_TYPE_PRIORITY = {
+    "company_announcement": 0,
+    "broker_data": 1,
+    "financial_journalism": 2,
+    "retail_commentary": 3,
+    "aggregated_unknown": 4,
+}
+
+NEAR_DUPLICATE_HEADLINE_THRESHOLD = 0.85  # deliberately high (85%+ similarity) -
+# conservative on purpose: a missed near-duplicate is a minor cosmetic
+# issue, but a FALSE positive would silently hide a genuinely different
+# story just because it shares some wording, which is a real information
+# loss. Never applied across different tickers or different days (see
+# dedupe_near_duplicate_headlines) - only ever compares headlines already
+# confirmed to be about the SAME stock, on the SAME day.
+
+
+def _normalize_headline_for_comparison(title):
+    """Lowercase, strip punctuation/extra whitespace - so 'Barclays Q3
+    profit beats forecasts' and 'Barclays: Q3 profit beats forecasts.'
+    compare as near-identical rather than differing only in punctuation
+    that carries no real meaning."""
+    return re.sub(r"[^\w\s]", "", (title or "").lower()).split()
+
+
+def dedupe_near_duplicate_headlines(items):
+    """
+    Removes near-duplicate STORIES (not just exact-link duplicates,
+    which the existing seen_links check already catches) — the same
+    underlying event covered independently by two different outlets
+    with two different URLs and slightly different headline wording.
+
+    Only ever compares items already known to be about the SAME ticker
+    on the SAME day (callers pass in a single ticker's already-same-day-
+    filtered list) - never cross-ticker, never cross-day. When two
+    items are near-duplicates (headline similarity >= threshold), keeps
+    the one from the more authoritative source (via SOURCE_TYPE_PRIORITY,
+    the same ordering classify_source_type already documents), and among
+    equal-priority sources, keeps whichever was published first.
+
+    Never removes a headline that's merely SHORT or that shares a few
+    common words - the threshold is deliberately high specifically to
+    avoid ever discarding a genuinely different story.
+    """
+    if len(items) <= 1:
+        return items
+
+    kept = []
+    kept_normalized = []
+    # Process in priority order first (most authoritative source wins
+    # when a near-duplicate is found), then by earliest publish time
+    # within equal priority.
+    ordered = sorted(
+        items,
+        key=lambda it: (SOURCE_TYPE_PRIORITY.get(it.get("sourceType"), 4),
+                         _parse_pub_date(it.get("pubDate")) or datetime.min.replace(tzinfo=timezone.utc)),
+    )
+    for it in ordered:
+        norm = _normalize_headline_for_comparison(it.get("title", ""))
+        is_near_duplicate = False
+        for existing_norm in kept_normalized:
+            ratio = difflib.SequenceMatcher(None, norm, existing_norm).ratio()
+            if ratio >= NEAR_DUPLICATE_HEADLINE_THRESHOLD:
+                is_near_duplicate = True
+                break
+        if not is_near_duplicate:
+            kept.append(it)
+            kept_normalized.append(norm)
+    return kept
+
+
 def detect_contradictions(
     change_pct, change_pct_5d, above_ma20, rsi14, volume_ratio,
     evidence, broker_momentum, upside_pct, ma200,
@@ -7497,7 +7573,7 @@ def main():
                 return out
 
             if items_today:
-                screener_news[symbol] = _enrich_mover_items(items_today)
+                screener_news[symbol] = dedupe_near_duplicate_headlines(_enrich_mover_items(items_today))
 
             # Recent-fallback pool: merge with whatever was persisted for this
             # symbol, revalidate against the wide recency+relevance rule
@@ -7515,6 +7591,7 @@ def main():
                     continue
                 seen_links_sc.add(it["link"])
                 deduped_recent_sc.append(it)
+            deduped_recent_sc = dedupe_near_duplicate_headlines(deduped_recent_sc)
             deduped_recent_sc.sort(key=item_sort_key, reverse=True)
             if deduped_recent_sc:
                 screener_news_recent[symbol] = deduped_recent_sc[:5]
@@ -7722,6 +7799,19 @@ def main():
         # The EXISTING same-day pool — identical items to before this change,
         # just now derived from the wider set rather than separately filtered.
         market_wide_enriched = [it for it in market_wide_enriched_wide if is_today_in_london(it.get("pubDate"))]
+        # Near-duplicate dedup must stay WITHIN each ticker — this pool is
+        # flat across many different companies, and comparing headlines
+        # ACROSS tickers would risk two unrelated companies' genuinely
+        # different alerts being wrongly treated as duplicates just for
+        # sharing common rating-change wording. Grouped by ticker first,
+        # deduped within each group, then flattened back.
+        _mw_by_ticker = {}
+        for it in market_wide_enriched:
+            _mw_by_ticker.setdefault(it.get("ticker"), []).append(it)
+        market_wide_enriched = [
+            it for tkr_items in _mw_by_ticker.values()
+            for it in dedupe_near_duplicate_headlines(tkr_items)
+        ]
 
         for it in market_wide_enriched:
             if it["link"] in seen:
@@ -7852,6 +7942,11 @@ def main():
                 continue
             seen_links.add(it["link"])
             deduped.append(it)
+        # Near-duplicate dedup: the SAME story covered independently by
+        # different outlets with different links (exact-link dedup above
+        # only catches identical URLs) - keeps the most authoritative
+        # source's version when two headlines are genuinely near-identical.
+        deduped = dedupe_near_duplicate_headlines(deduped)
         deduped.sort(key=item_sort_key, reverse=True)
         items_by_ticker[ticker] = deduped[:MAX_ITEMS_PER_TICKER]
 
@@ -7871,6 +7966,7 @@ def main():
                 continue
             seen_links_recent.add(it["link"])
             deduped_recent.append(it)
+        deduped_recent = dedupe_near_duplicate_headlines(deduped_recent)
         deduped_recent.sort(key=item_sort_key, reverse=True)
         recent_items_by_ticker[ticker] = deduped_recent[:MAX_ITEMS_PER_TICKER]
 
