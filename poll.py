@@ -5252,6 +5252,7 @@ a:focus-visible,summary:focus-visible,button:focus-visible{{outline:2px solid #7
 table{{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;border-collapse:collapse;margin-bottom:16px;font-size:16px}}
 table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:left}}
 .radar-table-wrap{{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:8px;border:1px solid #2a2e37;margin-bottom:16px}}
+nav[aria-label="Section navigation"] a{{white-space:nowrap}}
 .radar-table{{display:table;border-collapse:collapse;width:100%;min-width:1100px;margin-bottom:0}}
 .radar-table thead th{{background:#171a21;color:#7fb3ff;text-align:left;padding:12px 14px;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;border-bottom:2px solid #2a2e37;white-space:nowrap;position:sticky;top:0;z-index:1}}
 .radar-table tbody td{{padding:14px;border-bottom:1px solid #22262f;font-size:15px;vertical-align:top}}
@@ -5381,7 +5382,7 @@ table td, table th{{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:
 <b style="color:#9aa0a6;margin-right:8px;">Quick Navigation:</b>
 <a href="#top-radar" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🔥 Top Radar</a>
 <a href="#radar-now" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📡 Radar Now</a>
-<a href="#radar-stocks" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📡 Radar Stocks</a>
+<a href="#radar-stocks" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🛰️ Radar Stocks</a>
 <a href="#radar-summary" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📋 Radar Summary</a>
 <a href="#strongest-evidence" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">🏆 Strongest Evidence</a>
 <a href="#screener" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">📊 Screener</a>
