@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en-GB"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Warnings — UK Stock Watch</title>
+<style>
+body{background:#0f1115;color:#e8eaed;font-family:-apple-system,sans-serif;margin:0 auto;padding:12px;font-size:17px;line-height:1.6;max-width:1200px;word-wrap:break-word;overflow-wrap:break-word}
+h1{font-size:26px;margin:4px 0;font-weight:800}
+h2{font-size:21px;margin:26px 0 10px;font-weight:800;border-left:4px solid #7fb3ff;padding-left:10px}
+h3{font-size:16px;margin:0 0 8px;color:#c2c7d0;font-weight:700}
+a:focus-visible,summary:focus-visible,button:focus-visible{outline:2px solid #7fb3ff;outline-offset:2px;border-radius:2px}
+.screener-grid{display:grid;grid-template-columns:1fr;gap:10px}
+@media(min-width:600px){.screener-grid{grid-template-columns:1fr 1fr 1fr}}
+.heatmap-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:16px}
+@media(max-width:380px){.heatmap-grid{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:600px){.heatmap-grid{grid-template-columns:repeat(8,1fr)}}
+.heat-cell{border-radius:4px;padding:8px 4px;text-align:center;color:#fff}
+.heat-symbol{font-size:14px;font-weight:700}
+.heat-pct{font-size:13px;opacity:0.9}
+.disclaimer{background:#1c2b25;border:1px solid #274235;color:#9aa0a6;border-radius:6px;padding:10px;font-size:14px;margin-bottom:10px}
+.quotes{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.q{background:#171a21;border:1px solid #2a2e37;border-radius:6px;padding:8px 12px;font-size:15px}
+.up{color:#50dc96;font-weight:800;font-size:17px} .down{color:#ff6b6b;font-weight:800;font-size:17px}
+.radar-card{background:#171a21;border:1px solid #2a2e37;border-radius:8px;padding:14px 16px;margin-bottom:14px}
+.radar-compact-wrap{margin-bottom:10px}
+.radar-compact{background:#141821;border-left:3px solid #ffb454;border-radius:6px;padding:10px 14px}
+.radar-compact .meta{line-height:1.7;margin:2px 0}
+.radar-header{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin-bottom:6px}
+.radar-ticker{font-size:20px;font-weight:800;color:#e8eaed}
+.radar-freshness{font-size:13px;padding:2px 8px;border-radius:10px;background:#20242d;display:inline-block}
+.radar-multi{font-size:12px;font-weight:700;color:#0f1115;background:#7fb3ff;padding:2px 8px;border-radius:10px;display:inline-block}
+.radar-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:10px 0}
+.radar-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:10px 0}
+.radar-col{background:#12141a;border:1px solid #22262f;border-radius:6px;padding:10px 12px}
+.radar-col-label{font-size:13px;font-weight:800;letter-spacing:0.6px;color:#7fb3ff;margin-bottom:6px;text-transform:uppercase}
+.radar-col-warn .radar-col-label{color:#e8918a}
+.radar-col-target{border-left:3px solid #7fb3ff}
+@media (max-width:800px){
+  .radar-grid, .radar-grid-2{grid-template-columns:1fr}
+  .radar-ticker{font-size:18px}
+  nav[aria-label="Section navigation"] a{font-size:14px !important}
+}
+table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;border-collapse:collapse;margin-bottom:16px;font-size:16px}
+table td, table th{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:left}
+.radar-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:8px;border:1px solid #2a2e37;margin-bottom:16px}
+nav[aria-label="Section navigation"] a{white-space:nowrap}
+.radar-table{display:table;border-collapse:collapse;width:100%;min-width:1100px;margin-bottom:0}
+.radar-table thead th{background:#171a21;color:#7fb3ff;text-align:left;padding:12px 14px;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;border-bottom:2px solid #2a2e37;white-space:nowrap;position:sticky;top:0;z-index:1}
+.radar-table tbody td{padding:14px;border-bottom:1px solid #22262f;font-size:15px;vertical-align:top}
+.radar-table tbody tr:hover{background:#161920}
+.radar-table th:first-child, .radar-table td:first-child{position:sticky;left:0;background:#0f1115;z-index:2;border-right:1px solid #2a2e37}
+.radar-table thead th:first-child{background:#171a21;z-index:3}
+.source-pill{display:inline-block;background:#20242d;color:#9aa0a6;font-size:12px;padding:2px 8px;border-radius:10px;margin:1px 3px 1px 0}
+.signal{font-weight:800;font-size:15px;letter-spacing:0.3px}
+.signal-strong{color:#50dc96} .signal-mixed{color:#e0b84a} .signal-weak{color:#9aa0a6}
+.confidence{font-size:14px;font-weight:700;color:#c7cad1}
+.evidence-list{margin:0;padding-left:16px;font-size:13.5px;color:#8fd6b4}
+.evidence-list li{margin-bottom:3px}
+.dont-chase-badge{display:inline-block;background:#3a1f1f;color:#ff8f87;font-size:11px;font-weight:800;padding:2px 7px;border-radius:4px;letter-spacing:0.4px}
+@media (max-width:800px){
+  .radar-table{font-size:13px}
+}
+.item{background:#171a21;border:1px solid #2a2e37;border-radius:8px;padding:12px;margin-bottom:8px}
+.item a{color:#e8eaed;text-decoration:none;font-size:17px;font-weight:600}
+.item a:hover{text-decoration:underline}
+.meta{color:#9aa0a6;font-size:15px;line-height:2.0}
+.status-ok{color:#50dc96;font-size:15px;font-weight:600}
+.status-warn{color:#f0b429;font-size:15px;font-weight:700}
+.status-bad{color:#ff6b6b;font-size:15px;font-weight:700}
+.val{color:#e8eaed;font-weight:700}
+.badge{border-radius:4px;padding:2px 8px;font-size:12px;font-weight:700;margin-right:4px}
+.badge.upgrade{background:#163a2a;color:#50dc96}
+.badge.downgrade{background:#3a1919;color:#ff6b6b}
+.badge.target{background:#2a2a17;color:#e0d267}
+.badge.target_raise{background:#1c3a1c;color:#7bd97b}
+.badge.target_cut{background:#3a2317;color:#e0977f}
+.badge.initiation{background:#1f2a3a;color:#8fb8ff}
+.badge.reiteration{background:#2a2532;color:#b8a0d9}
+.badge.director_dealing{background:#1a2a3a;color:#7fb3ff}
+.badge.event{background:#1c2a3a;color:#6ab6ff}
+.badge.news{background:#22262f;color:#9aa0a6}
+.broker{background:#2a1c3a;color:#c69bf0;border-radius:4px;padding:2px 8px;font-size:12px;font-weight:700;margin-right:4px}
+.lastpoll{color:#9aa0a6;font-size:11px;text-align:right}
+.status-neutral{color:#9aa0a6;font-size:15px;font-weight:600}
+</style>
+</head>
+<body>
+<p style="margin:0 0 10px;"><a href="index.html" style="color:#7fb3ff;text-decoration:none;font-size:15px;">← Back to Dashboard</a></p>
+<h1>⚠️ Warnings / Contradictions</h1>
+<main>
+
+<p class="meta">Every stock currently on Radar with a flagged contradiction or an active DON'T CHASE warning, gathered here from the same evidence shown on each stock's own card — nothing new calculated.</p>
+<div class="quotes"><div class="quote-row"><a href="#radar-summary-LLOY" style="color:#e8eaed;text-decoration:none;"><b>LLOY</b></a> — ⚠ 5-day trend negative (-1.2%) — weakening trend</div><div class="quote-row"><a href="#radar-summary-BARC" style="color:#e8eaed;text-decoration:none;"><b>BARC</b></a> — ⚠ Price below 20-day MA — weakening trend</div><div class="quote-row"><a href="#radar-summary-BP." style="color:#e8eaed;text-decoration:none;"><b>BP.</b></a> — ⚠ 5-day trend negative (-6.4%) — weakening trend</div><div class="quote-row"><a href="#radar-summary-SHEL" style="color:#e8eaed;text-decoration:none;"><b>SHEL</b></a> — ⚠ 5-day trend negative (-1.9%) — weakening trend</div><div class="quote-row"><a href="#radar-summary-KOO" style="color:#e8eaed;text-decoration:none;"><b>KOO</b></a> — ⚠ A strong rise (+20.0%) alongside an already-overextended RSI (93) · ⏳ DON'T CHASE: +32.2% over 5 days; RSI 93; Volume 8.3× average</div><div class="quote-row"><a href="#radar-summary-TLW" style="color:#e8eaed;text-decoration:none;"><b>TLW</b></a> — ⚠ RSI 81 — overextended</div><div class="quote-row"><a href="#radar-summary-TCAP" style="color:#e8eaed;text-decoration:none;"><b>TCAP</b></a> — ⚠ 20-day MA below 50-day MA (bearish crossover)</div><div class="quote-row"><a href="#radar-summary-SDLF" style="color:#e8eaed;text-decoration:none;"><b>SDLF</b></a> — ⚠ Price already 5.7% above broker consensus target</div><div class="quote-row"><a href="#radar-summary-MARS" style="color:#e8eaed;text-decoration:none;"><b>MARS</b></a> — ⚠ 20-day MA below 50-day MA (bearish crossover)</div><div class="quote-row"><a href="#radar-summary-NG" style="color:#e8eaed;text-decoration:none;"><b>NG</b></a> — ⚠ 5-day trend negative (-0.1%) — weakening trend</div><div class="quote-row"><a href="#radar-summary-LGEN" style="color:#e8eaed;text-decoration:none;"><b>LGEN</b></a> — ⚠ Price below 20-day MA — weakening trend</div><div class="quote-row"><a href="#radar-summary-CNA" style="color:#e8eaed;text-decoration:none;"><b>CNA</b></a> — ⚠ 20-day MA below 50-day MA (bearish crossover)</div><div class="quote-row"><a href="#radar-summary-ASC" style="color:#e8eaed;text-decoration:none;"><b>ASC</b></a> — ⚠ RSI 73 — overextended</div><div class="quote-row"><a href="#radar-summary-UKW" style="color:#e8eaed;text-decoration:none;"><b>UKW</b></a> — ⚠ Price below 20-day MA — weakening trend</div><div class="quote-row"><a href="#radar-summary-GSK" style="color:#e8eaed;text-decoration:none;"><b>GSK</b></a> — ⚠ 5-day trend negative (-3.4%) — weakening trend</div><div class="quote-row"><a href="#radar-summary-GLEN" style="color:#e8eaed;text-decoration:none;"><b>GLEN</b></a> — ⚠ 5-day trend negative (-0.2%) — weakening trend</div><div class="quote-row"><a href="#radar-summary-CBG" style="color:#e8eaed;text-decoration:none;"><b>CBG</b></a> — ⚠ 5-day trend negative (-3.6%) — weakening trend</div><div class="quote-row"><a href="#radar-summary-TW" style="color:#e8eaed;text-decoration:none;"><b>TW</b></a> — ⚠ Underperforming FTSE 100 by 0.4%</div><div class="quote-row"><a href="#radar-summary-HLN" style="color:#e8eaed;text-decoration:none;"><b>HLN</b></a> — ⚠ Underperforming FTSE 100 by 0.4%</div><div class="quote-row"><a href="#radar-summary-RPI" style="color:#e8eaed;text-decoration:none;"><b>RPI</b></a> — ⚠ 5-day trend negative (-4.8%) — weakening trend</div><div class="quote-row"><a href="#radar-summary-FCH" style="color:#e8eaed;text-decoration:none;"><b>FCH</b></a> — ⚠ 5-day trend negative (-3.2%) — weakening trend</div><div class="quote-row"><a href="#radar-summary-BA" style="color:#e8eaed;text-decoration:none;"><b>BA</b></a> — ⚠ 5-day trend negative (-3.9%) — weakening trend</div><div class="quote-row"><a href="#radar-summary-JIM" style="color:#e8eaed;text-decoration:none;"><b>JIM</b></a> — ⚠ 5-day trend negative (-12.5%) — weakening trend</div><div class="quote-row"><a href="#radar-summary-LLOY" style="color:#e8eaed;text-decoration:none;"><b>LLOY</b></a> — ⚠ 5-day trend negative (-1.2%) — weakening trend</div><div class="quote-row"><a href="#radar-summary-GLEN" style="color:#e8eaed;text-decoration:none;"><b>GLEN</b></a> — ⚠ 5-day trend negative (-0.2%) — weakening trend</div><div class="quote-row"><a href="#radar-summary-BP." style="color:#e8eaed;text-decoration:none;"><b>BP.</b></a> — ⚠ 5-day trend negative (-6.4%) — weakening trend</div><div class="quote-row"><a href="#radar-summary-LGEN" style="color:#e8eaed;text-decoration:none;"><b>LGEN</b></a> — ⚠ Price below 20-day MA — weakening trend</div><div class="quote-row"><a href="#radar-summary-BBOX" style="color:#e8eaed;text-decoration:none;"><b>BBOX</b></a> — ⚠ 5-day trend negative (-0.6%) — weakening trend</div><div class="quote-row"><a href="#radar-summary-TSCO" style="color:#e8eaed;text-decoration:none;"><b>TSCO</b></a> — ⚠ Price below 20-day MA — weakening trend</div><div class="quote-row"><a href="#radar-summary-BARC" style="color:#e8eaed;text-decoration:none;"><b>BARC</b></a> — ⚠ Price below 20-day MA — weakening trend</div><div class="quote-row"><a href="#radar-summary-SSE" style="color:#e8eaed;text-decoration:none;"><b>SSE</b></a> — ⚠ 20-day MA below 50-day MA (bearish crossover)</div><div class="quote-row"><a href="#radar-summary-STAN" style="color:#e8eaed;text-decoration:none;"><b>STAN</b></a> — ⚠ Price below 20-day MA — weakening trend</div><div class="quote-row"><a href="#radar-summary-INF" style="color:#e8eaed;text-decoration:none;"><b>INF</b></a> — ⚠ Price below 20-day MA — weakening trend</div><div class="quote-row"><a href="#radar-summary-BAB" style="color:#e8eaed;text-decoration:none;"><b>BAB</b></a> — ⚠ 5-day trend negative (-4.3%) — weakening trend</div><div class="quote-row"><a href="#radar-summary-BA." style="color:#e8eaed;text-decoration:none;"><b>BA.</b></a> — ⚠ 5-day trend negative (-3.9%) — weakening trend</div><div class="quote-row"><a href="#radar-summary-AAF" style="color:#e8eaed;text-decoration:none;"><b>AAF</b></a> — ⚠ 20-day MA below 50-day MA (bearish crossover)</div><div class="quote-row"><a href="#radar-summary-AUTO" style="color:#e8eaed;text-decoration:none;"><b>AUTO</b></a> — ⚠ 5-day trend negative (-3.4%) — weakening trend</div><div class="quote-row"><a href="#radar-summary-HWDN" style="color:#e8eaed;text-decoration:none;"><b>HWDN</b></a> — ⚠ 5-day trend negative (-0.5%) — weakening trend</div><div class="quote-row"><a href="#radar-summary-ADM" style="color:#e8eaed;text-decoration:none;"><b>ADM</b></a> — ⚠ Volume 2.0× average on a decline — weakness confirmed by volume</div><div class="quote-row"><a href="#radar-summary-AZN" style="color:#e8eaed;text-decoration:none;"><b>AZN</b></a> — ⚠ 5-day trend negative (-2.2%) — weakening trend</div><div class="quote-row"><a href="#radar-summary-HLMA" style="color:#e8eaed;text-decoration:none;"><b>HLMA</b></a> — ⚠ Price below 20-day MA — weakening trend</div><div class="quote-row"><a href="#radar-summary-SGE" style="color:#e8eaed;text-decoration:none;"><b>SGE</b></a> — ⚠ 5-day trend negative (-0.5%) — weakening trend</div></div>
+
+</main>
+<p style="text-align:center;margin-top:18px;"><a href="index.html" style="color:#7fb3ff;text-decoration:none;font-size:14px;">← Back to Dashboard</a></p>
+</body></html>

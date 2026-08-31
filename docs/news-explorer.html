@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en-GB"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>News Explorer — UK Stock Watch</title>
+<style>
+body{background:#0f1115;color:#e8eaed;font-family:-apple-system,sans-serif;margin:0 auto;padding:12px;font-size:17px;line-height:1.6;max-width:1200px;word-wrap:break-word;overflow-wrap:break-word}
+h1{font-size:26px;margin:4px 0;font-weight:800}
+h2{font-size:21px;margin:26px 0 10px;font-weight:800;border-left:4px solid #7fb3ff;padding-left:10px}
+h3{font-size:16px;margin:0 0 8px;color:#c2c7d0;font-weight:700}
+a:focus-visible,summary:focus-visible,button:focus-visible{outline:2px solid #7fb3ff;outline-offset:2px;border-radius:2px}
+.screener-grid{display:grid;grid-template-columns:1fr;gap:10px}
+@media(min-width:600px){.screener-grid{grid-template-columns:1fr 1fr 1fr}}
+.heatmap-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:16px}
+@media(max-width:380px){.heatmap-grid{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:600px){.heatmap-grid{grid-template-columns:repeat(8,1fr)}}
+.heat-cell{border-radius:4px;padding:8px 4px;text-align:center;color:#fff}
+.heat-symbol{font-size:14px;font-weight:700}
+.heat-pct{font-size:13px;opacity:0.9}
+.disclaimer{background:#1c2b25;border:1px solid #274235;color:#9aa0a6;border-radius:6px;padding:10px;font-size:14px;margin-bottom:10px}
+.quotes{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.q{background:#171a21;border:1px solid #2a2e37;border-radius:6px;padding:8px 12px;font-size:15px}
+.up{color:#50dc96;font-weight:800;font-size:17px} .down{color:#ff6b6b;font-weight:800;font-size:17px}
+.radar-card{background:#171a21;border:1px solid #2a2e37;border-radius:8px;padding:14px 16px;margin-bottom:14px}
+.radar-compact-wrap{margin-bottom:10px}
+.radar-compact{background:#141821;border-left:3px solid #ffb454;border-radius:6px;padding:10px 14px}
+.radar-compact .meta{line-height:1.7;margin:2px 0}
+.radar-header{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin-bottom:6px}
+.radar-ticker{font-size:20px;font-weight:800;color:#e8eaed}
+.radar-freshness{font-size:13px;padding:2px 8px;border-radius:10px;background:#20242d;display:inline-block}
+.radar-multi{font-size:12px;font-weight:700;color:#0f1115;background:#7fb3ff;padding:2px 8px;border-radius:10px;display:inline-block}
+.radar-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:10px 0}
+.radar-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:10px 0}
+.radar-col{background:#12141a;border:1px solid #22262f;border-radius:6px;padding:10px 12px}
+.radar-col-label{font-size:13px;font-weight:800;letter-spacing:0.6px;color:#7fb3ff;margin-bottom:6px;text-transform:uppercase}
+.radar-col-warn .radar-col-label{color:#e8918a}
+.radar-col-target{border-left:3px solid #7fb3ff}
+@media (max-width:800px){
+  .radar-grid, .radar-grid-2{grid-template-columns:1fr}
+  .radar-ticker{font-size:18px}
+  nav[aria-label="Section navigation"] a{font-size:14px !important}
+}
+table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;border-collapse:collapse;margin-bottom:16px;font-size:16px}
+table td, table th{padding:9px 10px;border-bottom:1px solid #2a2e37;text-align:left}
+.radar-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:8px;border:1px solid #2a2e37;margin-bottom:16px}
+nav[aria-label="Section navigation"] a{white-space:nowrap}
+.radar-table{display:table;border-collapse:collapse;width:100%;min-width:1100px;margin-bottom:0}
+.radar-table thead th{background:#171a21;color:#7fb3ff;text-align:left;padding:12px 14px;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;border-bottom:2px solid #2a2e37;white-space:nowrap;position:sticky;top:0;z-index:1}
+.radar-table tbody td{padding:14px;border-bottom:1px solid #22262f;font-size:15px;vertical-align:top}
+.radar-table tbody tr:hover{background:#161920}
+.radar-table th:first-child, .radar-table td:first-child{position:sticky;left:0;background:#0f1115;z-index:2;border-right:1px solid #2a2e37}
+.radar-table thead th:first-child{background:#171a21;z-index:3}
+.source-pill{display:inline-block;background:#20242d;color:#9aa0a6;font-size:12px;padding:2px 8px;border-radius:10px;margin:1px 3px 1px 0}
+.signal{font-weight:800;font-size:15px;letter-spacing:0.3px}
+.signal-strong{color:#50dc96} .signal-mixed{color:#e0b84a} .signal-weak{color:#9aa0a6}
+.confidence{font-size:14px;font-weight:700;color:#c7cad1}
+.evidence-list{margin:0;padding-left:16px;font-size:13.5px;color:#8fd6b4}
+.evidence-list li{margin-bottom:3px}
+.dont-chase-badge{display:inline-block;background:#3a1f1f;color:#ff8f87;font-size:11px;font-weight:800;padding:2px 7px;border-radius:4px;letter-spacing:0.4px}
+@media (max-width:800px){
+  .radar-table{font-size:13px}
+}
+.item{background:#171a21;border:1px solid #2a2e37;border-radius:8px;padding:12px;margin-bottom:8px}
+.item a{color:#e8eaed;text-decoration:none;font-size:17px;font-weight:600}
+.item a:hover{text-decoration:underline}
+.meta{color:#9aa0a6;font-size:15px;line-height:2.0}
+.status-ok{color:#50dc96;font-size:15px;font-weight:600}
+.status-warn{color:#f0b429;font-size:15px;font-weight:700}
+.status-bad{color:#ff6b6b;font-size:15px;font-weight:700}
+.val{color:#e8eaed;font-weight:700}
+.badge{border-radius:4px;padding:2px 8px;font-size:12px;font-weight:700;margin-right:4px}
+.badge.upgrade{background:#163a2a;color:#50dc96}
+.badge.downgrade{background:#3a1919;color:#ff6b6b}
+.badge.target{background:#2a2a17;color:#e0d267}
+.badge.target_raise{background:#1c3a1c;color:#7bd97b}
+.badge.target_cut{background:#3a2317;color:#e0977f}
+.badge.initiation{background:#1f2a3a;color:#8fb8ff}
+.badge.reiteration{background:#2a2532;color:#b8a0d9}
+.badge.director_dealing{background:#1a2a3a;color:#7fb3ff}
+.badge.event{background:#1c2a3a;color:#6ab6ff}
+.badge.news{background:#22262f;color:#9aa0a6}
+.broker{background:#2a1c3a;color:#c69bf0;border-radius:4px;padding:2px 8px;font-size:12px;font-weight:700;margin-right:4px}
+.lastpoll{color:#9aa0a6;font-size:11px;text-align:right}
+.status-neutral{color:#9aa0a6;font-size:15px;font-weight:600}
+</style>
+</head>
+<body>
+<p style="margin:0 0 10px;"><a href="index.html" style="color:#7fb3ff;text-decoration:none;font-size:15px;">← Back to Dashboard</a></p>
+<h1>📰 News Explorer (LSE regulatory &amp; company announcements)</h1>
+<main>
+
+<p class="meta">Genuine LSE first-party data — regulatory news and company announcements across the whole market, not limited to your watchlist. No equivalent exists via any other source used on this page, so this section shows an honest "unavailable" state rather than a substitute when the LSE source can't be reached.</p>
+<p class="status-ok">✅ Data source: London Stock Exchange (first-party) · Retrieved: Mon 31 Aug 2026, 20:54 BST (19:54 UTC) · 16 total result(s), showing 16</p>
+<table><tr><th>Headline</th><th>Company</th><th>Source</th><th>Date / Time</th><th>RNS Number</th><th>Price</th><th>Change %</th></tr><tr><td>End of Day Message</td><td>GlobeNewswire, Inc.</td><td>GNW</td><td>Mon 31 Aug 2026, 18:35 BST (17:35 UTC)</td><td>1260075-en</td><td>—</td><td>—</td></tr><tr><td>End of Day Message</td><td>MFN</td><td>MFN</td><td>Mon 31 Aug 2026, 18:30 BST (17:30 UTC)</td><td>0e2c6c6a4f</td><td>—</td><td>—</td></tr><tr><td>Ignitis Group receives Baa1 credit rating from Moody's</td><td>AB "Ignitis grupė"</td><td>GNW</td><td>Mon 31 Aug 2026, 14:00 BST (13:00 UTC)</td><td>1260165-en</td><td>22.80</td><td><span class="up">+0.00%</span></td></tr><tr><td>Amundi Physical Metals plc: UK Final Terms</td><td>Amundi Physical Metals plc</td><td>EQS</td><td>Mon 31 Aug 2026, 12:55 BST (11:55 UTC)</td><td>2391112_en</td><td>13313.75</td><td><span class="down">-0.65%</span></td></tr><tr><td>Amundi Physical Metals plc: Final Terms</td><td>Amundi Physical Metals plc</td><td>EQS</td><td>Mon 31 Aug 2026, 12:31 BST (11:31 UTC)</td><td>2391070_en</td><td>13313.75</td><td><span class="down">-0.65%</span></td></tr><tr><td>Aktietilbagekøb i AL Sydbank A/S – transaktioner i uge 35</td><td>Sydbank A/S</td><td>GNW</td><td>Mon 31 Aug 2026, 08:42 BST (07:42 UTC)</td><td>1260111-da</td><td>670.00</td><td><span class="up">+0.79%</span></td></tr><tr><td>AL Sydbank A/S share buyback programme: transactions in week 35</td><td>Sydbank A/S</td><td>GNW</td><td>Mon 31 Aug 2026, 08:42 BST (07:42 UTC)</td><td>1260111-en</td><td>670.00</td><td><span class="up">+0.79%</span></td></tr><tr><td>Share buyback programme – week 35</td><td>Ringkjøbing Landbobank A/S</td><td>GNW</td><td>Mon 31 Aug 2026, 07:53 BST (06:53 UTC)</td><td>1260103-en</td><td>614.00</td><td><span class="up">+0.00%</span></td></tr><tr><td>Aktietilbagekøbsprogram - uge 35</td><td>Ringkjøbing Landbobank A/S</td><td>GNW</td><td>Mon 31 Aug 2026, 07:53 BST (06:53 UTC)</td><td>1260103-da</td><td>614.00</td><td><span class="up">+0.00%</span></td></tr><tr><td>Borkum Riffgrund 3 enters commercial operation, strengthening Germany’s energy security with home-grown renewable power</td><td>Ørsted A/S</td><td>EQS</td><td>Mon 31 Aug 2026, 07:00 BST (06:00 UTC)</td><td>2390708_en</td><td>139.68</td><td><span class="down">-1.38%</span></td></tr><tr><td>Share repurchase programme: Transactions of week 35 2026</td><td>Jyske Bank A/S</td><td>GNW</td><td>Mon 31 Aug 2026, 06:37 BST (05:37 UTC)</td><td>1260080-en</td><td>1078.50</td><td><span class="up">+0.37%</span></td></tr><tr><td>Aktietilbagekøb: Transaktioner i uge 35 2026</td><td>Jyske Bank A/S</td><td>GNW</td><td>Mon 31 Aug 2026, 06:37 BST (05:37 UTC)</td><td>1260080-da</td><td>1078.50</td><td><span class="up">+0.37%</span></td></tr><tr><td>Sampo Oyj ei hankkinut omia osakkeitaan viikolla 35/2026</td><td>Sampo Oyj</td><td>GNW</td><td>Mon 31 Aug 2026, 06:30 BST (05:30 UTC)</td><td>1259923-fi</td><td>9.86</td><td><span class="up">+0.18%</span></td></tr><tr><td>Sampo plc did not acquire its own shares during week 35/2026</td><td>Sampo Oyj</td><td>GNW</td><td>Mon 31 Aug 2026, 06:30 BST (05:30 UTC)</td><td>1259923-en</td><td>9.86</td><td><span class="up">+0.18%</span></td></tr><tr><td>Start of Day Message</td><td>MFN</td><td>MFN</td><td>Mon 31 Aug 2026, 06:00 BST (05:00 UTC)</td><td>4e17230fda</td><td>—</td><td>—</td></tr><tr><td>Start of Day Message</td><td>GlobeNewswire, Inc.</td><td>GNW</td><td>Mon 31 Aug 2026, 06:00 BST (05:00 UTC)</td><td>1260074-en</td><td>—</td><td>—</td></tr></table>
+
+</main>
+<p style="text-align:center;margin-top:18px;"><a href="index.html" style="color:#7fb3ff;text-decoration:none;font-size:14px;">← Back to Dashboard</a></p>
+</body></html>
