@@ -2355,19 +2355,28 @@ def _normalize_lse_ticker(ticker):
 
     Confirmed real case this fixes: Aviva's genuine LSE ticker is "AV."
     (the trailing period is part of LSE's own disambiguation
-    convention) while the independent list (and Yahoo generally) uses
-    "AV" with no trailing period — without normalizing this, a
-    genuine FTSE 100 constituent was being reported as "unmatched",
-    which was never a real coverage gap, just a formatting mismatch.
-    Also strips a ".L" suffix (Yahoo's own exchange-suffix convention)
-    for the same reason, applied symmetrically to both sides of the
-    comparison.
+    convention). The independent list's SOURCE data represents this
+    same ticker as "AV/.L" — confirmed directly against the real
+    captured fixture (fixtures/ftse100_yfiua_real_response.json) —
+    i.e. Yahoo's own convention escapes an embedded period as a forward
+    slash before the ".L" exchange suffix, rather than dropping it. An
+    earlier version of this function only stripped a trailing period
+    and was tested against invented data ("AV.L") that did not match
+    this real escaping convention, so it never actually fixed the live
+    case — this version is verified directly against the real fixture.
+    Also strips a plain ".L" suffix for tickers that don't need
+    unescaping at all.
     """
     if not ticker:
         return ""
     t = ticker.strip().upper()
     if t.endswith(".L"):
         t = t[:-2]
+    # Yahoo's escaped-period convention: a trailing "/" (after the ".L"
+    # suffix has already been stripped above) represents an embedded
+    # period LSE's own ticker would show directly - e.g. "AV/" is "AV."
+    if t.endswith("/"):
+        t = t[:-1]
     if t.endswith("."):
         t = t[:-1]
     return t
