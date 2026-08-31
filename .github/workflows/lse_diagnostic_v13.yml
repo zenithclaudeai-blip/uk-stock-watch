@@ -1,0 +1,30 @@
+name: LSE Diagnostic v13 - Protocol Comparison (minimal)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  protocol-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Config check + tabId protocol test (2 requests total)
+        run: python diagnose_lse_v13_protocol.py
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lse-v13-evidence
+          path: |
+            lse_v13_current_page_config.json
+            lse_v13_config_comparison.json
+            lse_v13_news_with_tabid_response.json
+          retention-days: 14
