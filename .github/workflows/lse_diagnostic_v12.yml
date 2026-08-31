@@ -1,0 +1,47 @@
+name: LSE Diagnostic v12 - Evidence Gathering (log-visible)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Heatmap - isolated request, full body capture
+        run: python diagnose_lse_v12_evidence.py heatmap
+
+      - name: News Explorer - isolated attempt 1
+        run: python diagnose_lse_v12_evidence.py news 1
+
+      - name: Wait 30s before attempt 2
+        run: sleep 30
+
+      - name: News Explorer - isolated attempt 2
+        run: python diagnose_lse_v12_evidence.py news 2
+
+      - name: Wait 30s before attempt 3
+        run: sleep 30
+
+      - name: News Explorer - isolated attempt 3
+        run: python diagnose_lse_v12_evidence.py news 3
+
+      - name: Upload all evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lse-v12-evidence
+          path: |
+            lse_v12_heatmap_response.json
+            lse_v12_heatmap_shape.json
+            lse_v12_heatmap_result.json
+            lse_v12_news_attempt_*_response.json
+            lse_v12_news_all_attempts.json
+          retention-days: 14
