@@ -2095,6 +2095,76 @@ def fetch_lse_screener_primary(raw_count=10, display_count=10):
     return screener, status, source_dict
 
 
+def check_lse_ftse100_coverage():
+    """
+    A genuine constituent-coverage check, not an assumption: fetches the
+    FULL LSE risersFallersVolume response (which — being a single
+    "risers and fallers" component — genuinely may not return all ~100
+    constituents; it's fundamentally a MOVERS list, not necessarily an
+    exhaustive constituent dump) and the independently-sourced FTSE 100
+    constituent list (yfiua's ticker+name JSON, already used elsewhere
+    in this project), then reports exactly how many of each were
+    matched, unmatched, or duplicated — by ticker, falling back to a
+    cleaned company-name comparison for any row whose extracted
+    "symbol" turned out to be an ISIN (this project's own honest
+    fallback when a genuine ticker field wasn't confirmed present).
+
+    Returns a dict with the full breakdown. Logs a clear summary either
+    way — this function's job is to report the truth, not to make LSE
+    coverage look better or worse than it actually is.
+    """
+    ftse100_rows = []
+    try:
+        raw = http_get(FTSE100_CONSTITUENTS_URL)
+        ftse100_rows = _parse_ftse100_json(raw)
+    except Exception as e:
+        print(f"  ! Coverage check: could not fetch the independent FTSE 100 constituent "
+              f"list ({e}) — coverage cannot be verified this run", file=sys.stderr)
+        return {"status": "failed", "error": str(e)}
+
+    expected_tickers = {r["ticker"].upper() for r in ftse100_rows if r.get("ticker")}
+    expected_names = {clean_company_name(r["name"]).lower() for r in ftse100_rows if r.get("name")}
+
+    lse_result = fetch_lse_ftse100_market_data("risersFallersVolume")
+    if lse_result["status"] != "ok":
+        print(f"  ! Coverage check: LSE fetch itself failed ({lse_result['error']}) — "
+              f"cannot verify coverage this run", file=sys.stderr)
+        return {"status": "failed", "error": lse_result["error"]}
+
+    instruments = lse_result["instruments"]
+    seen_tickers = set()
+    matched, unmatched, duplicates = [], [], []
+    for row in instruments:
+        symbol = (row.get("symbol") or "").upper()
+        name_clean = clean_company_name(row.get("name") or "").lower()
+        is_matched = symbol in expected_tickers or name_clean in expected_names
+        key = symbol or row.get("isin")
+        if key in seen_tickers:
+            duplicates.append(key)
+            continue
+        seen_tickers.add(key)
+        (matched if is_matched else unmatched).append(row)
+
+    report = {
+        "status": "ok",
+        "ftse100Expected": len(expected_tickers),
+        "lseInstrumentsReturned": len(instruments),
+        "matched": len(matched),
+        "unmatched": len(unmatched),
+        "duplicates": len(duplicates),
+        "unmatchedSamples": [{"symbol": r.get("symbol"), "name": r.get("name"), "isin": r.get("isin")}
+                              for r in unmatched[:10]],
+    }
+    marker = "" if report["matched"] >= report["ftse100Expected"] * 0.9 else "!!! "
+    print(f"{marker}LSE FTSE 100 coverage check: expected {report['ftse100Expected']} constituents, "
+          f"LSE returned {report['lseInstrumentsReturned']} instruments, "
+          f"{report['matched']} matched, {report['unmatched']} unmatched, "
+          f"{report['duplicates']} duplicate(s)")
+    if unmatched:
+        print(f"  Unmatched sample: {report['unmatchedSamples'][:3]}")
+    return report
+
+
 # =========================================================================
 # FTSE 100 / FTSE 250 universe — restricts the market-wide screener (and
 # everything downstream of it: News on Movers, 5-Day Uptrend, Broker
@@ -6386,6 +6456,19 @@ def main():
         ftse_universe_status = ftse_universe_status_label(ftse_universe_source)
         screener, screener_status, screener_source = fetch_lse_screener_primary(
             raw_count=60 if ftse_universe_names is not None else 10, display_count=10)
+        # A genuine, logged-every-run coverage check — not an assumption
+        # made once and never re-verified. Only meaningful when LSE was
+        # actually the source this run; skipped (not fabricated) when we
+        # fell back to Yahoo, since there's nothing LSE-specific to check.
+        if screener_source.get("gainers") == "LSE":
+            try:
+                lse_coverage_report = check_lse_ftse100_coverage()
+            except Exception as e:
+                print(f"  ! LSE coverage check itself failed unexpectedly: {e}", file=sys.stderr)
+                lse_coverage_report = {"status": "failed", "error": str(e)}
+        else:
+            lse_coverage_report = {"status": "skipped", "reason": "LSE was not the source this run"}
+
         # The FTSE-universe name filter below exists specifically to correct
         # Yahoo's broader GB-region screener down to genuine FTSE 100/250
         # constituents. When the LSE-primary fetch succeeded, the data is
