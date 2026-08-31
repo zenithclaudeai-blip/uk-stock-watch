@@ -1944,29 +1944,122 @@ LSE_NEWS_COMPONENT_ID = "block_content%3A431d02ac-09b8-40c9-aba6-04a72a4f2e49"
 LSE_NEWS_TIMEOUT_SECONDS = 15
 
 
+def _parse_lse_instrument_row(row):
+    """
+    Shared per-row extraction — the exact same identity/price/name/change
+    handling used by every LSE instrument parser in this project, so
+    there's exactly one place this logic exists rather than duplicated
+    across the generic parser and the risers/fallers/volume-specific one.
+    Returns None if the row is genuinely missing identity or price
+    (never fabricated), otherwise the project's standard instrument dict.
+    """
+    if not isinstance(row, dict):
+        return None
+    isin = row.get("isin") or row.get("ISIN")
+    tidm = row.get("tidm") or row.get("TIDM")
+    price = row.get("lastprice")
+    if price is None:
+        price = row.get("lastPrice")
+    if price is None:
+        price = row.get("last_price")
+    # Accept EITHER genuine identity field — never require isin
+    # specifically (that was a confirmed bug: it silently discarded
+    # every row on endpoints, like Heatmap, that only ever provide tidm).
+    if not (isin or tidm) or price is None:
+        return None  # never fabricate a row missing genuine identity or price
+    identity_type = "isin" if isin else "tidm"
+    ticker = (row.get("ticker") or row.get("symbol") or tidm
+              or row.get("epic") or isin)
+    name = (row.get("name") or row.get("companyname") or row.get("issuername")
+            or row.get("description") or row.get("longname"))
+    change_pct = (row.get("percentchange") or row.get("changepercent")
+                  or row.get("pctchange") or row.get("changePercent")
+                  or row.get("percentualchange"))
+    net_change = row.get("netchange") or row.get("netChange")
+    volume = row.get("volume") or row.get("tradedvolume") or row.get("dayvolume")
+    return {
+        "symbol": ticker,
+        "isin": isin,  # None if genuinely absent - never fabricated from tidm
+        "tidm": tidm,  # None if genuinely absent
+        "identityType": identity_type,
+        # Never invent a company name — if genuinely absent from the
+        # response, the ticker/identity is shown as-is rather than a
+        # fabricated label.
+        "name": name or ticker,
+        "price": price,
+        "changePct": change_pct,
+        "netChange": net_change,
+        "volume": volume,
+    }
+
+
+def _parse_lse_risers_fallers_volume(data):
+    """
+    Dedicated parser for the risersFallersVolume response's REAL
+    structure — confirmed by direct inspection of a genuine captured
+    response: it contains THREE SEPARATE lists, each explicitly labeled
+    by LSE itself via a "type" field ("RISERS", "FALLERS", "VOLUME"),
+    NOT one combined list that a caller should locally re-sort into
+    three categories.
+
+    This fixes a confirmed, real bug: the previous approach
+    (_parse_lse_components_refresh) walked the whole structure, found
+    all three 9-row lists as candidates, and picked ONE of them via
+    max(..., key=len) — since all three are the same length, this
+    silently kept only whichever list happened to be encountered first
+    (in practice, RISERS) and discarded the other two entirely. Deriving
+    "losers" by locally re-sorting a risers-only list correctly finds
+    nothing — which is exactly the "no liquid losers found" symptom this
+    fixes, not a genuine absence of fallers.
+
+    Returns {"gainers": [...], "losers": [...], "volume": [...]} using
+    LSE's own pre-categorized lists directly — each row parsed via the
+    shared _parse_lse_instrument_row, never re-derived by local sorting.
+    Returns None if the expected RISERS/FALLERS/VOLUME structure isn't
+    found at all (caller should treat this as "structure not
+    recognized", not silently return empty lists as if that were a
+    genuine empty result).
+    """
+    type_to_key = {"RISERS": "gainers", "FALLERS": "losers", "VOLUME": "volume"}
+    found = {}
+
+    def walk(obj):
+        if isinstance(obj, dict):
+            block_type = obj.get("type")
+            values = obj.get("values")
+            if isinstance(block_type, str) and block_type in type_to_key and isinstance(values, list):
+                key = type_to_key[block_type]
+                rows = [r for r in (_parse_lse_instrument_row(row) for row in values) if r is not None]
+                found[key] = rows
+            for v in obj.values():
+                walk(v)
+        elif isinstance(obj, list):
+            for item in obj:
+                walk(item)
+
+    walk(data)
+    if not found:
+        return None
+    # Only return categories genuinely found — never fabricate an empty
+    # list for a category that wasn't present in the response at all,
+    # since that's a different situation from "present but empty".
+    return found
+
+
 def _parse_lse_components_refresh(data):
     """
-    Defensive, shape-agnostic parser. The two confirmed real responses
-    (risersFallersVolume, heatmap) nest their per-instrument list
-    differently (one under a "values" key, the other under a "content"
-    key one level up) — rather than hardcode either exact path and
-    silently break if LSE's own layout shifts slightly, this walks the
-    WHOLE structure looking for any list whose items look like genuine
-    instrument records (an isin/tidm/ticker AND a price), and uses the
-    largest such list found — i.e., the real data, not a short nested
-    fragment. Returns a list of dicts already shaped to match this
-    project's EXISTING screener row shape ({"symbol", "name", "price",
-    "changePct", "volume"}) so no downstream rendering code needs to
-    change to consume it.
-
-    Identity handling (fixed after a confirmed bug: the Heatmap
-    endpoint's real records have NO "isin" field at all — they use
-    "tidm", LSE's own ticker mnemonic, instead; the risersFallersVolume
-    endpoint's real records DO have genuine ISINs. A row is accepted if
-    EITHER a genuine isin OR a genuine tidm is present — never both
-    required, and never one fabricated from the other. Which one was
-    actually present is preserved explicitly via "identityType", so
-    nothing downstream can mistake a tidm for an isin or vice versa.
+    Defensive, shape-agnostic GENERIC parser — used for endpoints
+    (Heatmap) whose response is genuinely one combined instrument list,
+    not pre-split into labeled categories the way risersFallersVolume is
+    (see _parse_lse_risers_fallers_volume for that one specifically).
+    Rather than hardcode an exact path and silently break if LSE's own
+    layout shifts slightly, this walks the WHOLE structure looking for
+    any list whose items look like genuine instrument records (an
+    isin/tidm/ticker AND a price), and uses the largest such list found
+    — i.e., the real data, not a short nested fragment. Returns a list
+    of dicts already shaped to match this project's EXISTING screener
+    row shape so no downstream rendering code needs to change to
+    consume it.
     """
     candidate_lists = []
 
@@ -1988,46 +2081,7 @@ def _parse_lse_components_refresh(data):
         return []
     raw_rows = max(candidate_lists, key=len)
 
-    out = []
-    for row in raw_rows:
-        if not isinstance(row, dict):
-            continue
-        isin = row.get("isin") or row.get("ISIN")
-        tidm = row.get("tidm") or row.get("TIDM")
-        price = row.get("lastprice")
-        if price is None:
-            price = row.get("lastPrice")
-        if price is None:
-            price = row.get("last_price")
-        # Accept EITHER genuine identity field — never require isin
-        # specifically (that was the bug: it silently discarded every
-        # row on endpoints, like Heatmap, that only ever provide tidm).
-        if not (isin or tidm) or price is None:
-            continue  # never fabricate a row missing genuine identity or price
-        identity_type = "isin" if isin else "tidm"
-        ticker = (row.get("ticker") or row.get("symbol") or tidm
-                  or row.get("epic") or isin)
-        name = (row.get("name") or row.get("companyname") or row.get("issuername")
-                or row.get("description") or row.get("longname"))
-        change_pct = (row.get("percentchange") or row.get("changepercent")
-                      or row.get("pctchange") or row.get("changePercent")
-                      or row.get("percentualchange"))
-        net_change = row.get("netchange") or row.get("netChange")
-        volume = row.get("volume") or row.get("tradedvolume") or row.get("dayvolume")
-        out.append({
-            "symbol": ticker,
-            "isin": isin,  # None if genuinely absent - never fabricated from tidm
-            "tidm": tidm,  # None if genuinely absent
-            "identityType": identity_type,
-            # Never invent a company name — if genuinely absent from the
-            # response, the ticker/identity is shown as-is rather than a
-            # fabricated label.
-            "name": name or ticker,
-            "price": price,
-            "changePct": change_pct,
-            "netChange": net_change,
-            "volume": volume,
-        })
+    out = [r for r in (_parse_lse_instrument_row(row) for row in raw_rows) if r is not None]
     return out
 
 
@@ -2155,21 +2209,57 @@ def fetch_lse_ftse100_market_data(tab, timeout=LSE_MARKET_DATA_TIMEOUT_SECONDS, 
     if error:
         print(f"  ! LSE market data fetch failed for tab={tab}: {error}", file=sys.stderr)
         return {"status": "failed", "source": "LSE", "retrievedAt": retrieved_at,
-                "instruments": [], "error": error}
+                "instruments": [], "categorized": None, "error": error}
 
-    instruments = _parse_lse_components_refresh(parsed)
+    categorized = None
+    if tab == "risersFallersVolume":
+        # Confirmed real structure (a genuine bug fix): this endpoint's
+        # response contains THREE SEPARATE lists, each explicitly
+        # labeled by LSE itself (type: RISERS/FALLERS/VOLUME) — not one
+        # combined list to locally re-sort. Using LSE's own
+        # categorization directly, rather than re-deriving "losers" by
+        # sorting a risers-only list (which always found nothing).
+        categorized = _parse_lse_risers_fallers_volume(parsed)
+
+    if categorized:
+        # Flat "instruments" list still populated (deduped by identity)
+        # for callers that only need "every returned row" regardless of
+        # category, e.g. the FTSE 100 coverage check.
+        seen_keys = set()
+        instruments = []
+        for rows in categorized.values():
+            for r in rows:
+                key = r.get("isin") or r.get("tidm") or r.get("symbol")
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                instruments.append(r)
+    else:
+        # Either not the risersFallersVolume tab, or the dedicated
+        # RISERS/FALLERS/VOLUME structure genuinely wasn't found this
+        # run (e.g. LSE's own layout changed) — fall back to the
+        # generic flatten-largest-list parser rather than returning
+        # nothing at all.
+        instruments = _parse_lse_components_refresh(parsed)
+
     if not instruments:
         _lse_log(run_id, f"LSE {label}: PARSED 0 instruments — no genuine instrument rows "
                           f"found in an otherwise successful response — treating as a failure")
         print(f"  ! LSE market data for tab={tab}: response parsed but no genuine "
               f"instrument rows found — treating as a failure, not an empty-but-valid result", file=sys.stderr)
         return {"status": "failed", "source": "LSE", "retrievedAt": retrieved_at,
-                "instruments": [], "error": "no instrument rows found in response"}
+                "instruments": [], "categorized": None, "error": "no instrument rows found in response"}
 
-    _lse_log(run_id, f"LSE {label}: PARSED {len(instruments)} instruments")
+    if categorized:
+        _lse_log(run_id, f"LSE {label}: PARSED {len(instruments)} instruments "
+                          f"(gainers={len(categorized.get('gainers', []))}, "
+                          f"losers={len(categorized.get('losers', []))}, "
+                          f"volume={len(categorized.get('volume', []))})")
+    else:
+        _lse_log(run_id, f"LSE {label}: PARSED {len(instruments)} instruments")
     print(f"  > LSE market data for tab={tab}: {len(instruments)} instruments, retrieved {retrieved_at}")
     return {"status": "ok", "source": "LSE", "retrievedAt": retrieved_at,
-            "instruments": instruments, "error": None}
+            "instruments": instruments, "categorized": categorized, "error": None}
 
 
 def _find_newsexplorersearch_block(obj):
@@ -2328,13 +2418,30 @@ def fetch_lse_screener_primary(raw_count=10, display_count=10, run_id=None):
     source_dict = {"volume": "LSE", "gainers": "LSE", "losers": "LSE"}
 
     if lse_result["status"] == "ok":
-        instruments = lse_result["instruments"]
-        by_volume = sorted([r for r in instruments if r.get("volume")],
-                            key=lambda r: r["volume"], reverse=True)[:display_count]
-        by_gainers = sorted([r for r in instruments if r.get("changePct") is not None],
-                             key=lambda r: r["changePct"], reverse=True)[:display_count]
-        by_losers = sorted([r for r in instruments if r.get("changePct") is not None],
-                            key=lambda r: r["changePct"])[:display_count]
+        categorized = lse_result.get("categorized")
+        if categorized:
+            # Use LSE's own pre-categorized RISERS/FALLERS/VOLUME lists
+            # directly — confirmed real structure, not locally re-sorted
+            # from one combined list (that approach was a genuine bug:
+            # re-deriving "losers" by sorting a risers-only list always
+            # found nothing, which was never a genuine absence of real
+            # fallers).
+            by_gainers = categorized.get("gainers", [])[:display_count]
+            by_losers = categorized.get("losers", [])[:display_count]
+            by_volume = categorized.get("volume", [])[:display_count]
+        else:
+            # Defensive fallback only — the dedicated RISERS/FALLERS/
+            # VOLUME structure genuinely wasn't found this run (e.g.
+            # LSE's own layout changed), so fall back to locally
+            # deriving categories from the flat instrument list rather
+            # than returning nothing.
+            instruments = lse_result["instruments"]
+            by_volume = sorted([r for r in instruments if r.get("volume")],
+                                key=lambda r: r["volume"], reverse=True)[:display_count]
+            by_gainers = sorted([r for r in instruments if r.get("changePct") is not None],
+                                 key=lambda r: r["changePct"], reverse=True)[:display_count]
+            by_losers = sorted([r for r in instruments if r.get("changePct") is not None],
+                                key=lambda r: r["changePct"])[:display_count]
         screener = {"volume": by_volume, "gainers": by_gainers, "losers": by_losers}
         status = {"volume": "ok", "gainers": "ok", "losers": "ok"}
         return screener, status, source_dict, lse_result
