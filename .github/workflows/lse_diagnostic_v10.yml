@@ -1,0 +1,29 @@
+name: LSE Data Source Diagnostic v10 (News Standalone)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  standalone-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run v10 standalone test
+        run: python diagnose_lse_v10_standalone.py
+
+      - name: Upload report and response
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lse-v10-standalone-result
+          path: |
+            lse_diagnostic_report_v10.json
+            lse_news_standalone_response.json
+          retention-days: 14
