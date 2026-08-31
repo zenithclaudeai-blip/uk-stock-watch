@@ -22,7 +22,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date, timedelta
 from zoneinfo import ZoneInfo
 
 STATE_DIR = os.environ.get("STATE_DIR", "state")
@@ -615,14 +615,93 @@ UK_MARKET_OPEN_MINUTES = 8 * 60       # 08:00
 UK_MARKET_CLOSE_MINUTES = 16 * 60 + 30  # 16:30
 
 
+def _easter_sunday(year):
+    """Anonymous Gregorian algorithm for the date of Easter Sunday — the
+    standard, well-tested method, not an approximation. Needed because
+    Good Friday and Easter Monday (both LSE bank holidays) fall on a
+    different date every year."""
+    a = year % 19
+    b = year // 100
+    c = year % 100
+    d = b // 4
+    e = b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i = c // 4
+    k = c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    month = (h + l - 7 * m + 114) // 31
+    day = ((h + l - 7 * m + 114) % 31) + 1
+    return date(year, month, day)
+
+
+def uk_bank_holidays(year):
+    """England & Wales bank holidays — the calendar the LSE actually
+    follows — computed programmatically from the year's own calendar
+    rather than a hardcoded list of dates, so this stays correct every
+    year rather than needing a manual update each January. Covers the
+    standard 8 holidays: New Year's Day, Good Friday, Easter Monday,
+    Early May, Spring (late May), Summer (late August), Christmas Day,
+    Boxing Day — including the weekend-shift rules for the fixed-date
+    ones. Doesn't attempt one-off royal/coronation-style extra holidays,
+    which aren't predictable from the calendar alone."""
+    holidays = set()
+    new_year = date(year, 1, 1)
+    if new_year.weekday() == 5:
+        new_year += timedelta(days=2)
+    elif new_year.weekday() == 6:
+        new_year += timedelta(days=1)
+    holidays.add(new_year)
+    easter = _easter_sunday(year)
+    holidays.add(easter - timedelta(days=2))  # Good Friday
+    holidays.add(easter + timedelta(days=1))  # Easter Monday
+    early_may = date(year, 5, 1)
+    while early_may.weekday() != 0:
+        early_may += timedelta(days=1)
+    holidays.add(early_may)
+    spring = date(year, 5, 31)
+    while spring.weekday() != 0:
+        spring -= timedelta(days=1)
+    holidays.add(spring)
+    summer = date(year, 8, 31)
+    while summer.weekday() != 0:
+        summer -= timedelta(days=1)
+    holidays.add(summer)
+    christmas = date(year, 12, 25)
+    boxing = date(year, 12, 26)
+    if christmas.weekday() in (5, 6):
+        christmas += timedelta(days=2)
+    if boxing.weekday() in (5, 6) or boxing == christmas:
+        boxing = christmas + timedelta(days=1)
+        while boxing.weekday() in (5, 6):
+            boxing += timedelta(days=1)
+    holidays.add(christmas)
+    holidays.add(boxing)
+    return holidays
+
+
+def _is_uk_bank_holiday(dt_utc):
+    """True if this UTC instant, in London local time, falls on an LSE
+    bank holiday. Computes only the current year's calendar each call —
+    cheap, and avoids ever needing a stored/maintained holiday list."""
+    dt_london = dt_utc.astimezone(LONDON_TZ)
+    return dt_london.date() in uk_bank_holidays(dt_london.year)
+
+
 def _is_uk_market_hours(dt_utc):
     """
     Mon-Fri, 08:00-16:30 Europe/London LOCAL time (standard LSE trading
     hours) — correctly handles the GMT/BST switch via zoneinfo (the same
-    LONDON_TZ already used elsewhere), not a fixed UTC offset.
+    LONDON_TZ already used elsewhere), not a fixed UTC offset. Also
+    correctly treats LSE bank holidays as closed, even on an otherwise
+    ordinary weekday.
     """
     dt_london = dt_utc.astimezone(LONDON_TZ)
     if dt_london.weekday() >= 5:  # Saturday=5, Sunday=6
+        return False
+    if _is_uk_bank_holiday(dt_utc):
         return False
     minutes_since_midnight = dt_london.hour * 60 + dt_london.minute
     return UK_MARKET_OPEN_MINUTES <= minutes_since_midnight < UK_MARKET_CLOSE_MINUTES
@@ -2239,7 +2318,20 @@ def _rate_limit_ok():
     return len(_recent_send_times) < _RATE_LIMIT_MAX_SENDS
 
 
-def send_webhook(message):
+def send_webhook(message, bypass_market_hours_gate=False):
+    if not bypass_market_hours_gate and not _is_uk_market_hours(datetime.now(timezone.utc)):
+        # Covers weekends AND LSE bank holidays (both handled inside
+        # _is_uk_market_hours) — e.g. the recurring "still checking"
+        # heartbeat, screener summaries, and mover/broker alerts have
+        # nothing genuinely new to report when the market's shut, so
+        # sending them is just noise. A scheduled run can still fire on
+        # a bank holiday (cron has no concept of holidays), so this is
+        # the actual gate that stops it becoming a notification, not the
+        # workflow schedule. bypass_market_hours_gate=True is for
+        # genuinely exceptional cases — e.g. "the poller itself crashed"
+        # — where the reader needs to know regardless of what day it is.
+        print("  ! send skipped: LSE closed (weekend or bank holiday) — still on dashboard.", file=sys.stderr)
+        return
     if not _rate_limit_ok():
         print(f"  ! send skipped: WhatsApp rate-limit budget exhausted ({_RATE_LIMIT_MAX_SENDS}/{_RATE_LIMIT_WINDOW_SECONDS//60}min) — still on dashboard.", file=sys.stderr)
         return
@@ -9102,7 +9194,7 @@ if __name__ == "__main__":
         err_msg = f"⚠️ UK Stock Watch poller crashed: {type(e).__name__}: {e}\nWill retry next scheduled run."
         print(err_msg, file=sys.stderr)
         try:
-            send_webhook(err_msg)
+            send_webhook(err_msg, bypass_market_hours_gate=True)
         except Exception:
             pass  # if even the failure notification fails, there's nothing more we can do here
         raise  # re-raise so the GitHub Actions run shows red/failed in the Actions tab too
