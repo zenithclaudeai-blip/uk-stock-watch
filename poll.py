@@ -1925,14 +1925,21 @@ LSE_TAB_CONFIG = {
 }
 LSE_MARKET_DATA_TIMEOUT_SECONDS = 15
 
-# News Explorer's own path/parameters/componentId — confirmed via
-# diagnostic v10's direct extraction from a genuinely captured real
-# response (project diagnostic history: v4 through v8 all captured this
-# same request naturally on every page load; v9's screenshots proved
-# the default response already contains 14 real, populated stories —
-# no filter interaction is required at all).
+# News Explorer's own path/parameters/componentId. Its "parameters"
+# now follows the EXACT SAME construction pattern as LSE_TAB_CONFIG's
+# entries above (tab=X&tabId=Y) — a genuine, confirmed request-shape
+# bug: every earlier version omitted tabId entirely, which every other
+# working endpoint always included. Confirmed directly (diagnostic
+# v13, live): the identical request WITHOUT tabId returns an empty
+# "[]" (HTTP 200, no error, no data); the SAME request WITH tabId
+# returns a populated response (19,599 bytes, 16 real stories,
+# newsexplorersearch present). The tabId itself
+# (58734a12-d97c-40cb-8047-df76e660f23f) is the News Explorer tab's own
+# ID, confirmed against the page's own /api/v1/pages configuration —
+# not invented, not brute-forced.
 LSE_NEWS_PATH = "news"
-LSE_NEWS_PARAMETERS = "tab%3Dnews-explorer"
+LSE_NEWS_TAB_ID = "58734a12-d97c-40cb-8047-df76e660f23f"
+LSE_NEWS_PARAMETERS = f"tab%3Dnews-explorer%26tabId%3D{LSE_NEWS_TAB_ID}"
 LSE_NEWS_COMPONENT_ID = "block_content%3A431d02ac-09b8-40c9-aba6-04a72a4f2e49"
 LSE_NEWS_TIMEOUT_SECONDS = 15
 
