@@ -1945,12 +1945,21 @@ def _parse_lse_components_refresh(data):
     key one level up) — rather than hardcode either exact path and
     silently break if LSE's own layout shifts slightly, this walks the
     WHOLE structure looking for any list whose items look like genuine
-    instrument records (an isin/ticker AND a price), and uses the
+    instrument records (an isin/tidm/ticker AND a price), and uses the
     largest such list found — i.e., the real data, not a short nested
     fragment. Returns a list of dicts already shaped to match this
     project's EXISTING screener row shape ({"symbol", "name", "price",
     "changePct", "volume"}) so no downstream rendering code needs to
     change to consume it.
+
+    Identity handling (fixed after a confirmed bug: the Heatmap
+    endpoint's real records have NO "isin" field at all — they use
+    "tidm", LSE's own ticker mnemonic, instead; the risersFallersVolume
+    endpoint's real records DO have genuine ISINs. A row is accepted if
+    EITHER a genuine isin OR a genuine tidm is present — never both
+    required, and never one fabricated from the other. Which one was
+    actually present is preserved explicitly via "identityType", so
+    nothing downstream can mistake a tidm for an isin or vice versa.
     """
     candidate_lists = []
 
@@ -1959,7 +1968,7 @@ def _parse_lse_components_refresh(data):
             for key in ("values", "content", "instruments", "constituents"):
                 v = obj.get(key)
                 if isinstance(v, list) and v and isinstance(v[0], dict) and (
-                        "isin" in v[0] or "lastprice" in v[0] or "lastPrice" in v[0]):
+                        "isin" in v[0] or "tidm" in v[0] or "lastprice" in v[0] or "lastPrice" in v[0]):
                     candidate_lists.append(v)
             for v in obj.values():
                 walk(v)
@@ -1977,29 +1986,39 @@ def _parse_lse_components_refresh(data):
         if not isinstance(row, dict):
             continue
         isin = row.get("isin") or row.get("ISIN")
+        tidm = row.get("tidm") or row.get("TIDM")
         price = row.get("lastprice")
         if price is None:
             price = row.get("lastPrice")
         if price is None:
             price = row.get("last_price")
-        if not isin or price is None:
+        # Accept EITHER genuine identity field — never require isin
+        # specifically (that was the bug: it silently discarded every
+        # row on endpoints, like Heatmap, that only ever provide tidm).
+        if not (isin or tidm) or price is None:
             continue  # never fabricate a row missing genuine identity or price
-        ticker = (row.get("ticker") or row.get("symbol") or row.get("tidm")
+        identity_type = "isin" if isin else "tidm"
+        ticker = (row.get("ticker") or row.get("symbol") or tidm
                   or row.get("epic") or isin)
         name = (row.get("name") or row.get("companyname") or row.get("issuername")
                 or row.get("description") or row.get("longname"))
         change_pct = (row.get("percentchange") or row.get("changepercent")
-                      or row.get("pctchange") or row.get("changePercent"))
+                      or row.get("pctchange") or row.get("changePercent")
+                      or row.get("percentualchange"))
+        net_change = row.get("netchange") or row.get("netChange")
         volume = row.get("volume") or row.get("tradedvolume") or row.get("dayvolume")
         out.append({
             "symbol": ticker,
-            "isin": isin,
+            "isin": isin,  # None if genuinely absent - never fabricated from tidm
+            "tidm": tidm,  # None if genuinely absent
+            "identityType": identity_type,
             # Never invent a company name — if genuinely absent from the
-            # response, the ticker/ISIN is shown as-is rather than a
+            # response, the ticker/identity is shown as-is rather than a
             # fabricated label.
             "name": name or ticker,
             "price": price,
             "changePct": change_pct,
+            "netChange": net_change,
             "volume": volume,
         })
     return out
@@ -2326,6 +2345,34 @@ def fetch_lse_screener_primary(raw_count=10, display_count=10, run_id=None):
     return screener, status, source_dict, None
 
 
+def _normalize_lse_ticker(ticker):
+    """
+    Normalizes genuine ticker format differences between LSE's own
+    convention and the independent (Yahoo-derived) FTSE 100 constituent
+    list's convention, so a real match isn't missed purely over
+    formatting — never changes WHICH instrument is being compared, only
+    how its ticker is spelled for comparison purposes.
+
+    Confirmed real case this fixes: Aviva's genuine LSE ticker is "AV."
+    (the trailing period is part of LSE's own disambiguation
+    convention) while the independent list (and Yahoo generally) uses
+    "AV" with no trailing period — without normalizing this, a
+    genuine FTSE 100 constituent was being reported as "unmatched",
+    which was never a real coverage gap, just a formatting mismatch.
+    Also strips a ".L" suffix (Yahoo's own exchange-suffix convention)
+    for the same reason, applied symmetrically to both sides of the
+    comparison.
+    """
+    if not ticker:
+        return ""
+    t = ticker.strip().upper()
+    if t.endswith(".L"):
+        t = t[:-2]
+    if t.endswith("."):
+        t = t[:-1]
+    return t
+
+
 def check_lse_ftse100_coverage(instruments=None):
     """
     A genuine constituent-coverage check, not an assumption: compares
@@ -2333,10 +2380,22 @@ def check_lse_ftse100_coverage(instruments=None):
     independently-sourced FTSE 100 constituent list (yfiua's ticker+name
     JSON, already used elsewhere in this project), then reports exactly
     how many of each were matched, unmatched, or duplicated — by
-    ticker, falling back to a cleaned company-name comparison for any
-    row whose extracted "symbol" turned out to be an ISIN (this
-    project's own honest fallback when a genuine ticker field wasn't
-    confirmed present).
+    ticker (normalized for genuine formatting differences like LSE's
+    "AV." vs the independent list's "AV" — see _normalize_lse_ticker),
+    falling back to a cleaned company-name comparison for any row whose
+    extracted "symbol" turned out to be an ISIN/tidm rather than a
+    plain ticker (this project's own honest fallback when a genuine
+    ticker field wasn't confirmed present).
+
+    IMPORTANT — this check validates that returned rows genuinely
+    belong to the FTSE 100; it does NOT assume or imply that a
+    top-movers widget (risersFallersVolume) should return anywhere
+    close to all 100 constituents. "lseInstrumentsReturned" is simply
+    how many rows this specific widget returned this run (routinely a
+    small, curated top-movers list by the endpoint's own design, not a
+    constituent dump) — "matched"/"unmatched" describe how many of
+    THOSE rows are genuine FTSE 100 members, which is the actual
+    question this check answers.
 
     instruments, if provided, is the ALREADY-FETCHED instrument list
     from this run's own fetch_lse_screener_primary() call — reusing it
@@ -2361,7 +2420,7 @@ def check_lse_ftse100_coverage(instruments=None):
               f"list ({e}) — coverage cannot be verified this run", file=sys.stderr)
         return {"status": "failed", "error": str(e)}
 
-    expected_tickers = {r["ticker"].upper() for r in ftse100_rows if r.get("ticker")}
+    expected_tickers = {_normalize_lse_ticker(r["ticker"]) for r in ftse100_rows if r.get("ticker")}
     expected_names = {clean_company_name(r["name"]).lower() for r in ftse100_rows if r.get("name")}
 
     if instruments is None:
@@ -2375,10 +2434,10 @@ def check_lse_ftse100_coverage(instruments=None):
     seen_tickers = set()
     matched, unmatched, duplicates = [], [], []
     for row in instruments:
-        symbol = (row.get("symbol") or "").upper()
+        symbol_norm = _normalize_lse_ticker(row.get("symbol") or "")
         name_clean = clean_company_name(row.get("name") or "").lower()
-        is_matched = symbol in expected_tickers or name_clean in expected_names
-        key = symbol or row.get("isin")
+        is_matched = symbol_norm in expected_tickers or name_clean in expected_names
+        key = symbol_norm or row.get("isin") or row.get("tidm")
         if key in seen_tickers:
             duplicates.append(key)
             continue
@@ -2395,10 +2454,18 @@ def check_lse_ftse100_coverage(instruments=None):
         "unmatchedSamples": [{"symbol": r.get("symbol"), "name": r.get("name"), "isin": r.get("isin")}
                               for r in unmatched[:10]],
     }
-    marker = "" if report["matched"] >= report["ftse100Expected"] * 0.9 else "!!! "
-    print(f"{marker}LSE FTSE 100 coverage check: expected {report['ftse100Expected']} constituents, "
-          f"LSE returned {report['lseInstrumentsReturned']} instruments, "
-          f"{report['matched']} matched, {report['unmatched']} unmatched, "
+    # The warning marker is about whether returned rows are genuinely
+    # FTSE 100 members, NOT whether the widget returned close to the
+    # full ~100-constituent universe (risersFallersVolume is a
+    # top-movers list by design and routinely returns far fewer rows on
+    # a quiet day — that alone is never a problem).
+    returned = report["lseInstrumentsReturned"]
+    match_rate_ok = returned == 0 or (report["matched"] / returned) >= 0.9
+    marker = "" if match_rate_ok else "!!! "
+    print(f"{marker}LSE FTSE 100 coverage check: this widget returned {report['lseInstrumentsReturned']} "
+          f"row(s) (a top-movers list, not a constituent dump — {report['ftse100Expected']} is the "
+          f"full FTSE 100 universe size for reference only), "
+          f"{report['matched']} matched to FTSE 100, {report['unmatched']} unmatched, "
           f"{report['duplicates']} duplicate(s)")
     if unmatched:
         print(f"  Unmatched sample: {report['unmatchedSamples'][:3]}")
@@ -5765,13 +5832,25 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
     if _screener_sources_seen == {"LSE"}:
         cov = lse_coverage_report or {}
         if cov.get("status") == "ok":
-            expected, matched, unmatched = cov.get("ftse100Expected", 0), cov.get("matched", 0), cov.get("unmatched", 0)
-            cov_class = "status-ok" if expected and matched >= expected * 0.9 else "status-warn"
+            returned = cov.get("lseInstrumentsReturned", 0)
+            matched, unmatched = cov.get("matched", 0), cov.get("unmatched", 0)
+            # The right question is "of the rows this widget actually
+            # returned, how many are genuine FTSE 100 members?" — NOT
+            # "does this widget's row count approach the full ~100
+            # constituent universe". risersFallersVolume is a top-movers
+            # widget by design (its own name says so) and routinely
+            # returns far fewer than 100 rows on a quiet day; that is
+            # not itself a problem, so the warning threshold is based on
+            # the match rate WITHIN what was returned, never against the
+            # full universe size.
+            match_rate_ok = returned == 0 or (matched / returned) >= 0.9
+            cov_class = "status-ok" if match_rate_ok else "status-warn"
             cov_icon = "✅" if cov_class == "status-ok" else "⚠️"
             universe_status_line = (
                 f'<p class="{cov_class}">{cov_icon} Universe: FTSE 100 (LSE first-party) — '
-                f'{matched}/{expected} constituent(s) matched, {unmatched} unmatched, '
-                f'{cov.get("lseInstrumentsReturned", 0)} instrument(s) in this response</p>'
+                f'{returned} row(s) returned by this widget (a top-movers list, not a full '
+                f'constituent dump), {matched} matched to FTSE 100, {unmatched} unmatched '
+                f'(out of {cov.get("ftse100Expected", 0)} total FTSE 100 constituents)</p>'
             )
         else:
             universe_status_line = (
