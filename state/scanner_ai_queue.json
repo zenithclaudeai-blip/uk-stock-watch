@@ -4195,9 +4195,9 @@
     "buy_score": 51.1,
     "first_detected": "2026-09-01T12:12:59.683198+00:00",
     "last_detected": "2026-09-01T12:12:59.683198+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T12:33:47.833671+00:00",
+    "status": "FAILED"
   },
   "DCC:risk_flag_appeared:e6836a02b2612464": {
     "ticker": "DCC",
@@ -4483,9 +4483,9 @@
     "buy_score": 52.0,
     "first_detected": "2026-09-01T12:12:59.683198+00:00",
     "last_detected": "2026-09-01T12:12:59.683198+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T12:33:47.035140+00:00",
+    "status": "FAILED"
   },
   "BAB:risk_flag_appeared:bc59234efe53ae2c": {
     "ticker": "BAB",
@@ -4567,9 +4567,9 @@
     "buy_score": 51.2,
     "first_detected": "2026-09-01T12:12:59.683198+00:00",
     "last_detected": "2026-09-01T12:12:59.683198+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T12:33:47.309296+00:00",
+    "status": "FAILED"
   },
   "LGEN:risk_flag_appeared:14eabd0c879c6700": {
     "ticker": "LGEN",
@@ -4603,9 +4603,9 @@
     "buy_score": 51.2,
     "first_detected": "2026-09-01T12:12:59.683198+00:00",
     "last_detected": "2026-09-01T12:12:59.683198+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T12:33:47.580487+00:00",
+    "status": "FAILED"
   },
   "RIO:risk_flag_appeared:4fbd0b36e7e4de66": {
     "ticker": "RIO",
@@ -4807,9 +4807,9 @@
     "buy_score": 52.7,
     "first_detected": "2026-09-01T12:12:59.683198+00:00",
     "last_detected": "2026-09-01T12:12:59.683198+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T12:33:46.755973+00:00",
+    "status": "FAILED"
   },
   "DGE:risk_flag_appeared:3c0f0d3154baafc5": {
     "ticker": "DGE",
@@ -4881,7 +4881,7 @@
     "last_detected": "2026-09-01T12:12:59.683198+00:00",
     "attempt_count": 0,
     "last_attempt": null,
-    "status": "QUEUED"
+    "status": "SUPERSEDED"
   },
   "PSH:risk_flag_appeared:a87259797ec3ab7e": {
     "ticker": "PSH",
@@ -5191,6 +5191,30 @@
     "buy_score": 34.1,
     "first_detected": "2026-09-01T12:28:01.139593+00:00",
     "last_detected": "2026-09-01T12:28:01.139593+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "SUPERSEDED"
+  },
+  "PSN:risk_flag_disappeared:6f3dde4b89ada635": {
+    "ticker": "PSN",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "6f3dde4b89ada635",
+    "buy_score": 39.8,
+    "first_detected": "2026-09-01T12:33:46.488466+00:00",
+    "last_detected": "2026-09-01T12:33:46.488466+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "EDV:risk_flag_disappeared:0ba8dc4feb2a1b7c": {
+    "ticker": "EDV",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "0ba8dc4feb2a1b7c",
+    "buy_score": 34.2,
+    "first_detected": "2026-09-01T12:33:46.488466+00:00",
+    "last_detected": "2026-09-01T12:33:46.488466+00:00",
     "attempt_count": 0,
     "last_attempt": null,
     "status": "QUEUED"
