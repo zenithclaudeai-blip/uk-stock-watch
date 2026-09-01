@@ -60,42 +60,37 @@ BEAR_AGENT_MIN_SCORE = 80
 BEAR_AGENT_MAX_PER_RUN = 3
 
 
-def bear_challenge(evidence_dict: dict, cache: dict) -> dict:
+def bear_challenge(evidence_dict: dict, cache: dict, gateway=None) -> dict:
     """
     A genuinely SEPARATE AI call from analyze_evidence - different
     system prompt, different task (actively disprove, not neutrally
     interpret), different cache namespace so a bull-case cache hit
     never silently substitutes for a bear challenge. Same fact-boundary
-    guarantees: never invents a number, never available without an API
-    key, never fabricated if the call fails.
+    guarantees: never invents a number, never available without a
+    configured provider, never fabricated if the call fails.
+
+    Routed through the AI Provider Gateway (ai_provider_gateway.py) -
+    this function no longer knows HOW to reach Anthropic specifically;
+    it asks the gateway for a completion and gets back a real result
+    or an honest failure. A gateway instance is created on demand if
+    none is passed, so existing callers keep working unchanged.
     """
+    import ai_provider_gateway
+    gateway = gateway or ai_provider_gateway.AIProviderGateway()
+
     ticker = evidence_dict["ticker"]
     ehash = evidence_hash(evidence_dict)
     cache_key = f"bear:{ticker}:{BEAR_AGENT_VERSION}:{ehash}"
     if cache_key in cache:
         return cache[cache_key]
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-    if not api_key:
+    result = gateway.complete(BEAR_SYSTEM_PROMPT, f"Evidence:\n{json.dumps(evidence_dict, indent=2)}")
+    if not result.success:
+        print(f"  ! Bear Agent for {ticker} failed via {result.provider or 'no provider'}: "
+              f"{result.error_type} — {result.error_detail}", file=sys.stderr)
         return None
-
-    body = json.dumps({
-        "model": AI_EVIDENCE_MODEL,
-        "max_tokens": 500,
-        "system": BEAR_SYSTEM_PROMPT,
-        "messages": [{"role": "user", "content": f"Evidence:\n{json.dumps(evidence_dict, indent=2)}"}],
-    }).encode("utf-8")
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages", data=body,
-        headers={"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-        method="POST",
-    )
     try:
-        resp_data = json.loads(urllib.request.urlopen(req, timeout=30).read())
-        text = "".join(b.get("text", "") for b in resp_data.get("content", []) if b.get("type") == "text").strip()
-        if not text:
-            return None
-        parsed = json.loads(text)
+        parsed = json.loads(result.text)
         required = {"bear_case", "weaknesses_in_bull_case", "missing_evidence_that_would_matter",
                     "verdict", "bear_confidence"}
         if not required.issubset(parsed.keys()):
@@ -109,15 +104,8 @@ def bear_challenge(evidence_dict: dict, cache: dict) -> dict:
         parsed["modelVersion"] = BEAR_AGENT_VERSION
         cache[cache_key] = parsed
         return parsed
-    except urllib.error.HTTPError as e:
-        try:
-            error_body = e.read().decode("utf-8", errors="replace")
-        except Exception:
-            error_body = "(couldn't read error body)"
-        print(f"  ! Bear Agent for {ticker} failed: HTTP {e.code} — {error_body[:200]}", file=sys.stderr)
-        return None
-    except Exception as e:
-        print(f"  ! Bear Agent for {ticker} failed: {e}", file=sys.stderr)
+    except (json.JSONDecodeError, KeyError, TypeError) as e:
+        print(f"  ! Bear Agent for {ticker}: could not parse response as valid JSON: {e}", file=sys.stderr)
         return None
 
 
@@ -217,42 +205,34 @@ def build_evidence_summary(stock_record, breakdown, risk_flags) -> dict:
     return evidence
 
 
-def analyze_evidence(evidence_dict: dict, cache: dict) -> dict:
+def analyze_evidence(evidence_dict: dict, cache: dict, gateway=None) -> dict:
     """
     Calls the AI ONLY if this exact evidence set (by hash) hasn't
     already been analyzed under the current model version. Returns
-    None (never a fabricated analysis) if no API key is configured,
-    the call fails, or the response fails the safety-pattern check -
-    the scanner and its numerical BUY SCORE work identically either
-    way, exactly as this project's existing AI digest feature does.
+    None (never a fabricated analysis) if no provider is configured,
+    every configured provider fails, or the response fails the
+    safety-pattern check - the scanner and its numerical BUY SCORE
+    work identically either way.
+
+    Routed through the AI Provider Gateway - this function has no
+    Anthropic-specific HTTP logic of its own anymore.
     """
+    import ai_provider_gateway
+    gateway = gateway or ai_provider_gateway.AIProviderGateway()
+
     ticker = evidence_dict["ticker"]
     ehash = evidence_hash(evidence_dict)
     cache_key = f"{ticker}:{AI_EVIDENCE_ANALYSIS_VERSION}:{ehash}"
     if cache_key in cache:
         return cache[cache_key]  # unchanged evidence - no repeat API call
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-    if not api_key:
+    result = gateway.complete(SYSTEM_PROMPT, f"Evidence:\n{json.dumps(evidence_dict, indent=2)}")
+    if not result.success:
+        print(f"  ! AI evidence analysis for {ticker} failed via {result.provider or 'no provider'}: "
+              f"{result.error_type} — {result.error_detail}", file=sys.stderr)
         return None
-
-    body = json.dumps({
-        "model": AI_EVIDENCE_MODEL,
-        "max_tokens": 500,
-        "system": SYSTEM_PROMPT,
-        "messages": [{"role": "user", "content": f"Evidence:\n{json.dumps(evidence_dict, indent=2)}"}],
-    }).encode("utf-8")
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages", data=body,
-        headers={"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-        method="POST",
-    )
     try:
-        resp_data = json.loads(urllib.request.urlopen(req, timeout=30).read())
-        text = "".join(b.get("text", "") for b in resp_data.get("content", []) if b.get("type") == "text").strip()
-        if not text:
-            return None
-        parsed = json.loads(text)
+        parsed = json.loads(result.text)
         required = {"bull_case", "bear_case", "key_catalysts", "key_risks", "evidence_conflicts",
                     "what_would_change_the_view", "outlook", "analysis_confidence"}
         if not required.issubset(parsed.keys()):
@@ -264,17 +244,12 @@ def analyze_evidence(evidence_dict: dict, cache: dict) -> dict:
             return None
         parsed["evidenceHash"] = ehash
         parsed["modelVersion"] = AI_EVIDENCE_ANALYSIS_VERSION
+        parsed["aiProvider"] = result.provider
+        parsed["aiModel"] = result.model
         cache[cache_key] = parsed
         return parsed
-    except urllib.error.HTTPError as e:
-        try:
-            error_body = e.read().decode("utf-8", errors="replace")
-        except Exception:
-            error_body = "(couldn't read error body)"
-        print(f"  ! AI evidence analysis for {ticker} failed: HTTP {e.code} — {error_body[:200]}", file=sys.stderr)
-        return None
-    except Exception as e:
-        print(f"  ! AI evidence analysis for {ticker} failed: {e}", file=sys.stderr)
+    except (json.JSONDecodeError, KeyError, TypeError) as e:
+        print(f"  ! AI evidence analysis for {ticker}: could not parse response as valid JSON: {e}", file=sys.stderr)
         return None
 
 
