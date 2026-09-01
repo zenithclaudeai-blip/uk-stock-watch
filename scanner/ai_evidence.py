@@ -24,6 +24,117 @@ import sys
 
 AI_EVIDENCE_MODEL = "claude-haiku-4-5-20251001"  # cheap/fast tier - bounded structured task, not open-ended
 AI_EVIDENCE_ANALYSIS_VERSION = "v1.0"
+BEAR_AGENT_VERSION = "v1.0"
+
+BEAR_SYSTEM_PROMPT = """You are a skeptical, adversarial research assistant for a UK stock research tool. \
+Your ONLY job is to find the strongest reasons this stock should NOT be considered attractive, using \
+ONLY the evidence you are given below.
+
+You will be given a fixed set of ALREADY-VERIFIED facts - real prices, real broker targets, real news, \
+real risk flags. You do NOT have web access and did not gather this evidence yourself.
+
+You must NEVER:
+- state a price, percentage, target, or any number that was not explicitly given to you
+- invent a fact, statistic, catalyst, or event not present in the evidence
+- soften your challenge because the evidence looks positive - actively look for what's missing, weak, or contradictory
+- give investment advice or tell the reader to buy/sell
+
+Respond with ONLY a JSON object with exactly these fields:
+{
+  "bear_case": "the strongest case AGAINST this being attractive, using only the supplied evidence",
+  "weaknesses_in_bull_case": ["short phrase", ...] (gaps or weak points in the positive evidence),
+  "missing_evidence_that_would_matter": ["short phrase", ...] (what's absent that a skeptic would want to see),
+  "verdict": "Challenge Upheld" (bear case genuinely undermines the opportunity) or "Challenge Weak" (evidence still looks reasonably solid despite the challenge),
+  "bear_confidence": integer 0-100 (how strong the bear case is, given only the supplied evidence)
+}
+
+No text outside the JSON object. No markdown formatting."""
+
+# Mandatory bear-challenge tier - deliberately much smaller than the
+# general AI evidence tier, since this is specifically for the
+# highest-conviction opportunities where an unchallenged bull case is
+# most risky to present unquestioned.
+BEAR_AGENT_MIN_SCORE = 80
+BEAR_AGENT_MAX_PER_RUN = 3
+
+
+def bear_challenge(evidence_dict: dict, cache: dict) -> dict:
+    """
+    A genuinely SEPARATE AI call from analyze_evidence - different
+    system prompt, different task (actively disprove, not neutrally
+    interpret), different cache namespace so a bull-case cache hit
+    never silently substitutes for a bear challenge. Same fact-boundary
+    guarantees: never invents a number, never available without an API
+    key, never fabricated if the call fails.
+    """
+    ticker = evidence_dict["ticker"]
+    ehash = evidence_hash(evidence_dict)
+    cache_key = f"bear:{ticker}:{BEAR_AGENT_VERSION}:{ehash}"
+    if cache_key in cache:
+        return cache[cache_key]
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if not api_key:
+        return None
+
+    body = json.dumps({
+        "model": AI_EVIDENCE_MODEL,
+        "max_tokens": 500,
+        "system": BEAR_SYSTEM_PROMPT,
+        "messages": [{"role": "user", "content": f"Evidence:\n{json.dumps(evidence_dict, indent=2)}"}],
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages", data=body,
+        headers={"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+        method="POST",
+    )
+    try:
+        resp_data = json.loads(urllib.request.urlopen(req, timeout=30).read())
+        text = "".join(b.get("text", "") for b in resp_data.get("content", []) if b.get("type") == "text").strip()
+        if not text:
+            return None
+        parsed = json.loads(text)
+        required = {"bear_case", "weaknesses_in_bull_case", "missing_evidence_that_would_matter",
+                    "verdict", "bear_confidence"}
+        if not required.issubset(parsed.keys()):
+            print(f"  ! Bear Agent for {ticker}: response missing required fields, discarded", file=sys.stderr)
+            return None
+        full_text = json.dumps(parsed)
+        if any(re.search(pat, full_text, re.IGNORECASE) for pat in FORBIDDEN_PATTERNS):
+            print(f"  ! Bear Agent for {ticker} blocked: matched an advice/prediction pattern", file=sys.stderr)
+            return None
+        parsed["evidenceHash"] = ehash
+        parsed["modelVersion"] = BEAR_AGENT_VERSION
+        cache[cache_key] = parsed
+        return parsed
+    except urllib.error.HTTPError as e:
+        try:
+            error_body = e.read().decode("utf-8", errors="replace")
+        except Exception:
+            error_body = "(couldn't read error body)"
+        print(f"  ! Bear Agent for {ticker} failed: HTTP {e.code} — {error_body[:200]}", file=sys.stderr)
+        return None
+    except Exception as e:
+        print(f"  ! Bear Agent for {ticker} failed: {e}", file=sys.stderr)
+        return None
+
+
+def select_bear_agent_candidates(scan_result) -> list:
+    """
+    Per the explicit requirement, the bear challenge is MANDATORY for
+    high-score opportunities - selects every stock at or above
+    BEAR_AGENT_MIN_SCORE, ranked highest-score-first, capped at
+    BEAR_AGENT_MAX_PER_RUN for cost control (a smaller cap than the
+    general AI evidence tier, since this targets specifically the
+    highest-conviction stocks where an unchallenged bull case matters most).
+    """
+    candidates = [
+        (t, b.buy_score) for t, b in scan_result.breakdowns.items()
+        if b.buy_score is not None and b.buy_score >= BEAR_AGENT_MIN_SCORE
+    ]
+    candidates.sort(key=lambda c: -c[1])
+    return [t for t, _ in candidates[:BEAR_AGENT_MAX_PER_RUN]]
+
 
 SYSTEM_PROMPT = """You are an evidence-interpretation assistant for a UK stock research tool.
 

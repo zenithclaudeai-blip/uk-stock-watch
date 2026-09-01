@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 
 from scoring import classify_opportunity_tier, compute_risk_score
 import history as history_module
+import ai_evidence as ai_evidence_module
 
 
 def _confidence_warning(breakdown):
@@ -81,7 +82,7 @@ def _section_html(title, breakdowns, snapshot_history, risk_flags_by_ticker, now
 
 
 def render_opportunities_page(scan_result, snapshot_history: dict, dashboard_css: str, docs_dir: str,
-                               render_standalone_page_fn, ai_analyses: dict = None):
+                               render_standalone_page_fn, ai_analyses: dict = None, bear_challenges: dict = None):
     """
     scan_result: orchestrator.ScanResult from the most recent real scan.
     snapshot_history: {ticker: [snapshot_dict, ...]} - real persisted history.
@@ -138,6 +139,7 @@ def render_opportunities_page(scan_result, snapshot_history: dict, dashboard_css
     )
 
     ai_analyses = ai_analyses or {}
+    bear_challenges = bear_challenges or {}
 
     content = f"""
 <p class="meta">Genuine, periodically-refreshed opportunity discovery — not real-time. Refreshed every 5 minutes during UK market hours, same schedule as the rest of this dashboard.</p>
@@ -193,6 +195,15 @@ def render_opportunities_page(scan_result, snapshot_history: dict, dashboard_css
   {f'<p><b>Evidence conflicts:</b> {a["evidence_conflicts"]}</p>' if a.get("evidence_conflicts") else ""}
   <p><b>What would change this view:</b> {a.get("what_would_change_the_view", "")}</p>
 </div>''' for ticker, a in ai_analyses.items()) or '<p class="opp-empty">No stocks qualified for AI evidence analysis this run.</p>'}
+
+<h2>🐻 Bear Agent — Mandatory Challenge (80+ scores)</h2>
+<p class="opp-meta">Every stock scoring 80+ receives an independent, adversarial challenge — a separate AI call specifically instructed to find the strongest case AGAINST the opportunity, never a softened version of the bull case above. Capped at {ai_evidence_module.BEAR_AGENT_MAX_PER_RUN} per run for cost control.</p>
+{"".join(f'''<div class="opp-bear-challenge">
+  <h4>{ticker} — Verdict: {c.get("verdict", "—")} (bear confidence: {c.get("bear_confidence", "—")})</h4>
+  <p><b>Bear case:</b> {c.get("bear_case", "")}</p>
+  {f'<p><b>Weaknesses in the bull case:</b> {", ".join(c["weaknesses_in_bull_case"])}</p>' if c.get("weaknesses_in_bull_case") else ""}
+  {f'<p><b>Missing evidence that would matter:</b> {", ".join(c["missing_evidence_that_would_matter"])}</p>' if c.get("missing_evidence_that_would_matter") else ""}
+</div>''' for ticker, c in bear_challenges.items()) or '<p class="opp-empty">No stocks currently score 80+, so no mandatory bear challenge was triggered this run.</p>'}
 """
 
     return render_standalone_page_fn("opportunities.html", "Opportunity Scanner", "🔥 LSE Opportunity Scanner", content, docs_dir)
