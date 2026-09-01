@@ -101,11 +101,15 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
   <tr><td>Momentum</td><td>30%</td><td>CORE</td></tr><tr><td>Trend</td><td>25%</td><td>CORE</td></tr><tr><td>Liquidity</td><td>20%</td><td>CORE</td></tr><tr><td>Analyst Evidence</td><td>15%</td><td>ENHANCEMENT</td></tr><tr><td>News Catalyst</td><td>10%</td><td>ENHANCEMENT</td></tr>
   </table>
   <p class="opp-meta">CORE components must supply at least 30 of their combined weight before a stock is considered scoreable at all — a stock with only ENHANCEMENT evidence (e.g. news alone) is never scored from that alone. When a component is missing, its weight is redistributed proportionally among the components that ARE available — the score reflects only real evidence, and DATA CONFIDENCE is reduced separately to reflect the gap, rather than the missing component silently becoming a zero.</p>
+  <h4>Engines not yet connected — genuinely UNAVAILABLE, not zero, and carrying zero weight in the score above:</h4>
+  <table><tr><th>Engine</th><th>Status</th><th>Reason</th></tr>
+  <tr><td>Quality</td><td>⚪ UNAVAILABLE</td><td>No connected fundamentals source (ROE/margins/balance sheet)</td></tr><tr><td>Growth</td><td>⚪ UNAVAILABLE</td><td>No connected fundamentals source (revenue/EPS/FCF growth)</td></tr><tr><td>Valuation</td><td>⚪ UNAVAILABLE</td><td>No connected fundamentals source (P/E vs sector/history)</td></tr><tr><td>Dividend</td><td>⚪ UNAVAILABLE</td><td>No connected fundamentals source (payout ratio/cover/history)</td></tr><tr><td>Balance Sheet</td><td>⚪ UNAVAILABLE</td><td>No connected fundamentals source (debt/equity/interest cover)</td></tr><tr><td>Profitability</td><td>⚪ UNAVAILABLE</td><td>No connected fundamentals source (margins/ROIC)</td></tr><tr><td>Cash Flow</td><td>⚪ UNAVAILABLE</td><td>No connected fundamentals source (operating/free cash flow)</td></tr>
+  </table>
 </div>
 
 <div class="opp-scan-health">
   <h3>Scan Health</h3>
-  <p class="opp-meta">Last scan: 2026-09-01T00:58:33.340432+00:00 · <b>Universe Coverage: 100.0%</b> (every eligible stock was scanned) ·
+  <p class="opp-meta">Last scan: 2026-09-01T01:10:33.809243+00:00 · <b>Universe Coverage: 100.0%</b> (every eligible stock was scanned) ·
   <b>Model Data Coverage: 98.9%</b> (average completeness of the actual scoring evidence — these are DIFFERENT numbers; 100% universe coverage does not mean complete financial evidence)</p>
   <p class="opp-meta">Scoreable: 100 · Fully covered: 94 ·
   Partially covered: 6 · Unscoreable: 0</p>
@@ -113,9 +117,21 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
   Stocks with insufficient history for momentum tracking: 100 (expected — history accumulates over multiple runs)</p>
 </div>
 
+<div class="opp-ai-status">
+  <h3>AI Status</h3>
+  <ul>
+    <li>Candidates identified this run: 40</li>
+    <li>Analysed: 0</li>
+    <li>Waiting (qualified, budget-limited): 35</li>
+    <li>Failed (API/billing/rate-limit error): 5</li>
+    <li>No-change runs (nothing materially different): no</li>
+  </ul>
+  <p class="opp-meta">Candidates are selected by event priority (new opportunity → band change → evidence conflict → risk flag appeared → major score change → risk flag disappeared), never by encounter order — and the 5-candidate budget never limits the underlying market scan, which always covers the full 100-stock universe.</p>
+</div>
+
 <div class="opp-provider-health">
   <h3>Provider Health</h3>
-  <p class="opp-meta">LSE Heatmap (FTSE 100): available · 6 request(s) · 0% error rate</p><p class="opp-meta">Yahoo Finance (enrichment): available · 120 request(s) · 0% error rate</p>
+  <p class="opp-meta">LSE Heatmap (FTSE 100): available · 7 request(s) · 0% error rate</p><p class="opp-meta">Yahoo Finance (enrichment): available · 140 request(s) · 0% error rate</p>
 </div>
 
 <h2>🔥 Best Opportunities Now</h2>
@@ -124,7 +140,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 <h3>Promising (70-79) (2)</h3><div class="opp-list"><div class="opp-row">
   <div class="opp-ticker">DPLM</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 72</div>
-  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: PROMISING</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 72 → 72 (+0.0)</div>
@@ -135,7 +151,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">SVT</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 71</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: PROMISING</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 71 → 71 (+0.0)</div>
@@ -159,7 +175,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 <h3>All scoreable stocks (100)</h3><div class="opp-list"><div class="opp-row">
   <div class="opp-ticker">DPLM</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 72</div>
-  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: PROMISING</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 72 → 72 (+0.0)</div>
@@ -170,7 +186,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">SVT</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 71</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: PROMISING</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 71 → 71 (+0.0)</div>
@@ -181,7 +197,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">INVP</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 69</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 69 → 69 (+0.0)</div>
@@ -192,7 +208,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">CRDA</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 69</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 69 → 69 (+0.0)</div>
@@ -214,7 +230,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">SSE</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 66</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 20</div>
+  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 20</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 66 → 66 (+0.0)</div>
@@ -225,7 +241,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">STAN</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 66</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 20</div>
+  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 20</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 66 → 66 (+0.0)</div>
@@ -236,7 +252,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">UU.</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 66</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 66 → 66 (+0.0)</div>
@@ -269,7 +285,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">LGEN</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 65</div>
-  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 65 → 65 (+0.0)</div>
@@ -291,7 +307,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">SDLF</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 64</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 15</div>
+  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 15</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 64 → 64 (+0.0)</div>
@@ -302,7 +318,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">ALW</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 64</div>
-  <div class="opp-conf">Confidence: 77 · Model Coverage: 85% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 85 · Model Coverage: 85% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 64 → 64 (+0.0)</div>
@@ -313,7 +329,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">CTEC</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 64</div>
-  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 64 → 64 (+0.0)</div>
@@ -324,7 +340,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">BGEO</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 64</div>
-  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 20</div>
+  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 20</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 64 → 64 (+0.0)</div>
@@ -335,7 +351,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">BBOX</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 64</div>
-  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 64 → 64 (+0.0)</div>
@@ -346,7 +362,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">SMIN</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 64</div>
-  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 64 → 64 (+0.0)</div>
@@ -357,7 +373,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">SGE</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 64</div>
-  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 64 → 64 (+0.0)</div>
@@ -368,7 +384,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">HSBA</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 63</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 20</div>
+  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 20</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 63 → 63 (+0.0)</div>
@@ -377,51 +393,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
   
   <span class="opp-risk-flags">⚠ High volatility (52wk range 71%)</span>
 </div><div class="opp-row">
-  <div class="opp-ticker">AAL</div>
-  <div class="opp-score">PROVISIONAL BUY SCORE: 63</div>
-  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 20</div>
-  <div class="opp-status">Status: BELOW THRESHOLD</div>
-  <span class="opp-meta">Momentum: insufficient history</span>
-  <div class="opp-what-changed"><b>What changed:</b> 63 → 63 (+0.0)</div>
-  
-  
-  
-  <span class="opp-risk-flags">⚠ High volatility (52wk range 98%)</span>
-</div><div class="opp-row">
   <div class="opp-ticker">MKS</div>
-  <div class="opp-score">PROVISIONAL BUY SCORE: 62</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
-  <div class="opp-status">Status: BELOW THRESHOLD</div>
-  <span class="opp-meta">Momentum: insufficient history</span>
-  <div class="opp-what-changed"><b>What changed:</b> 62 → 62 (+0.0)</div>
-  
-  
-  
-  
-</div><div class="opp-row">
-  <div class="opp-ticker">ICG</div>
-  <div class="opp-score">PROVISIONAL BUY SCORE: 62</div>
-  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 20</div>
-  <div class="opp-status">Status: BELOW THRESHOLD</div>
-  <span class="opp-meta">Momentum: insufficient history</span>
-  <div class="opp-what-changed"><b>What changed:</b> 62 → 62 (+0.0)</div>
-  
-  
-  
-  <span class="opp-risk-flags">⚠ High volatility (52wk range 64%)</span>
-</div><div class="opp-row">
-  <div class="opp-ticker">AV.</div>
-  <div class="opp-score">PROVISIONAL BUY SCORE: 62</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
-  <div class="opp-status">Status: BELOW THRESHOLD</div>
-  <span class="opp-meta">Momentum: insufficient history</span>
-  <div class="opp-what-changed"><b>What changed:</b> 62 → 62 (+0.0)</div>
-  
-  
-  
-  
-</div><div class="opp-row">
-  <div class="opp-ticker">ADM</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 62</div>
   <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
@@ -432,9 +404,53 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
   
   
 </div><div class="opp-row">
+  <div class="opp-ticker">ICG</div>
+  <div class="opp-score">PROVISIONAL BUY SCORE: 62</div>
+  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 20</div>
+  <div class="opp-status">Status: BELOW THRESHOLD</div>
+  <span class="opp-meta">Momentum: insufficient history</span>
+  <div class="opp-what-changed"><b>What changed:</b> 62 → 62 (+0.0)</div>
+  
+  
+  
+  <span class="opp-risk-flags">⚠ High volatility (52wk range 64%)</span>
+</div><div class="opp-row">
+  <div class="opp-ticker">AAL</div>
+  <div class="opp-score">PROVISIONAL BUY SCORE: 62</div>
+  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 20</div>
+  <div class="opp-status">Status: BELOW THRESHOLD</div>
+  <span class="opp-meta">Momentum: insufficient history</span>
+  <div class="opp-what-changed"><b>What changed:</b> 63 → 62 (-0.2) · Analyst -1.3</div>
+  
+  
+  
+  <span class="opp-risk-flags">⚠ High volatility (52wk range 98%)</span>
+</div><div class="opp-row">
+  <div class="opp-ticker">AV.</div>
+  <div class="opp-score">PROVISIONAL BUY SCORE: 62</div>
+  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-status">Status: BELOW THRESHOLD</div>
+  <span class="opp-meta">Momentum: insufficient history</span>
+  <div class="opp-what-changed"><b>What changed:</b> 62 → 62 (+0.0)</div>
+  
+  
+  
+  
+</div><div class="opp-row">
+  <div class="opp-ticker">ADM</div>
+  <div class="opp-score">PROVISIONAL BUY SCORE: 62</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-status">Status: BELOW THRESHOLD</div>
+  <span class="opp-meta">Momentum: insufficient history</span>
+  <div class="opp-what-changed"><b>What changed:</b> 62 → 62 (+0.0)</div>
+  
+  
+  
+  
+</div><div class="opp-row">
   <div class="opp-ticker">FCIT</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 62</div>
-  <div class="opp-conf">Confidence: 77 · Model Coverage: 85% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 85 · Model Coverage: 85% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 62 → 62 (+0.0)</div>
@@ -445,7 +461,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">INF</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 62</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 62 → 62 (+0.0)</div>
@@ -456,7 +472,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">BARC</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 62</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 62 → 62 (+0.0)</div>
@@ -478,7 +494,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">MNG</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 61</div>
-  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 15</div>
+  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 15</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 61 → 61 (+0.0)</div>
@@ -522,7 +538,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">SMT</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 60</div>
-  <div class="opp-conf">Confidence: 85 · Model Coverage: 85% · Risk: 25</div>
+  <div class="opp-conf">Confidence: 82 · Model Coverage: 85% · Risk: 25</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 60 → 60 (+0.0)</div>
@@ -533,7 +549,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">LLOY</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 60</div>
-  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 60 → 60 (+0.0)</div>
@@ -597,20 +613,9 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
   
   
 </div><div class="opp-row">
-  <div class="opp-ticker">ULVR</div>
-  <div class="opp-score">PROVISIONAL BUY SCORE: 59</div>
-  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
-  <div class="opp-status">Status: BELOW THRESHOLD</div>
-  <span class="opp-meta">Momentum: insufficient history</span>
-  <div class="opp-what-changed"><b>What changed:</b> 59 → 59 (+0.0)</div>
-  
-  
-  
-  
-</div><div class="opp-row">
   <div class="opp-ticker">CCC</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 59</div>
-  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 20</div>
+  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 20</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 59 → 59 (+0.0)</div>
@@ -621,7 +626,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">SHEL</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 59</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 59 → 59 (+0.0)</div>
@@ -632,7 +637,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">TSCO</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 58</div>
-  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 58 → 58 (+0.0)</div>
@@ -654,7 +659,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">CCEP</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 58</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 58 → 58 (+0.0)</div>
@@ -676,7 +681,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">CPG</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 58</div>
-  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 58 → 58 (+0.0)</div>
@@ -709,7 +714,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">MRO</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 58</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 20</div>
+  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 20</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 58 → 58 (+0.0)</div>
@@ -731,10 +736,21 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">ABDN</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 57</div>
-  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 57 → 57 (+0.0)</div>
+  
+  
+  
+  
+</div><div class="opp-row">
+  <div class="opp-ticker">ULVR</div>
+  <div class="opp-score">PROVISIONAL BUY SCORE: 57</div>
+  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-status">Status: BELOW THRESHOLD</div>
+  <span class="opp-meta">Momentum: insufficient history</span>
+  <div class="opp-what-changed"><b>What changed:</b> 59 → 57 (-2.1) · Liquidity -10.7</div>
   
   
   
@@ -775,7 +791,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">VOD</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 56</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 56 → 56 (+0.0)</div>
@@ -819,7 +835,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">NG.</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 55</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 55 → 55 (+0.0)</div>
@@ -863,7 +879,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">BRBY</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 55</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 55 → 55 (+0.0)</div>
@@ -874,7 +890,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">SBRY</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 54</div>
-  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 54 → 54 (+0.0)</div>
@@ -894,17 +910,6 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
   
   <span class="opp-risk-flags">⚠ High volatility (52wk range 93%)</span>
 </div><div class="opp-row">
-  <div class="opp-ticker">DGE</div>
-  <div class="opp-score">PROVISIONAL BUY SCORE: 54</div>
-  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 20</div>
-  <div class="opp-status">Status: BELOW THRESHOLD</div>
-  <span class="opp-meta">Momentum: insufficient history</span>
-  <div class="opp-what-changed"><b>What changed:</b> 54 → 54 (+0.0)</div>
-  
-  
-  
-  <span class="opp-risk-flags">⚠ High volatility (52wk range 63%)</span>
-</div><div class="opp-row">
   <div class="opp-ticker">PCT</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 54</div>
   <div class="opp-conf">Confidence: 77 · Model Coverage: 85% · Risk: 45</div>
@@ -916,9 +921,20 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
   <span class="opp-missing">Missing: Analyst Evidence</span>
   <span class="opp-risk-flags">⚠ High volatility (52wk range 93%) · ⚠ Low liquidity (volume 0.3x average)</span>
 </div><div class="opp-row">
+  <div class="opp-ticker">DGE</div>
+  <div class="opp-score">PROVISIONAL BUY SCORE: 54</div>
+  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 20</div>
+  <div class="opp-status">Status: BELOW THRESHOLD</div>
+  <span class="opp-meta">Momentum: insufficient history</span>
+  <div class="opp-what-changed"><b>What changed:</b> 54 → 54 (-0.2) · Analyst -0.9</div>
+  
+  
+  
+  <span class="opp-risk-flags">⚠ High volatility (52wk range 63%)</span>
+</div><div class="opp-row">
   <div class="opp-ticker">SPX</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 54</div>
-  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 54 → 54 (+0.0)</div>
@@ -951,7 +967,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">PRU</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 52</div>
-  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 52 → 52 (+0.0)</div>
@@ -984,7 +1000,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">GAW</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 52</div>
-  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 45</div>
+  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 45</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 52 → 52 (+0.0)</div>
@@ -1006,7 +1022,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">BA.</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 51</div>
-  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 51 → 51 (+0.0)</div>
@@ -1017,7 +1033,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">AAF</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 50</div>
-  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 20</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 20</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 50 → 50 (+0.0)</div>
@@ -1028,7 +1044,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">STJ</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 50</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 25</div>
+  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 25</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 50 → 50 (+0.0)</div>
@@ -1050,7 +1066,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">AZN</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 50</div>
-  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 50 → 50 (+0.0)</div>
@@ -1061,7 +1077,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">KGF</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 49</div>
-  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 49 → 49 (+0.0)</div>
@@ -1083,7 +1099,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">CNA</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 49</div>
-  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 49 → 49 (+0.0)</div>
@@ -1094,7 +1110,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">BATS</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 48</div>
-  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 48 → 48 (+0.0)</div>
@@ -1116,7 +1132,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">HWDN</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 47</div>
-  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 47 → 47 (+0.0)</div>
@@ -1149,7 +1165,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">ENT</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 46</div>
-  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 20</div>
+  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 20</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 46 → 46 (+0.0)</div>
@@ -1160,7 +1176,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">BTRW</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 45</div>
-  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 45</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 45</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 45 → 45 (+0.0)</div>
@@ -1182,7 +1198,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">HLMA</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 44</div>
-  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 44 → 44 (+0.0)</div>
@@ -1193,7 +1209,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">WTB</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 44</div>
-  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 44 → 44 (+0.0)</div>
@@ -1204,7 +1220,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">ABF</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 44</div>
-  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 44 → 44 (+0.0)</div>
@@ -1215,7 +1231,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">BAB</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 42</div>
-  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 20</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 20</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 42 → 42 (+0.0)</div>
@@ -1237,7 +1253,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">SN.</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 41</div>
-  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 0</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 41 → 41 (+0.0)</div>
@@ -1248,7 +1264,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">AUTO</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 39</div>
-  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 20</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 20</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 39 → 39 (+0.0)</div>
@@ -1263,8 +1279,8 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 
 <h2>🤖 AI Evidence View</h2>
 <p class="opp-meta">A separate, clearly-labeled interpretive layer — the AI is given only the same verified facts already shown above and asked to interpret them; it never generates a number, price, or target, and never changes the PROVISIONAL BUY SCORE. Only run for a small, cost-bounded set of stocks each run (new 80+/90+ entrants and large score changes) — most stocks will not have an entry here, which is expected.</p>
+<p class="opp-ai-unavailable"><b>AI ANALYSIS: UNAVAILABLE — Reason: 5 stock(s) qualified for analysis but every API call failed this run (see the poller log for the exact error — commonly a billing/credit issue or a rate limit). The deterministic BUY SCORE above is completely unaffected.</b></p>
 
-<p class="opp-empty">No stocks qualified for AI evidence analysis this run.</p>
 
 <h2>🐻 Bear Agent — Mandatory Challenge (80+ scores)</h2>
 <p class="opp-meta">Every stock scoring 80+ receives an independent, adversarial challenge — a separate AI call specifically instructed to find the strongest case AGAINST the opportunity, never a softened version of the bull case above. Capped at 3 per run for cost control.</p>
