@@ -8359,8 +8359,45 @@ def main():
                 _snapshot = _scanner_history_module.ScoreSnapshot.from_breakdown(_breakdown)
                 _scanner_history = _scanner_history_module.append_snapshot(_scanner_history, _snapshot)
 
+            # AI Evidence Analysis - a bounded, cost-controlled tier
+            # (new 80+/90+ entrants and large score changes only,
+            # capped per run), never called for the whole universe.
+            # The deterministic buy_score computed above is already
+            # final by this point - this step can never change it,
+            # only add a separate, clearly-labeled interpretive layer.
+            _ai_evidence_state_file = os.path.join(STATE_DIR, "scanner_ai_cache.json")
+            _ai_analyses = {}
+            try:
+                import ai_evidence as _ai_evidence_module
+                if os.path.exists(_ai_evidence_state_file):
+                    with open(_ai_evidence_state_file, "r", encoding="utf-8") as f:
+                        _ai_cache = json.loads(f.read())
+                else:
+                    _ai_cache = {}
+                _candidates = _ai_evidence_module.select_ai_analysis_candidates(
+                    _scan_result, _scanner_history, _scanner_history_module,
+                )
+                if _candidates and os.environ.get("ANTHROPIC_API_KEY", "").strip():
+                    print(f"  > AI Evidence Analysis: {len(_candidates)} candidate(s) this run "
+                          f"(capped at {_ai_evidence_module.AI_ANALYSIS_MAX_PER_RUN})")
+                for _ticker in _candidates:
+                    _record = _scan_result.records.get(_ticker)
+                    _breakdown = _scan_result.breakdowns.get(_ticker)
+                    if not _record or not _breakdown:
+                        continue
+                    _evidence = _ai_evidence_module.build_evidence_summary(
+                        _record, _breakdown, _scan_result.risk_flags.get(_ticker, []),
+                    )
+                    _analysis = _ai_evidence_module.analyze_evidence(_evidence, _ai_cache)
+                    if _analysis:
+                        _ai_analyses[_ticker] = _analysis
+                atomic_write_json(_ai_evidence_state_file, _ai_cache)
+            except Exception as e:
+                print(f"  ! AI Evidence Analysis step failed this run (scanner unaffected): {e}", file=sys.stderr)
+
             opportunity_page_renderer.render_opportunities_page(
                 _scan_result, _scanner_history, DASHBOARD_CSS, DOCS_DIR, render_standalone_page,
+                ai_analyses=_ai_analyses,
             )
 
             save_scanner_state(_scan_result.updated_persisted_store, _scan_result.updated_analyst_refresh_state,

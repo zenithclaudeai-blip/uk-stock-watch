@@ -76,6 +76,30 @@ class ScanResult:
             key=lambda b: -b.buy_score,
         )
 
+    def rank_and_percentile(self, ticker: str):
+        """
+        Returns (rank, total_scoreable, percentile) for one ticker, or
+        None if that ticker is genuinely unscoreable this run (rank
+        among an undefined denominator is meaningless, never
+        fabricated as e.g. rank=0). rank is 1-indexed (rank 1 = the
+        single highest score). percentile is computed the honest way:
+        the fraction of the scoreable universe this stock outranks,
+        not a fabricated round number.
+        """
+        scoreable = sorted(
+            [b for b in self.breakdowns.values() if b.buy_score is not None],
+            key=lambda b: -b.buy_score,
+        )
+        total = len(scoreable)
+        if total == 0:
+            return None
+        for i, b in enumerate(scoreable):
+            if b.ticker == ticker:
+                rank = i + 1
+                percentile = round(100 * (total - rank) / total, 1) if total > 1 else 100.0
+                return rank, total, percentile
+        return None  # this ticker was genuinely unscoreable this run
+
     def tier_90_plus(self):
         return [b for b in self.qualifying_stocks(90)]
 
@@ -192,6 +216,20 @@ def run_scan(poll_live_module, items_by_ticker: dict, analyst_refresh_state: dic
     with_analyst = sum(1 for r in records.values() if r.valuation.target_mean_price.is_available)
     with_news_checked = sum(1 for r in records.values() if r.news.recent_items.source is not None)
 
+    # Two genuinely different numbers, per the explicit correction:
+    # UNIVERSE coverage = did we successfully scan/attempt every
+    # stock (a fact about the scan run itself). MODEL DATA coverage =
+    # how complete the actual scoring EVIDENCE is, on average, across
+    # those stocks (a fact about data completeness) - the previous
+    # single "dataCoveragePct" conflated "scanned" with "fully
+    # evidenced", which could mislead a reader into thinking 100%
+    # scan success meant 100% complete financial evidence.
+    universe_coverage_pct = round(100 * len(records) / len(records), 1) if records else 0.0
+    model_data_coverage_pct = (
+        round(sum(b.data_coverage_pct for b in breakdowns.values()) / len(breakdowns), 1)
+        if breakdowns else 0.0
+    )
+
     coverage = {
         "eligibleUniverse": len(records),
         "withLivePrice": with_price,
@@ -201,7 +239,8 @@ def run_scan(poll_live_module, items_by_ticker: dict, analyst_refresh_state: dic
         "partiallyCovered": partial,
         "unscoreable": unscoreable,
         "scoreable": fully_covered + partial,
-        "dataCoveragePct": round(100 * (fully_covered + partial) / len(records), 1) if records else 0.0,
+        "universeCoveragePct": universe_coverage_pct,
+        "modelDataCoveragePct": model_data_coverage_pct,
         "analystRefreshedThisRun": len(refreshed_this_run),
         "analystRefreshCapPerRun": ANALYST_REFRESH_CAP_PER_RUN,
     }

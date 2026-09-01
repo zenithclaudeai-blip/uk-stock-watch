@@ -11,7 +11,7 @@ the rest of this project's poller), never described as real-time.
 """
 from datetime import datetime, timezone
 
-from scoring import classify_opportunity_tier
+from scoring import classify_opportunity_tier, compute_risk_score
 import history as history_module
 
 
@@ -36,34 +36,59 @@ def _momentum_badge(ticker, snapshot_history, now=None):
            f'<span class="opp-meta">{momentum.label}</span>'
 
 
-def _stock_row_html(breakdown, snapshot_history, now):
+def _status_label(breakdown):
+    """Tier + evidence-quality suffix, per the explicit requirement
+    that two identical scores with different evidence must look
+    visibly different - 'PROMISING' vs 'PROMISING — LIMITED EVIDENCE'."""
+    if breakdown.buy_score is None:
+        return "UNSCOREABLE"
+    tier = classify_opportunity_tier(breakdown.buy_score)
+    tier_labels = {"90+": "EXCEPTIONAL", "80-89": "STRONG", "70-79": "PROMISING"}
+    label = tier_labels.get(tier, "BELOW THRESHOLD")
+    if breakdown.opportunity_quality == "LOW":
+        label += " — LIMITED EVIDENCE"
+    return label
+
+
+def _stock_row_html(breakdown, snapshot_history, risk_flags_for_ticker, now):
     ticker = breakdown.ticker
     score_display = f"{breakdown.buy_score:.0f}" if breakdown.buy_score is not None else "—"
+    risk_score = compute_risk_score(risk_flags_for_ticker or [])
     badge = _confidence_warning(breakdown)
     momentum_html = _momentum_badge(ticker, snapshot_history, now)
     missing = f'<span class="opp-missing">Missing: {", ".join(breakdown.missing_categories)}</span>' if breakdown.missing_categories else ""
+    risk_flag_html = (
+        f'<span class="opp-risk-flags">{" · ".join(f.label for f in risk_flags_for_ticker)}</span>'
+        if risk_flags_for_ticker else ""
+    )
     return f"""<div class="opp-row">
   <div class="opp-ticker">{ticker}</div>
-  <div class="opp-score">{score_display}</div>
-  <div class="opp-conf">Confidence: {breakdown.data_confidence:.0f} · Coverage: {breakdown.data_coverage_pct:.0f}%</div>
+  <div class="opp-score">PROVISIONAL BUY SCORE: {score_display}</div>
+  <div class="opp-conf">Confidence: {breakdown.data_confidence:.0f} · Model Coverage: {breakdown.data_coverage_pct:.0f}% · Risk: {risk_score}</div>
+  <div class="opp-status">Status: {_status_label(breakdown)}</div>
   {momentum_html}
   {badge}
   {missing}
+  {risk_flag_html}
 </div>"""
 
 
-def _section_html(title, breakdowns, snapshot_history, now, empty_message):
+def _section_html(title, breakdowns, snapshot_history, risk_flags_by_ticker, now, empty_message):
     if not breakdowns:
         return f'<h3>{title}</h3><p class="opp-empty">{empty_message}</p>'
-    rows = "".join(_stock_row_html(b, snapshot_history, now) for b in breakdowns)
+    rows = "".join(_stock_row_html(b, snapshot_history, risk_flags_by_ticker.get(b.ticker, []), now) for b in breakdowns)
     return f'<h3>{title} ({len(breakdowns)})</h3><div class="opp-list">{rows}</div>'
 
 
 def render_opportunities_page(scan_result, snapshot_history: dict, dashboard_css: str, docs_dir: str,
-                               render_standalone_page_fn):
+                               render_standalone_page_fn, ai_analyses: dict = None):
     """
     scan_result: orchestrator.ScanResult from the most recent real scan.
     snapshot_history: {ticker: [snapshot_dict, ...]} - real persisted history.
+    ai_analyses: {ticker: analysis_dict} - AI Evidence Analysis output for
+    the small, cost-bounded tier of stocks selected this run (see
+    ai_evidence.select_ai_analysis_candidates) - most stocks will NOT
+    have an entry here, which is expected, not an error.
     render_standalone_page_fn: this project's existing render_standalone_page,
     reused rather than duplicated so styling/back-link/footer stay identical
     to every other dedicated page.
@@ -104,20 +129,30 @@ def render_opportunities_page(scan_result, snapshot_history: dict, dashboard_css
         if not history_module.calculate_momentum(snapshot_history.get(t, []), now).has_sufficient_history
     )
 
+    # Full ranked universe - EVERY scoreable stock, never truncated,
+    # per the explicit requirement that the underlying dataset must
+    # never be hidden behind only the top tiers.
+    all_scoreable_sorted = sorted(
+        [b for b in scan_result.breakdowns.values() if b.buy_score is not None],
+        key=lambda b: -b.buy_score,
+    )
+
+    ai_analyses = ai_analyses or {}
+
     content = f"""
 <p class="meta">Genuine, periodically-refreshed opportunity discovery — not real-time. Refreshed every 5 minutes during UK market hours, same schedule as the rest of this dashboard.</p>
 
 <div class="opp-model-status">
   <p><b>{scan_result.model_status}</b></p>
-  <p class="opp-meta">Universe: FTSE 100 ({scan_result.universe_size} stocks) — not the full LSE. Currently supported model dimensions: {", ".join(k for k, v in scan_result.model_coverage.items() if v == "Available")}. Not yet connected: {", ".join(k for k, v in scan_result.model_coverage.items() if v == "Unavailable")}.</p>
+  <p class="opp-meta"><b>Scores on this page are a PROVISIONAL BUY SCORE</b> — not yet the full intended model. Universe: FTSE 100 ({scan_result.universe_size} stocks) — not the full LSE. Currently supported model dimensions: {", ".join(k for k, v in scan_result.model_coverage.items() if v == "Available")}. Not yet connected: {", ".join(k for k, v in scan_result.model_coverage.items() if v == "Unavailable")}. Once Quality/Growth/Valuation/Timing are genuinely connected, this will be promoted to a full BUY SCORE 0-100.</p>
 </div>
 
 <div class="opp-scan-health">
   <h3>Scan Health</h3>
-  <p class="opp-meta">Last scan: {scan_result.ran_at} · Universe: {scan_result.coverage['eligibleUniverse']} ·
-  Scoreable: {scan_result.coverage['scoreable']} · Fully covered: {scan_result.coverage['fullyCovered']} ·
-  Partially covered: {scan_result.coverage['partiallyCovered']} · Unscoreable: {scan_result.coverage['unscoreable']} ·
-  Data coverage: {scan_result.coverage['dataCoveragePct']}%</p>
+  <p class="opp-meta">Last scan: {scan_result.ran_at} · <b>Universe Coverage: {scan_result.coverage['universeCoveragePct']}%</b> (every eligible stock was scanned) ·
+  <b>Model Data Coverage: {scan_result.coverage['modelDataCoveragePct']}%</b> (average completeness of the actual scoring evidence — these are DIFFERENT numbers; 100% universe coverage does not mean complete financial evidence)</p>
+  <p class="opp-meta">Scoreable: {scan_result.coverage['scoreable']} · Fully covered: {scan_result.coverage['fullyCovered']} ·
+  Partially covered: {scan_result.coverage['partiallyCovered']} · Unscoreable: {scan_result.coverage['unscoreable']}</p>
   <p class="opp-meta">Analyst data refreshed this run: {scan_result.coverage['analystRefreshedThisRun']} of {scan_result.coverage['analystRefreshCapPerRun']} cap ·
   Stocks with insufficient history for momentum tracking: {insufficient_history_count} (expected — history accumulates over multiple runs)</p>
 </div>
@@ -128,21 +163,36 @@ def render_opportunities_page(scan_result, snapshot_history: dict, dashboard_css
 </div>
 
 <h2>🔥 Best Opportunities Now</h2>
-{_section_html("Exceptional Setups (90+)", tier_90, snapshot_history, now, "No stocks currently score 90 or above.")}
-{_section_html("Strong Setups (80-89)", tier_80, snapshot_history, now, "No stocks currently score 80-89.")}
-{_section_html("Promising (70-79)", tier_70, snapshot_history, now, "No stocks currently score 70-79.")}
+{_section_html("Exceptional Setups (90+)", tier_90, snapshot_history, scan_result.risk_flags, now, "No stocks currently score 90 or above.")}
+{_section_html("Strong Setups (80-89)", tier_80, snapshot_history, scan_result.risk_flags, now, "No stocks currently score 80-89.")}
+{_section_html("Promising (70-79)", tier_70, snapshot_history, scan_result.risk_flags, now, "No stocks currently score 70-79.")}
 
 <h2>📈 Rising Fast</h2>
-{_section_html("Rapidly improving (7d change ≥ +8)", rising_fast, snapshot_history, now, "No stocks are currently rising rapidly — or insufficient history exists yet to measure this.")}
+{_section_html("Rapidly improving (7d change ≥ +8)", rising_fast, snapshot_history, scan_result.risk_flags, now, "No stocks are currently rising rapidly — or insufficient history exists yet to measure this.")}
 
 <h2>📉 Deteriorating</h2>
-{_section_html("Meaningful decline (7d change ≤ -8)", deteriorating, snapshot_history, now, "No stocks are currently deteriorating meaningfully — or insufficient history exists yet.")}
+{_section_html("Meaningful decline (7d change ≤ -8)", deteriorating, snapshot_history, scan_result.risk_flags, now, "No stocks are currently deteriorating meaningfully — or insufficient history exists yet.")}
 
 <h2>🆕 New Today</h2>
-{_section_html("Newly qualified (first-ever snapshot, score 70+)", new_today, snapshot_history, now, "No genuinely new qualifying stocks this run.")}
+{_section_html("Newly qualified (first-ever snapshot, score 70+)", new_today, snapshot_history, scan_result.risk_flags, now, "No genuinely new qualifying stocks this run.")}
+
+<h2>📋 All Opportunities (full ranked universe)</h2>
+<p class="meta">Every scoreable stock, ranked by PROVISIONAL BUY SCORE — never truncated. {len(all_scoreable_sorted)} stock(s).</p>
+{_section_html("All scoreable stocks", all_scoreable_sorted, snapshot_history, scan_result.risk_flags, now, "No scoreable stocks this run.")}
 
 <h2>📊 Backtesting Status</h2>
 <p class="opp-meta">🟡 BACKTESTING NOT YET STATISTICALLY VALID — Reason: insufficient point-in-time historical data. Score history only began accumulating this session; a real backtest requires many weeks of genuine daily snapshots to avoid look-ahead bias. The framework exists (history.py) and will produce honest results once sufficient data exists — never a fabricated performance figure in the meantime.</p>
+
+<h2>🤖 AI Evidence View</h2>
+<p class="opp-meta">A separate, clearly-labeled interpretive layer — the AI is given only the same verified facts already shown above and asked to interpret them; it never generates a number, price, or target, and never changes the PROVISIONAL BUY SCORE. Only run for a small, cost-bounded set of stocks each run (new 80+/90+ entrants and large score changes) — most stocks will not have an entry here, which is expected.</p>
+{"".join(f'''<div class="opp-ai-analysis">
+  <h4>{ticker}</h4>
+  <p><b>Outlook:</b> {a.get("outlook", "—")} (AI confidence: {a.get("analysis_confidence", "—")})</p>
+  <p><b>Bull case:</b> {a.get("bull_case", "")}</p>
+  <p><b>Bear case:</b> {a.get("bear_case", "")}</p>
+  {f'<p><b>Evidence conflicts:</b> {a["evidence_conflicts"]}</p>' if a.get("evidence_conflicts") else ""}
+  <p><b>What would change this view:</b> {a.get("what_would_change_the_view", "")}</p>
+</div>''' for ticker, a in ai_analyses.items()) or '<p class="opp-empty">No stocks qualified for AI evidence analysis this run.</p>'}
 """
 
     return render_standalone_page_fn("opportunities.html", "Opportunity Scanner", "🔥 LSE Opportunity Scanner", content, docs_dir)

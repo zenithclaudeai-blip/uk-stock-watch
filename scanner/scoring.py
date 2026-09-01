@@ -112,6 +112,24 @@ RISK_EARNINGS_IMMINENT_DAYS = 7          # days out considered "imminent"
 RISK_LOW_LIQUIDITY_RATIO = 0.5           # volume/avg_volume below this = thin trading
 
 
+RISK_FLAG_SEVERITY_POINTS = {
+    "extended_momentum": 15, "high_volatility": 20, "low_liquidity": 25,
+    "earnings_imminent": 15, "data_stale": 10,
+}
+
+
+def compute_risk_score(risk_flags: list) -> int:
+    """
+    A simple, transparent, additive 0-100 risk score built directly
+    from the same risk_flags compute_risk_flags already produces -
+    never a separate, opaque calculation. Each flag contributes a
+    fixed, documented point value (RISK_FLAG_SEVERITY_POINTS above);
+    zero flags = 0 risk score, never fabricated from nothing. Capped
+    at 100 - multiple severe flags don't overflow the scale.
+    """
+    return min(100, sum(RISK_FLAG_SEVERITY_POINTS.get(f.code, 10) for f in risk_flags))
+
+
 def compute_risk_flags(stock_record, now=None) -> list:
     """
     Descriptive, testable risk flags derived from data already
