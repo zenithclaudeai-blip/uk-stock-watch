@@ -82,7 +82,8 @@ def _section_html(title, breakdowns, snapshot_history, risk_flags_by_ticker, now
 
 
 def render_opportunities_page(scan_result, snapshot_history: dict, dashboard_css: str, docs_dir: str,
-                               render_standalone_page_fn, ai_analyses: dict = None, bear_challenges: dict = None):
+                               render_standalone_page_fn, ai_analyses: dict = None, bear_challenges: dict = None,
+                               ai_status: dict = None):
     """
     scan_result: orchestrator.ScanResult from the most recent real scan.
     snapshot_history: {ticker: [snapshot_dict, ...]} - real persisted history.
@@ -140,6 +141,27 @@ def render_opportunities_page(scan_result, snapshot_history: dict, dashboard_css
 
     ai_analyses = ai_analyses or {}
     bear_challenges = bear_challenges or {}
+    ai_status = ai_status or {}
+
+    def _ai_unavailable_reason():
+        """Explicit reason AI didn't run this round - never ambiguous
+        between 'nothing qualified' and 'it qualified but failed',
+        per the explicit requirement that AI unavailability be shown
+        clearly rather than left as silent absence."""
+        if ai_status.get("stepError"):
+            return f"AI Analysis step failed this run: {ai_status['stepError'][:150]}"
+        if not ai_status.get("hasApiKey", True):
+            return "AI ANALYSIS: UNAVAILABLE — Reason: no ANTHROPIC_API_KEY configured this run."
+        if ai_status.get("evidenceCandidates", 0) == 0:
+            return None  # genuinely nothing qualified this run - not an unavailability, just nothing to analyze
+        if ai_status.get("evidenceSucceeded", 0) == 0:
+            return (f"AI ANALYSIS: UNAVAILABLE — Reason: {ai_status['evidenceCandidates']} stock(s) qualified "
+                    f"for analysis but every API call failed this run (see the poller log for the exact error — "
+                    f"commonly a billing/credit issue or a rate limit). The deterministic BUY SCORE above is "
+                    f"completely unaffected.")
+        return None  # partial or full success - the analyses themselves are shown, no unavailability banner needed
+
+    _ai_unavailable_banner = _ai_unavailable_reason()
 
     content = f"""
 <p class="meta">Genuine, periodically-refreshed opportunity discovery — not real-time. Refreshed every 5 minutes during UK market hours, same schedule as the rest of this dashboard.</p>
@@ -187,6 +209,7 @@ def render_opportunities_page(scan_result, snapshot_history: dict, dashboard_css
 
 <h2>🤖 AI Evidence View</h2>
 <p class="opp-meta">A separate, clearly-labeled interpretive layer — the AI is given only the same verified facts already shown above and asked to interpret them; it never generates a number, price, or target, and never changes the PROVISIONAL BUY SCORE. Only run for a small, cost-bounded set of stocks each run (new 80+/90+ entrants and large score changes) — most stocks will not have an entry here, which is expected.</p>
+{f'<p class="opp-ai-unavailable"><b>{_ai_unavailable_banner}</b></p>' if _ai_unavailable_banner else ""}
 {"".join(f'''<div class="opp-ai-analysis">
   <h4>{ticker}</h4>
   <p><b>Outlook:</b> {a.get("outlook", "—")} (AI confidence: {a.get("analysis_confidence", "—")})</p>
@@ -194,7 +217,7 @@ def render_opportunities_page(scan_result, snapshot_history: dict, dashboard_css
   <p><b>Bear case:</b> {a.get("bear_case", "")}</p>
   {f'<p><b>Evidence conflicts:</b> {a["evidence_conflicts"]}</p>' if a.get("evidence_conflicts") else ""}
   <p><b>What would change this view:</b> {a.get("what_would_change_the_view", "")}</p>
-</div>''' for ticker, a in ai_analyses.items()) or '<p class="opp-empty">No stocks qualified for AI evidence analysis this run.</p>'}
+</div>''' for ticker, a in ai_analyses.items()) or ('<p class="opp-empty">No stocks qualified for AI evidence analysis this run.</p>' if not _ai_unavailable_banner else "")}
 
 <h2>🐻 Bear Agent — Mandatory Challenge (80+ scores)</h2>
 <p class="opp-meta">Every stock scoring 80+ receives an independent, adversarial challenge — a separate AI call specifically instructed to find the strongest case AGAINST the opportunity, never a softened version of the bull case above. Capped at {ai_evidence_module.BEAR_AGENT_MAX_PER_RUN} per run for cost control.</p>

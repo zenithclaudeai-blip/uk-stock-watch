@@ -8368,6 +8368,12 @@ def main():
             _ai_evidence_state_file = os.path.join(STATE_DIR, "scanner_ai_cache.json")
             _ai_analyses = {}
             _bear_challenges = {}
+            # Explicit status - per the requirement that AI unavailability
+            # must be shown clearly, never left ambiguous between "nothing
+            # qualified" and "it qualified but genuinely failed".
+            _ai_status = {"hasApiKey": bool(os.environ.get("ANTHROPIC_API_KEY", "").strip()),
+                          "evidenceCandidates": 0, "evidenceSucceeded": 0,
+                          "bearCandidates": 0, "bearSucceeded": 0, "stepError": None}
             try:
                 import ai_evidence as _ai_evidence_module
                 if os.path.exists(_ai_evidence_state_file):
@@ -8378,7 +8384,8 @@ def main():
                 _candidates = _ai_evidence_module.select_ai_analysis_candidates(
                     _scan_result, _scanner_history, _scanner_history_module,
                 )
-                if _candidates and os.environ.get("ANTHROPIC_API_KEY", "").strip():
+                _ai_status["evidenceCandidates"] = len(_candidates)
+                if _candidates and _ai_status["hasApiKey"]:
                     print(f"  > AI Evidence Analysis: {len(_candidates)} candidate(s) this run "
                           f"(capped at {_ai_evidence_module.AI_ANALYSIS_MAX_PER_RUN})")
                 for _ticker in _candidates:
@@ -8392,6 +8399,7 @@ def main():
                     _analysis = _ai_evidence_module.analyze_evidence(_evidence, _ai_cache)
                     if _analysis:
                         _ai_analyses[_ticker] = _analysis
+                        _ai_status["evidenceSucceeded"] += 1
 
                 # Bear Agent - a genuinely SEPARATE, mandatory challenge
                 # for high-score opportunities (80+), per the explicit
@@ -8401,7 +8409,8 @@ def main():
                 # bull-case cache hit never silently substitutes for
                 # an actual bear challenge.
                 _bear_candidates = _ai_evidence_module.select_bear_agent_candidates(_scan_result)
-                if _bear_candidates and os.environ.get("ANTHROPIC_API_KEY", "").strip():
+                _ai_status["bearCandidates"] = len(_bear_candidates)
+                if _bear_candidates and _ai_status["hasApiKey"]:
                     print(f"  > Bear Agent: {len(_bear_candidates)} mandatory challenge(s) this run "
                           f"(80+ scores, capped at {_ai_evidence_module.BEAR_AGENT_MAX_PER_RUN})")
                 for _ticker in _bear_candidates:
@@ -8415,13 +8424,15 @@ def main():
                     _challenge = _ai_evidence_module.bear_challenge(_evidence, _ai_cache)
                     if _challenge:
                         _bear_challenges[_ticker] = _challenge
+                        _ai_status["bearSucceeded"] += 1
                 atomic_write_json(_ai_evidence_state_file, _ai_cache)
             except Exception as e:
+                _ai_status["stepError"] = str(e)
                 print(f"  ! AI Evidence Analysis step failed this run (scanner unaffected): {e}", file=sys.stderr)
 
             opportunity_page_renderer.render_opportunities_page(
                 _scan_result, _scanner_history, DASHBOARD_CSS, DOCS_DIR, render_standalone_page,
-                ai_analyses=_ai_analyses, bear_challenges=_bear_challenges,
+                ai_analyses=_ai_analyses, bear_challenges=_bear_challenges, ai_status=_ai_status,
             )
 
             save_scanner_state(_scan_result.updated_persisted_store, _scan_result.updated_analyst_refresh_state,
