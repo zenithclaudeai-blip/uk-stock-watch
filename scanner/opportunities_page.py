@@ -11,7 +11,7 @@ the rest of this project's poller), never described as real-time.
 """
 from datetime import datetime, timezone
 
-from scoring import classify_opportunity_tier, compute_risk_score
+from scoring import classify_opportunity_tier, compute_risk_score, detect_evidence_conflicts
 import history as history_module
 import ai_evidence as ai_evidence_module
 
@@ -62,12 +62,24 @@ def _stock_row_html(breakdown, snapshot_history, risk_flags_for_ticker, now):
         f'<span class="opp-risk-flags">{" · ".join(f.label for f in risk_flags_for_ticker)}</span>'
         if risk_flags_for_ticker else ""
     )
+    what_changed = history_module.component_deltas(snapshot_history.get(ticker, []))
+    what_changed_html = (
+        f'<div class="opp-what-changed"><b>What changed:</b> {history_module.format_what_changed(what_changed)}</div>'
+        if what_changed else ""
+    )
+    conflicts = detect_evidence_conflicts(breakdown)
+    conflicts_html = (
+        "".join(f'<div class="opp-conflict">⚠ EVIDENCE CONFLICT: {c.description}</div>' for c in conflicts)
+        if conflicts else ""
+    )
     return f"""<div class="opp-row">
   <div class="opp-ticker">{ticker}</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: {score_display}</div>
   <div class="opp-conf">Confidence: {breakdown.data_confidence:.0f} · Model Coverage: {breakdown.data_coverage_pct:.0f}% · Risk: {risk_score}</div>
   <div class="opp-status">Status: {_status_label(breakdown)}</div>
   {momentum_html}
+  {what_changed_html}
+  {conflicts_html}
   {badge}
   {missing}
   {risk_flag_html}

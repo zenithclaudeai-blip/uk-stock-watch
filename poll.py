@@ -46,6 +46,7 @@ try:
         sys.path.insert(0, _scanner_dir)
     import orchestrator as opportunity_orchestrator
     import opportunities_page as opportunity_page_renderer
+    import data_quality_page as scanner_data_quality_page
     SCANNER_AVAILABLE = True
 except Exception as _scanner_import_error:
     print(f"  ! Opportunity Scanner module unavailable this run: {_scanner_import_error}", file=sys.stderr)
@@ -6597,6 +6598,7 @@ def render_dashboard(data, watchlist, latest_broker_events=None, events_by_ticke
 <a href="warnings.html" style="color:#7fb3ff;margin-right:14px;text-decoration:none;">⚠️ Warnings</a>
 <a href="data-freshness.html" style="color:#7fb3ff;text-decoration:none;white-space:nowrap;">ℹ️ Data&nbsp;/&nbsp;Freshness</a>
 <a href="opportunities.html" style="color:#7fb3ff;margin-left:14px;text-decoration:none;white-space:nowrap;">🔥 Opportunity Scanner</a>
+<a href="data-quality.html" style="color:#5a80a8;margin-left:8px;text-decoration:none;font-size:13px;white-space:nowrap;">🔍 Data Quality</a>
 <details class="nav-more" style="margin-top:4px;">
 <summary style="cursor:pointer;color:#5a6072;font-size:13px;list-style:none;">More navigation ▾</summary>
 <div style="margin-top:4px;font-size:13px;line-height:2;">
@@ -8433,6 +8435,9 @@ def main():
             opportunity_page_renderer.render_opportunities_page(
                 _scan_result, _scanner_history, DASHBOARD_CSS, DOCS_DIR, render_standalone_page,
                 ai_analyses=_ai_analyses, bear_challenges=_bear_challenges, ai_status=_ai_status,
+            )
+            scanner_data_quality_page.render_data_quality_page(
+                _scan_result, _ai_status, DOCS_DIR, render_standalone_page,
             )
 
             save_scanner_state(_scan_result.updated_persisted_store, _scan_result.updated_analyst_refresh_state,

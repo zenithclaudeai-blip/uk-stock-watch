@@ -189,6 +189,73 @@ class LifecycleTransition:
 MEANINGFUL_SCORE_CHANGE_THRESHOLD = 3.0
 
 
+def component_deltas(history_for_ticker: list) -> Optional[dict]:
+    """
+    "What Changed" - compares the two most recent REAL snapshots'
+    component_scores (already stored per-snapshot in ScoreSnapshot)
+    and returns the actual per-component point changes. Never
+    generates text that "sounds plausible" - every delta traces
+    directly back to the two real stored snapshots being compared.
+    Returns None if fewer than 2 snapshots exist.
+    """
+    if not history_for_ticker or len(history_for_ticker) < 2:
+        return None
+    sorted_snaps = sorted(history_for_ticker, key=lambda s: s["timestamp"])
+    previous, current = sorted_snaps[-2], sorted_snaps[-1]
+    prev_components = previous.get("component_scores", {})
+    curr_components = current.get("component_scores", {})
+
+    deltas = {}
+    all_names = set(prev_components) | set(curr_components)
+    for name in all_names:
+        prev_c = prev_components.get(name, {})
+        curr_c = curr_components.get(name, {})
+        prev_score = prev_c.get("score") if prev_c.get("available") else None
+        curr_score = curr_c.get("score") if curr_c.get("available") else None
+        if prev_score is not None and curr_score is not None:
+            deltas[name] = round(curr_score - prev_score, 1)
+        elif prev_score is None and curr_score is not None:
+            deltas[name] = f"newly available ({curr_score:.0f})"
+        elif prev_score is not None and curr_score is None:
+            deltas[name] = "became unavailable"
+        # both None - no change worth reporting, omitted entirely
+
+    return {
+        "previousScore": previous.get("buy_score"), "currentScore": current.get("buy_score"),
+        "previousTimestamp": previous["timestamp"], "currentTimestamp": current["timestamp"],
+        "componentDeltas": deltas,
+    }
+
+
+def format_what_changed(deltas: dict) -> str:
+    """Human-readable rendering of component_deltas' output - built
+    entirely from the real numbers already computed, never independently
+    generated text."""
+    if deltas is None:
+        return "Insufficient history to show what changed."
+    prev, curr = deltas["previousScore"], deltas["currentScore"]
+    if prev is None or curr is None:
+        return "Score coverage changed between snapshots (became scoreable or unscoreable)."
+    change = round(curr - prev, 1)
+    parts = [f"{prev:.0f} → {curr:.0f} ({change:+.1f})"]
+    for name, delta in sorted(deltas["componentDeltas"].items(),
+                               key=lambda kv: -abs(kv[1]) if isinstance(kv[1], (int, float)) else 0):
+        label = _CATEGORY_LABELS_FOR_CHANGE.get(name, name)
+        if isinstance(delta, (int, float)):
+            if abs(delta) < 0.5:
+                continue  # genuine noise, not worth reporting
+            parts.append(f"{label} {delta:+.1f}")
+        else:
+            parts.append(f"{label}: {delta}")
+    return " · ".join(parts)
+
+
+_CATEGORY_LABELS_FOR_CHANGE = {
+    "momentum": "Momentum", "trend": "52W Trend", "liquidity": "Liquidity",
+    "analyst_evidence": "Analyst", "news_catalyst": "Catalyst",
+}
+
+
 def detect_transition(history_for_ticker: list, now: datetime = None) -> Optional[LifecycleTransition]:
     """
     Compares the two most recent REAL snapshots (never today's data

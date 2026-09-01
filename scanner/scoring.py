@@ -350,6 +350,61 @@ def calculate_score(stock_record) -> ScoreBreakdown:
     )
 
 
+@dataclass
+class EvidenceConflict:
+    conflict_type: str
+    description: str
+
+
+def detect_evidence_conflicts(breakdown) -> list:
+    """
+    Genuine contradiction detection - checks specific, named component
+    pairs for disagreement, using the SAME ComponentScore data already
+    computed for the score itself. Never invents a conflict; only
+    fires when both sides of a named pair are genuinely available and
+    genuinely point in different directions.
+    """
+    conflicts = []
+    by_name = {c.name: c for c in breakdown.components}
+
+    momentum = by_name.get("momentum")
+    analyst = by_name.get("analyst_evidence")
+    if momentum and analyst and momentum.available and analyst.available:
+        if momentum.score_0_100 >= 65 and analyst.score_0_100 <= 35:
+            conflicts.append(EvidenceConflict(
+                "momentum_vs_analyst",
+                f"Strong price momentum (+{momentum.raw_value:.1f}% today) but weak broker-target evidence "
+                f"(implies {analyst.raw_value:+.1f}% vs current price) — the market's short-term move and "
+                f"analyst consensus are not agreeing.",
+            ))
+        elif momentum.score_0_100 <= 35 and analyst.score_0_100 >= 65:
+            conflicts.append(EvidenceConflict(
+                "momentum_vs_analyst",
+                f"Weak price momentum ({momentum.raw_value:+.1f}% today) despite a strong broker-target "
+                f"upside ({analyst.raw_value:+.1f}%) — the market isn't yet confirming the analyst view.",
+            ))
+
+    trend = by_name.get("trend")
+    liquidity = by_name.get("liquidity")
+    if trend and liquidity and trend.available and liquidity.available:
+        if trend.score_0_100 >= 80 and liquidity.score_0_100 <= 35:
+            conflicts.append(EvidenceConflict(
+                "trend_vs_liquidity",
+                f"Near its 52-week high ({trend.raw_value:.0f}% of the range) but on thin volume "
+                f"({liquidity.raw_value:.1f}x average) — the move up isn't backed by strong participation.",
+            ))
+
+    if breakdown.buy_score is not None and breakdown.buy_score >= 85 and breakdown.data_confidence < 55:
+        conflicts.append(EvidenceConflict(
+            "high_score_low_confidence",
+            f"BUY SCORE {breakdown.buy_score:.0f} looks strong, but DATA CONFIDENCE is only "
+            f"{breakdown.data_confidence:.0f} — this score is built from limited or stale evidence, "
+            f"not a comprehensively-confirmed picture.",
+        ))
+
+    return conflicts
+
+
 def classify_opportunity_tier(score: Optional[float]) -> Optional[str]:
     """90+, 80-89, 70-79 tiers - flags EVERY stock that qualifies,
     never capped at a fixed top-N."""
