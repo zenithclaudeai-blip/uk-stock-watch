@@ -249,7 +249,9 @@ def render_opportunities_page(scan_result, snapshot_history: dict, dashboard_css
 {f'<p class="opp-ai-unavailable"><b>{_ai_unavailable_banner}</b></p>' if _ai_unavailable_banner else ""}
 {"".join(f'''<div class="opp-ai-analysis">
   <h4>{ticker}</h4>
-  <p><b>Outlook:</b> {a.get("outlook", "—")} (AI confidence: {a.get("analysis_confidence", "—")})</p>
+  <p><b>BUY SCORE:</b> {scan_result.breakdowns[ticker].buy_score:.0f} · <b>AI CONVICTION:</b> {a.get("analysis_confidence", "—")}
+  {f' · <b>OVERALL STATUS:</b> {ai_evidence_module.combine_score_and_conviction(scan_result.breakdowns[ticker].buy_score, a.get("analysis_confidence"))}' if ticker in scan_result.breakdowns and scan_result.breakdowns[ticker].buy_score is not None and a.get("analysis_confidence") is not None else ""}</p>
+  <p><b>Outlook:</b> {a.get("outlook", "—")}</p>
   <p><b>Bull case:</b> {a.get("bull_case", "")}</p>
   <p><b>Bear case:</b> {a.get("bear_case", "")}</p>
   {f'<p><b>Evidence conflicts:</b> {a["evidence_conflicts"]}</p>' if a.get("evidence_conflicts") else ""}

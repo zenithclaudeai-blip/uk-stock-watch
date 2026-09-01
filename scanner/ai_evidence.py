@@ -496,3 +496,43 @@ def queue_summary(queue: dict) -> dict:
     for entry_dict in queue.values():
         counts[entry_dict.get("status", STATUS_QUEUED)] = counts.get(entry_dict.get("status", STATUS_QUEUED), 0) + 1
     return counts
+
+
+# =========================================================================
+# BUY SCORE vs AI CONVICTION - kept genuinely separate per the explicit
+# requirement (never merged, never one automatically derived from the
+# other). This function only produces a HUMAN-READABLE LABEL describing
+# the relationship between two numbers that already exist independently -
+# it never modifies either number.
+# =========================================================================
+
+HIGH_THRESHOLD = 85  # aligned with this project's own existing 80-89/90+ tier boundaries,
+# not an arbitrary new threshold - keeps "HIGH" meaning the same thing across the page.
+LOW_THRESHOLD = 50
+
+
+def _band(value):
+    if value is None:
+        return None
+    if value >= HIGH_THRESHOLD:
+        return "HIGH"
+    if value >= LOW_THRESHOLD:
+        return "MODERATE"
+    return "LOW"
+
+
+def combine_score_and_conviction(buy_score, ai_conviction):
+    """
+    Returns a human-readable overall-status label describing the
+    relationship between the two, e.g. "HIGH SCORE / LOW CONVICTION" -
+    never a new number, never a blend. Returns None if AI conviction
+    isn't available for this stock (most stocks, most runs) - the
+    absence of an AI view is not itself a status worth displaying.
+    """
+    if buy_score is None or ai_conviction is None:
+        return None
+    score_band = _band(buy_score)
+    conviction_band = _band(ai_conviction)
+    if score_band == conviction_band:
+        return f"{score_band} SCORE / {conviction_band} CONVICTION (evidence agrees)"
+    return f"{score_band} SCORE / {conviction_band} CONVICTION"
