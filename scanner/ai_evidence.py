@@ -21,6 +21,8 @@ import re
 import urllib.request
 import urllib.error
 import sys
+from dataclasses import dataclass, asdict, field
+from datetime import datetime, timezone
 
 AI_EVIDENCE_MODEL = "claude-haiku-4-5-20251001"  # cheap/fast tier - bounded structured task, not open-ended
 AI_EVIDENCE_ANALYSIS_VERSION = "v1.0"
@@ -356,3 +358,141 @@ def select_ai_analysis_candidates(scan_result, snapshot_history, history_module,
         key=lambda kv: (kv[1][1], -(scan_result.breakdowns[kv[0]].buy_score or 0)),
     )
     return [ticker for ticker, _ in ranked[:AI_ANALYSIS_MAX_PER_RUN]]
+
+
+# =========================================================================
+# AI WORK QUEUE - persisted, real, re-prioritized every run. A queued
+# event never simply vanishes just because it wasn't reached this run;
+# it stays QUEUED (with an updated priority, since new evidence may
+# have arrived) until it's processed, superseded by a newer event for
+# the same stock, or genuinely expires.
+# =========================================================================
+
+QUEUE_ENTRY_EXPIRY_DAYS = 7  # a queued event this old is stale enough that
+# re-analyzing it wouldn't reflect anything a fresh scan wouldn't already
+# capture next time a real event fires - expired, not processed forever.
+
+STATUS_QUEUED = "QUEUED"
+STATUS_ANALYSING = "ANALYSING"
+STATUS_COMPLETED = "COMPLETED"
+STATUS_FAILED = "FAILED"
+STATUS_RETRY_PENDING = "RETRY_PENDING"
+STATUS_SUPERSEDED = "SUPERSEDED"
+STATUS_EXPIRED = "EXPIRED"
+
+
+@dataclass
+class QueueEntry:
+    ticker: str
+    event_type: str
+    event_priority: int
+    evidence_hash: str
+    buy_score: float
+    first_detected: str    # ISO timestamp - never rewritten once set
+    last_detected: str     # ISO timestamp - updated whenever the SAME underlying event recurs
+    attempt_count: int = 0
+    last_attempt: str = None
+    status: str = STATUS_QUEUED
+
+    def to_dict(self):
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
+
+
+def _event_identity(ticker, event_type, evidence_hash_val):
+    """Immutable event identity for deduplication - per the explicit
+    requirement, the SAME underlying event (same stock, same event
+    type, same evidence) must never create a second queue entry."""
+    return f"{ticker}:{event_type}:{evidence_hash_val}"
+
+
+def update_ai_queue(queue: dict, scan_result, snapshot_history, history_module,
+                     prior_risk_flags=None, now=None) -> dict:
+    """
+    Re-derives priorities from CURRENT data (never blindly FIFO, per
+    the explicit requirement) and merges them into the persisted
+    queue: genuinely new events are added as QUEUED, an event that
+    recurs for a stock already queued updates last_detected and
+    priority (never duplicated), and a stock's OLDER queued entry is
+    marked SUPERSEDED when a newer, different event fires for the same
+    stock (the newer evidence is what should actually be analyzed).
+    Expired entries (older than QUEUE_ENTRY_EXPIRY_DAYS) are marked
+    EXPIRED, never silently deleted (auditable history of what the
+    queue decided and why).
+    """
+    now = now or datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    queue = {k: v for k, v in queue.items()}  # shallow copy, never mutate caller's dict in place
+
+    events = identify_ai_candidate_events(scan_result, snapshot_history, history_module, prior_risk_flags, now)
+    for ticker, (event_type, priority) in events.items():
+        breakdown = scan_result.breakdowns.get(ticker)
+        if not breakdown:
+            continue
+        record = scan_result.records.get(ticker)
+        ehash = evidence_hash(build_evidence_summary(record, breakdown, scan_result.risk_flags.get(ticker, []))) \
+            if record else "unknown"
+        identity = _event_identity(ticker, event_type, ehash)
+
+        if identity in queue:
+            entry = QueueEntry.from_dict(queue[identity])
+            if entry.status in (STATUS_QUEUED, STATUS_RETRY_PENDING):
+                entry.last_detected = now_iso  # same event recurring - update, don't duplicate
+                entry.event_priority = priority  # priority itself can still shift with fresh context
+                queue[identity] = entry.to_dict()
+            continue  # already COMPLETED/FAILED/etc for this exact evidence - don't requeue identical evidence
+
+        # Supersede any OTHER still-queued entry for the same ticker -
+        # newer evidence is what should actually get analyzed, not a
+        # stale queued reason that's since been overtaken.
+        for other_id, other_dict in list(queue.items()):
+            if other_dict["ticker"] == ticker and other_dict["status"] in (STATUS_QUEUED, STATUS_RETRY_PENDING) \
+                    and other_id != identity:
+                other_dict["status"] = STATUS_SUPERSEDED
+                queue[other_id] = other_dict
+
+        queue[identity] = QueueEntry(
+            ticker=ticker, event_type=event_type, event_priority=priority, evidence_hash=ehash,
+            buy_score=breakdown.buy_score, first_detected=now_iso, last_detected=now_iso,
+        ).to_dict()
+
+    # Expire old still-queued entries - marked, never deleted.
+    for identity, entry_dict in queue.items():
+        if entry_dict["status"] not in (STATUS_QUEUED, STATUS_RETRY_PENDING):
+            continue
+        try:
+            first = datetime.fromisoformat(entry_dict["first_detected"])
+            if (now - first).days >= QUEUE_ENTRY_EXPIRY_DAYS:
+                entry_dict["status"] = STATUS_EXPIRED
+        except (ValueError, KeyError):
+            pass
+
+    return queue
+
+
+def select_from_queue(queue: dict, max_per_run: int = None) -> list:
+    """
+    Selects the top-priority QUEUED/RETRY_PENDING entries for this
+    run's actual API calls - by event priority, then by BUY SCORE,
+    never FIFO/insertion order, per the explicit requirement. Returns
+    the list of (identity, QueueEntry) tuples to process.
+    """
+    max_per_run = max_per_run if max_per_run is not None else AI_ANALYSIS_MAX_PER_RUN
+    eligible = [
+        (identity, QueueEntry.from_dict(d)) for identity, d in queue.items()
+        if d["status"] in (STATUS_QUEUED, STATUS_RETRY_PENDING)
+    ]
+    eligible.sort(key=lambda kv: (kv[1].event_priority, -kv[1].buy_score))
+    return eligible[:max_per_run]
+
+
+def queue_summary(queue: dict) -> dict:
+    """Counts by status - for the AI Status display."""
+    counts = {STATUS_QUEUED: 0, STATUS_ANALYSING: 0, STATUS_COMPLETED: 0, STATUS_FAILED: 0,
+              STATUS_RETRY_PENDING: 0, STATUS_SUPERSEDED: 0, STATUS_EXPIRED: 0}
+    for entry_dict in queue.values():
+        counts[entry_dict.get("status", STATUS_QUEUED)] = counts.get(entry_dict.get("status", STATUS_QUEUED), 0) + 1
+    return counts

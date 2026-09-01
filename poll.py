@@ -8391,21 +8391,37 @@ def main():
                     ticker: [type("F", (), {"code": code, "label": code})() for code in codes]
                     for ticker, codes in _prior_risk_flags_raw.items()
                 }
-                _all_events = _ai_evidence_module.identify_ai_candidate_events(
-                    _scan_result, _scanner_history, _scanner_history_module, _prior_risk_flags,
+                # Real, persisted AI work queue - re-prioritized fresh
+                # every run from current data (never blind FIFO), so a
+                # "waiting" event genuinely survives to the next run
+                # rather than silently disappearing.
+                _ai_queue_state_file = os.path.join(STATE_DIR, "scanner_ai_queue.json")
+                if os.path.exists(_ai_queue_state_file):
+                    with open(_ai_queue_state_file, "r", encoding="utf-8") as f:
+                        _ai_queue = json.loads(f.read())
+                else:
+                    _ai_queue = {}
+                _ai_queue = _ai_evidence_module.update_ai_queue(
+                    _ai_queue, _scan_result, _scanner_history, _scanner_history_module, _prior_risk_flags,
                 )
-                _candidates = _ai_evidence_module.select_ai_analysis_candidates(
-                    _scan_result, _scanner_history, _scanner_history_module, _prior_risk_flags,
-                )
-                _ai_status["totalEventsIdentified"] = len(_all_events)
+                _queue_selection = _ai_evidence_module.select_from_queue(_ai_queue)
+                _candidates = [ident for ident, _ in _queue_selection]
+                _queue_summary = _ai_evidence_module.queue_summary(_ai_queue)
+                _ai_status["totalEventsIdentified"] = sum(
+                    1 for e in _ai_queue.values() if e["status"] in (
+                        _ai_evidence_module.STATUS_QUEUED, _ai_evidence_module.STATUS_RETRY_PENDING,
+                    )
+                ) + len(_candidates)
                 _ai_status["evidenceCandidates"] = len(_candidates)
-                _ai_status["waiting"] = max(0, len(_all_events) - len(_candidates))
+                _ai_status["waiting"] = _queue_summary[_ai_evidence_module.STATUS_QUEUED]
+                _ai_status["queueSummary"] = _queue_summary
                 if _candidates and _ai_status["hasApiKey"]:
-                    print(f"  > AI Evidence Analysis: {len(_all_events)} event(s) identified, "
+                    print(f"  > AI Evidence Analysis: {_ai_status['totalEventsIdentified']} queued event(s), "
                           f"{len(_candidates)} selected this run "
                           f"(capped at {_ai_evidence_module.AI_ANALYSIS_MAX_PER_RUN}, "
-                          f"{_ai_status['waiting']} waiting for a future run)")
-                for _ticker in _candidates:
+                          f"{_ai_status['waiting']} still waiting)")
+                for _identity, _entry in _queue_selection:
+                    _ticker = _entry.ticker
                     _record = _scan_result.records.get(_ticker)
                     _breakdown = _scan_result.breakdowns.get(_ticker)
                     if not _record or not _breakdown:
@@ -8414,9 +8430,16 @@ def main():
                         _record, _breakdown, _scan_result.risk_flags.get(_ticker, []),
                     )
                     _analysis = _ai_evidence_module.analyze_evidence(_evidence, _ai_cache)
+                    _entry.attempt_count += 1
+                    _entry.last_attempt = datetime.now(timezone.utc).isoformat()
                     if _analysis:
                         _ai_analyses[_ticker] = _analysis
                         _ai_status["evidenceSucceeded"] += 1
+                        _entry.status = _ai_evidence_module.STATUS_COMPLETED
+                    else:
+                        _entry.status = _ai_evidence_module.STATUS_FAILED
+                    _ai_queue[_identity] = _entry.to_dict()
+                atomic_write_json(_ai_queue_state_file, _ai_queue)
 
                 # Bear Agent - a genuinely SEPARATE, mandatory challenge
                 # for high-score opportunities (80+), per the explicit
