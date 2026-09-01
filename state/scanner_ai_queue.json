@@ -6295,9 +6295,9 @@
     "buy_score": 45.1,
     "first_detected": "2026-09-01T16:08:20.852566+00:00",
     "last_detected": "2026-09-01T16:08:20.852566+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T16:43:13.713081+00:00",
+    "status": "FAILED"
   },
   "CCC:risk_flag_disappeared:c13d6daf7127f7c8": {
     "ticker": "CCC",
@@ -6307,9 +6307,9 @@
     "buy_score": 47.2,
     "first_detected": "2026-09-01T16:08:20.852566+00:00",
     "last_detected": "2026-09-01T16:08:20.852566+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T16:43:13.490270+00:00",
+    "status": "FAILED"
   },
   "AAL:risk_flag_disappeared:89093d590dfc36d6": {
     "ticker": "AAL",
@@ -6355,9 +6355,9 @@
     "buy_score": 62.7,
     "first_detected": "2026-09-01T16:13:10.037145+00:00",
     "last_detected": "2026-09-01T16:13:10.037145+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T16:43:13.942900+00:00",
+    "status": "FAILED"
   },
   "GSK:risk_flag_disappeared:95a0e20c6e353e45": {
     "ticker": "GSK",
@@ -6393,7 +6393,7 @@
     "last_detected": "2026-09-01T16:13:10.037145+00:00",
     "attempt_count": 0,
     "last_attempt": null,
-    "status": "QUEUED"
+    "status": "SUPERSEDED"
   },
   "PSON:risk_flag_disappeared:57e71cd539cb765e": {
     "ticker": "PSON",
@@ -6489,6 +6489,30 @@
     "last_detected": "2026-09-01T16:38:28.653516+00:00",
     "attempt_count": 1,
     "last_attempt": "2026-09-01T16:38:29.425822+00:00",
+    "status": "FAILED"
+  },
+  "NWG:major_score_change:c1464908bae37503": {
+    "ticker": "NWG",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "c1464908bae37503",
+    "buy_score": 63.7,
+    "first_detected": "2026-09-01T16:43:12.806844+00:00",
+    "last_detected": "2026-09-01T16:43:12.806844+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T16:43:13.032988+00:00",
+    "status": "FAILED"
+  },
+  "GLEN:major_score_change:2f3d418fcb0fc85a": {
+    "ticker": "GLEN",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "2f3d418fcb0fc85a",
+    "buy_score": 60.7,
+    "first_detected": "2026-09-01T16:43:12.806844+00:00",
+    "last_detected": "2026-09-01T16:43:12.806844+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T16:43:13.279998+00:00",
     "status": "FAILED"
   }
 }
