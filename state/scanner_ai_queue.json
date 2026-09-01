@@ -2841,7 +2841,7 @@
     "last_detected": "2026-09-01T07:28:17.465406+00:00",
     "attempt_count": 0,
     "last_attempt": null,
-    "status": "QUEUED"
+    "status": "SUPERSEDED"
   },
   "CNA:risk_flag_appeared:19c9c0147ef35c06": {
     "ticker": "CNA",
@@ -2983,9 +2983,9 @@
     "buy_score": 51.7,
     "first_detected": "2026-09-01T07:28:17.465406+00:00",
     "last_detected": "2026-09-01T07:28:17.465406+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T08:08:23.967849+00:00",
+    "status": "FAILED"
   },
   "BTRW:major_score_change:e1f7ac5b51380d38": {
     "ticker": "BTRW",
@@ -3019,9 +3019,9 @@
     "buy_score": 50.4,
     "first_detected": "2026-09-01T07:28:17.465406+00:00",
     "last_detected": "2026-09-01T07:28:17.465406+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T08:08:24.224523+00:00",
+    "status": "FAILED"
   },
   "CPG:risk_flag_appeared:a405ebb910636b48": {
     "ticker": "CPG",
@@ -3031,9 +3031,9 @@
     "buy_score": 49.0,
     "first_detected": "2026-09-01T07:28:17.465406+00:00",
     "last_detected": "2026-09-01T07:28:17.465406+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T08:08:25.031113+00:00",
+    "status": "FAILED"
   },
   "DPLM:band_change:e18d30fea07e2ab3": {
     "ticker": "DPLM",
@@ -3103,9 +3103,9 @@
     "buy_score": 50.3,
     "first_detected": "2026-09-01T07:28:17.465406+00:00",
     "last_detected": "2026-09-01T07:28:17.465406+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T08:08:24.491540+00:00",
+    "status": "FAILED"
   },
   "SMIN:risk_flag_appeared:7ed8bb63d2dff0a2": {
     "ticker": "SMIN",
@@ -3115,9 +3115,9 @@
     "buy_score": 50.0,
     "first_detected": "2026-09-01T07:28:17.465406+00:00",
     "last_detected": "2026-09-01T07:28:17.465406+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T08:08:24.784315+00:00",
+    "status": "FAILED"
   },
   "SPX:risk_flag_appeared:13e8d1f82712ae13": {
     "ticker": "SPX",
@@ -3345,7 +3345,7 @@
     "last_detected": "2026-09-01T07:33:29.388042+00:00",
     "attempt_count": 0,
     "last_attempt": null,
-    "status": "QUEUED"
+    "status": "SUPERSEDED"
   },
   "VOD:risk_flag_appeared:7222c5a8dfd8cadf": {
     "ticker": "VOD",
@@ -3655,6 +3655,30 @@
     "buy_score": 47.8,
     "first_detected": "2026-09-01T07:48:13.483464+00:00",
     "last_detected": "2026-09-01T07:48:13.483464+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "ENT:major_score_change:344bc537cc29d519": {
+    "ticker": "ENT",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "344bc537cc29d519",
+    "buy_score": 50.8,
+    "first_detected": "2026-09-01T08:08:23.690731+00:00",
+    "last_detected": "2026-09-01T08:08:23.690731+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "CTEC:major_score_change:2ae148b6627565e1": {
+    "ticker": "CTEC",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "2ae148b6627565e1",
+    "buy_score": 60.5,
+    "first_detected": "2026-09-01T08:08:23.690731+00:00",
+    "last_detected": "2026-09-01T08:08:23.690731+00:00",
     "attempt_count": 0,
     "last_attempt": null,
     "status": "QUEUED"
