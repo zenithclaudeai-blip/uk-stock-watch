@@ -6259,9 +6259,9 @@
     "buy_score": 52.8,
     "first_detected": "2026-09-01T16:08:20.852566+00:00",
     "last_detected": "2026-09-01T16:08:20.852566+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T16:38:29.663361+00:00",
+    "status": "FAILED"
   },
   "ENT:major_score_change:0843d8a0b0b8039b": {
     "ticker": "ENT",
@@ -6283,9 +6283,9 @@
     "buy_score": 49.1,
     "first_detected": "2026-09-01T16:08:20.852566+00:00",
     "last_detected": "2026-09-01T16:08:20.852566+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T16:38:29.932111+00:00",
+    "status": "FAILED"
   },
   "ABDN:risk_flag_disappeared:7bc3d9f3fa7a5a65": {
     "ticker": "ABDN",
@@ -6321,7 +6321,7 @@
     "last_detected": "2026-09-01T16:08:20.852566+00:00",
     "attempt_count": 0,
     "last_attempt": null,
-    "status": "QUEUED"
+    "status": "SUPERSEDED"
   },
   "RKT:band_change:c89b337a4ef55b50": {
     "ticker": "RKT",
@@ -6453,6 +6453,42 @@
     "last_detected": "2026-09-01T16:33:53.504531+00:00",
     "attempt_count": 1,
     "last_attempt": "2026-09-01T16:33:53.740713+00:00",
+    "status": "FAILED"
+  },
+  "ENT:major_score_change:b21826f2e6236365": {
+    "ticker": "ENT",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "b21826f2e6236365",
+    "buy_score": 56.1,
+    "first_detected": "2026-09-01T16:38:28.653516+00:00",
+    "last_detected": "2026-09-01T16:38:28.653516+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T16:38:28.922444+00:00",
+    "status": "FAILED"
+  },
+  "PRU:major_score_change:a2b5dc9c56bbb09b": {
+    "ticker": "PRU",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "a2b5dc9c56bbb09b",
+    "buy_score": 49.9,
+    "first_detected": "2026-09-01T16:38:28.653516+00:00",
+    "last_detected": "2026-09-01T16:38:28.653516+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T16:38:29.182877+00:00",
+    "status": "FAILED"
+  },
+  "AAL:major_score_change:3c22bc20e919e0da": {
+    "ticker": "AAL",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "3c22bc20e919e0da",
+    "buy_score": 47.4,
+    "first_detected": "2026-09-01T16:38:28.653516+00:00",
+    "last_detected": "2026-09-01T16:38:28.653516+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T16:38:29.425822+00:00",
     "status": "FAILED"
   }
 }
