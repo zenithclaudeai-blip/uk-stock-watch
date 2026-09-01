@@ -5347,9 +5347,9 @@
     "buy_score": 62.4,
     "first_detected": "2026-09-01T13:28:28.089320+00:00",
     "last_detected": "2026-09-01T13:28:28.089320+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T13:53:40.551475+00:00",
+    "status": "FAILED"
   },
   "ALW:risk_flag_disappeared:250d875110391758": {
     "ticker": "ALW",
@@ -5359,9 +5359,9 @@
     "buy_score": 49.6,
     "first_detected": "2026-09-01T13:38:01.532570+00:00",
     "last_detected": "2026-09-01T13:38:01.532570+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T13:53:40.826135+00:00",
+    "status": "FAILED"
   },
   "PSH:risk_flag_disappeared:74e84040293d7f5e": {
     "ticker": "PSH",
@@ -5371,9 +5371,9 @@
     "buy_score": 27.9,
     "first_detected": "2026-09-01T13:43:12.829051+00:00",
     "last_detected": "2026-09-01T13:43:12.829051+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T13:53:41.100906+00:00",
+    "status": "FAILED"
   },
   "BP.:band_change:97ca69c1b4f02988": {
     "ticker": "BP.",
@@ -5395,6 +5395,42 @@
     "buy_score": 34.4,
     "first_detected": "2026-09-01T13:48:11.381588+00:00",
     "last_detected": "2026-09-01T13:48:11.381588+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T13:53:41.343699+00:00",
+    "status": "FAILED"
+  },
+  "BP.:band_change:d867b46eb08b57d5": {
+    "ticker": "BP.",
+    "event_type": "band_change",
+    "event_priority": 2,
+    "evidence_hash": "d867b46eb08b57d5",
+    "buy_score": 69.9,
+    "first_detected": "2026-09-01T13:53:40.057081+00:00",
+    "last_detected": "2026-09-01T13:53:40.057081+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T13:53:40.290961+00:00",
+    "status": "FAILED"
+  },
+  "AZN:risk_flag_disappeared:ed675d098428fe34": {
+    "ticker": "AZN",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "ed675d098428fe34",
+    "buy_score": 52.7,
+    "first_detected": "2026-09-01T13:53:40.057081+00:00",
+    "last_detected": "2026-09-01T13:53:40.057081+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "SGE:risk_flag_disappeared:efd640887ac1ba71": {
+    "ticker": "SGE",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "efd640887ac1ba71",
+    "buy_score": 50.3,
+    "first_detected": "2026-09-01T13:53:40.057081+00:00",
+    "last_detected": "2026-09-01T13:53:40.057081+00:00",
     "attempt_count": 0,
     "last_attempt": null,
     "status": "QUEUED"
