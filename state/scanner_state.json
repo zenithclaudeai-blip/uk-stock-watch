@@ -7161,14 +7161,14 @@
   },
   "providerHealth": {
     "LSE Heatmap (FTSE 100)": {
-      "status": "available",
+      "status": "degraded",
       "lastSuccessAt": "2026-09-01T12:03:34.872401+00:00",
-      "lastFailureAt": null,
-      "lastError": null,
-      "consecutiveFailures": 0,
-      "totalRequests": 69,
-      "totalFailures": 0,
-      "errorRate": 0.0,
+      "lastFailureAt": "2026-09-01T12:06:54.100712+00:00",
+      "lastError": "HTTP 405 Not Allowed — <!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"utf-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n    <title>Human Verification</title>\n    <style>\n        body {\n            font-family: \"Arial\";\n        }\n    </style>\n    <script typ",
+      "consecutiveFailures": 1,
+      "totalRequests": 70,
+      "totalFailures": 1,
+      "errorRate": 0.014,
       "lastLatencySeconds": 0.7046651840209961
     },
     "Yahoo Finance (enrichment)": {
