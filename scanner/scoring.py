@@ -46,6 +46,23 @@ assert sum(COMPONENT_WEIGHTS.values()) == 100
 
 CORE_COMPONENTS = {"momentum", "trend", "liquidity"}
 ENHANCEMENT_COMPONENTS = {"analyst_evidence", "news_catalyst"}
+
+# Explicitly named engines that DO NOT YET have a connected data
+# source - per the explicit requirement, these are reported as
+# UNAVAILABLE, visibly, on every stock's breakdown, rather than
+# silently absent from the component list. They carry ZERO weight and
+# are NEVER factored into COMPONENT_WEIGHTS/buy_score in any way -
+# this dict exists purely to make the gap visible on the page, not to
+# participate in scoring.
+UNAVAILABLE_ENGINES = {
+    "quality": "No connected fundamentals source (ROE/margins/balance sheet)",
+    "growth": "No connected fundamentals source (revenue/EPS/FCF growth)",
+    "valuation": "No connected fundamentals source (P/E vs sector/history)",
+    "dividend": "No connected fundamentals source (payout ratio/cover/history)",
+    "balance_sheet": "No connected fundamentals source (debt/equity/interest cover)",
+    "profitability": "No connected fundamentals source (margins/ROIC)",
+    "cash_flow": "No connected fundamentals source (operating/free cash flow)",
+}
 assert CORE_COMPONENTS | ENHANCEMENT_COMPONENTS == set(COMPONENT_WEIGHTS)
 
 AGE_CONFIDENCE_MULTIPLIER = {

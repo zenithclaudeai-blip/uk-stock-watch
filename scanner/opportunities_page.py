@@ -11,7 +11,7 @@ the rest of this project's poller), never described as real-time.
 """
 from datetime import datetime, timezone
 
-from scoring import classify_opportunity_tier, compute_risk_score, detect_evidence_conflicts, COMPONENT_WEIGHTS, CORE_COMPONENTS, ENHANCEMENT_COMPONENTS
+from scoring import classify_opportunity_tier, compute_risk_score, detect_evidence_conflicts, COMPONENT_WEIGHTS, CORE_COMPONENTS, ENHANCEMENT_COMPONENTS, UNAVAILABLE_ENGINES
 import history as history_module
 import ai_evidence as ai_evidence_module
 
@@ -190,6 +190,10 @@ def render_opportunities_page(scan_result, snapshot_history: dict, dashboard_css
   {"".join(f'<tr><td>{name.replace("_", " ").title()}</td><td>{weight}%</td><td>{"CORE" if name in CORE_COMPONENTS else "ENHANCEMENT"}</td></tr>' for name, weight in COMPONENT_WEIGHTS.items())}
   </table>
   <p class="opp-meta">CORE components must supply at least 30 of their combined weight before a stock is considered scoreable at all — a stock with only ENHANCEMENT evidence (e.g. news alone) is never scored from that alone. When a component is missing, its weight is redistributed proportionally among the components that ARE available — the score reflects only real evidence, and DATA CONFIDENCE is reduced separately to reflect the gap, rather than the missing component silently becoming a zero.</p>
+  <h4>Engines not yet connected — genuinely UNAVAILABLE, not zero, and carrying zero weight in the score above:</h4>
+  <table><tr><th>Engine</th><th>Status</th><th>Reason</th></tr>
+  {"".join(f'<tr><td>{name.replace("_", " ").title()}</td><td>⚪ UNAVAILABLE</td><td>{reason}</td></tr>' for name, reason in UNAVAILABLE_ENGINES.items())}
+  </table>
 </div>
 
 <div class="opp-scan-health">
