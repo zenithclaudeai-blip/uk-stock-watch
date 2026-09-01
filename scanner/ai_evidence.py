@@ -473,19 +473,44 @@ def update_ai_queue(queue: dict, scan_result, snapshot_history, history_module,
     return queue
 
 
-def select_from_queue(queue: dict, max_per_run: int = None) -> list:
+AGE_BOOST_PER_DAY = 0.5  # per full day waiting, effective priority number is
+# reduced (made more urgent) by this amount - transparent, linear, testable.
+# Prevents an event stuck behind a constant stream of higher-priority new
+# events from waiting forever, per the explicit starvation-prevention
+# requirement, without letting age alone override a genuinely much
+# higher-priority fresh event on day one.
+
+
+def _effective_priority(entry: "QueueEntry", now: datetime) -> float:
+    """Raw event_priority, reduced (made more urgent) by how long the
+    entry has genuinely been waiting - never boosted below 0.5 of its
+    original priority tier, so aging alone can't make a low-priority
+    event outrank a same-day new-90+-opportunity, only eventually catch
+    up with same-priority-tier events that arrived more recently."""
+    try:
+        first = datetime.fromisoformat(entry.first_detected)
+        days_waiting = max(0.0, (now - first).total_seconds() / 86400)
+    except (ValueError, TypeError):
+        days_waiting = 0.0
+    boost = min(entry.event_priority * 0.5, days_waiting * AGE_BOOST_PER_DAY)
+    return entry.event_priority - boost
+
+
+def select_from_queue(queue: dict, max_per_run: int = None, now: datetime = None) -> list:
     """
     Selects the top-priority QUEUED/RETRY_PENDING entries for this
-    run's actual API calls - by event priority, then by BUY SCORE,
-    never FIFO/insertion order, per the explicit requirement. Returns
-    the list of (identity, QueueEntry) tuples to process.
+    run's actual API calls - by EFFECTIVE priority (raw event priority,
+    aged by how long the entry has waited, per the explicit starvation-
+    prevention requirement), then by BUY SCORE, never FIFO/insertion
+    order. Returns the list of (identity, QueueEntry) tuples to process.
     """
+    now = now or datetime.now(timezone.utc)
     max_per_run = max_per_run if max_per_run is not None else AI_ANALYSIS_MAX_PER_RUN
     eligible = [
         (identity, QueueEntry.from_dict(d)) for identity, d in queue.items()
         if d["status"] in (STATUS_QUEUED, STATUS_RETRY_PENDING)
     ]
-    eligible.sort(key=lambda kv: (kv[1].event_priority, -kv[1].buy_score))
+    eligible.sort(key=lambda kv: (_effective_priority(kv[1], now), -kv[1].buy_score))
     return eligible[:max_per_run]
 
 
