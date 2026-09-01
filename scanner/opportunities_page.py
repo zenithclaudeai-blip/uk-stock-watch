@@ -11,7 +11,7 @@ the rest of this project's poller), never described as real-time.
 """
 from datetime import datetime, timezone
 
-from scoring import classify_opportunity_tier, compute_risk_score, detect_evidence_conflicts
+from scoring import classify_opportunity_tier, compute_risk_score, detect_evidence_conflicts, COMPONENT_WEIGHTS, CORE_COMPONENTS, ENHANCEMENT_COMPONENTS
 import history as history_module
 import ai_evidence as ai_evidence_module
 
@@ -181,6 +181,15 @@ def render_opportunities_page(scan_result, snapshot_history: dict, dashboard_css
 <div class="opp-model-status">
   <p><b>{scan_result.model_status}</b></p>
   <p class="opp-meta"><b>Scores on this page are a PROVISIONAL BUY SCORE</b> — not yet the full intended model. Universe: FTSE 100 ({scan_result.universe_size} stocks) — not the full LSE. Currently supported model dimensions: {", ".join(k for k, v in scan_result.model_coverage.items() if v == "Available")}. Not yet connected: {", ".join(k for k, v in scan_result.model_coverage.items() if v == "Unavailable")}. Once Quality/Growth/Valuation/Timing are genuinely connected, this will be promoted to a full BUY SCORE 0-100.</p>
+</div>
+
+<div class="opp-how-it-works">
+  <h3>How the Score Works</h3>
+  <p class="opp-meta">The ACTUAL current weighting (not an example) — a weighted average of whichever components have real data this run, renormalized when something is missing, never padded with a zero or an invented value:</p>
+  <table><tr><th>Component</th><th>Weight</th><th>Category</th></tr>
+  {"".join(f'<tr><td>{name.replace("_", " ").title()}</td><td>{weight}%</td><td>{"CORE" if name in CORE_COMPONENTS else "ENHANCEMENT"}</td></tr>' for name, weight in COMPONENT_WEIGHTS.items())}
+  </table>
+  <p class="opp-meta">CORE components must supply at least 30 of their combined weight before a stock is considered scoreable at all — a stock with only ENHANCEMENT evidence (e.g. news alone) is never scored from that alone. When a component is missing, its weight is redistributed proportionally among the components that ARE available — the score reflects only real evidence, and DATA CONFIDENCE is reduced separately to reflect the gap, rather than the missing component silently becoming a zero.</p>
 </div>
 
 <div class="opp-scan-health">
