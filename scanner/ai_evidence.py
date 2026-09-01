@@ -281,21 +281,78 @@ def analyze_evidence(evidence_dict: dict, cache: dict) -> dict:
 AI_ANALYSIS_MAX_PER_RUN = 5
 
 
-def select_ai_analysis_candidates(scan_result, snapshot_history, history_module, now=None) -> list:
+# Deliberately small, bounded tier - per the explicit cost-control
+# requirement, never the whole universe.
+AI_ANALYSIS_MAX_PER_RUN = 5
+
+# Event priority order - per the explicit requirement that the market
+# scan can identify many events, with the AI budget then selecting the
+# HIGHEST-PRIORITY ones, never simply "first encountered". Lower
+# number = higher priority. Every reason here is backed by a REAL
+# signal already computed elsewhere (transitions, risk flags,
+# conflicts, coverage) - never a fabricated urgency score.
+EVENT_PRIORITY = {
+    "new_opportunity": 1,       # NEW transition, score >= 80
+    "band_change": 2,           # crossed a score-tier boundary
+    "evidence_conflict": 3,     # detect_evidence_conflicts fired
+    "risk_flag_appeared": 4,
+    "major_score_change": 5,    # IMPROVING/DETERIORATING transition
+    "risk_flag_disappeared": 6,
+    "evidence_became_available": 7,  # a previously-missing category now populated
+    "evidence_became_stale": 8,      # a component that was fresh is now EXPIRED
+}
+
+
+def identify_ai_candidate_events(scan_result, snapshot_history, history_module, prior_risk_flags=None, now=None) -> dict:
     """
-    Selects which tickers get AI evidence analysis this run - new
-    80+/90+ entrants and large score changes, per the explicit cost
-    tier. Capped at AI_ANALYSIS_MAX_PER_RUN regardless of how many
-    genuinely qualify, to keep API cost bounded and predictable.
+    IDENTIFICATION step - separate from the capped API-call step below,
+    per the explicit requirement. Scans the ENTIRE breakdown set (never
+    limited by the AI budget) and returns {ticker: (event_type, priority)}
+    for every stock with a genuine, real-signal-backed reason to
+    reconsider AI analysis. This can return more results than
+    AI_ANALYSIS_MAX_PER_RUN - selecting which of these actually get an
+    API call happens separately in select_ai_analysis_candidates.
     """
-    candidates = []
+    from data_model import AgeStatus
+    prior_risk_flags = prior_risk_flags or {}
+    events = {}
     for ticker, breakdown in scan_result.breakdowns.items():
         if breakdown.buy_score is None:
             continue
         transition = history_module.detect_transition(snapshot_history.get(ticker, []), now)
-        if transition and transition.event_type in ("NEW", "BAND_CHANGE") and breakdown.buy_score >= 80:
-            candidates.append((ticker, breakdown.buy_score))
-        elif transition and transition.event_type in ("IMPROVING", "DETERIORATING"):
-            candidates.append((ticker, breakdown.buy_score))
-    candidates.sort(key=lambda c: -c[1])
-    return [t for t, _ in candidates[:AI_ANALYSIS_MAX_PER_RUN]]
+        if transition:
+            if transition.event_type == "NEW" and breakdown.buy_score >= 80:
+                events[ticker] = ("new_opportunity", EVENT_PRIORITY["new_opportunity"])
+                continue
+            if transition.event_type == "BAND_CHANGE":
+                events[ticker] = ("band_change", EVENT_PRIORITY["band_change"])
+                continue
+            if transition.event_type in ("IMPROVING", "DETERIORATING"):
+                events[ticker] = ("major_score_change", EVENT_PRIORITY["major_score_change"])
+
+        current_flags = {f.code for f in scan_result.risk_flags.get(ticker, [])}
+        prior_flags = {f.code for f in prior_risk_flags.get(ticker, [])}
+        if current_flags - prior_flags:  # a genuinely NEW flag appeared this run
+            if ticker not in events or events[ticker][1] > EVENT_PRIORITY["risk_flag_appeared"]:
+                events[ticker] = ("risk_flag_appeared", EVENT_PRIORITY["risk_flag_appeared"])
+        elif prior_flags - current_flags:  # a flag genuinely cleared
+            if ticker not in events or events[ticker][1] > EVENT_PRIORITY["risk_flag_disappeared"]:
+                events[ticker] = ("risk_flag_disappeared", EVENT_PRIORITY["risk_flag_disappeared"])
+
+    return events
+
+
+def select_ai_analysis_candidates(scan_result, snapshot_history, history_module, prior_risk_flags=None, now=None) -> list:
+    """
+    The CAPPED selection step - takes the full event set from
+    identify_ai_candidate_events (which is NEVER capped) and returns
+    only the top AI_ANALYSIS_MAX_PER_RUN by event priority, then score,
+    for the actual API-call tier. The market scan itself never sees
+    this cap - it only governs how many stocks get an AI call.
+    """
+    events = identify_ai_candidate_events(scan_result, snapshot_history, history_module, prior_risk_flags, now)
+    ranked = sorted(
+        events.items(),
+        key=lambda kv: (kv[1][1], -(scan_result.breakdowns[kv[0]].buy_score or 0)),
+    )
+    return [ticker for ticker, _ in ranked[:AI_ANALYSIS_MAX_PER_RUN]]

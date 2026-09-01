@@ -8374,7 +8374,7 @@ def main():
             # must be shown clearly, never left ambiguous between "nothing
             # qualified" and "it qualified but genuinely failed".
             _ai_status = {"hasApiKey": bool(os.environ.get("ANTHROPIC_API_KEY", "").strip()),
-                          "evidenceCandidates": 0, "evidenceSucceeded": 0,
+                          "evidenceCandidates": 0, "evidenceSucceeded": 0, "totalEventsIdentified": 0, "waiting": 0,
                           "bearCandidates": 0, "bearSucceeded": 0, "stepError": None}
             try:
                 import ai_evidence as _ai_evidence_module
@@ -8383,13 +8383,28 @@ def main():
                         _ai_cache = json.loads(f.read())
                 else:
                     _ai_cache = {}
-                _candidates = _ai_evidence_module.select_ai_analysis_candidates(
-                    _scan_result, _scanner_history, _scanner_history_module,
+                # Prior run's risk flags, persisted in the SAME cache file
+                # under a reserved key - needed to detect genuine
+                # appeared/disappeared flag events, never re-fetched.
+                _prior_risk_flags_raw = _ai_cache.get("_prior_risk_flags", {})
+                _prior_risk_flags = {
+                    ticker: [type("F", (), {"code": code, "label": code})() for code in codes]
+                    for ticker, codes in _prior_risk_flags_raw.items()
+                }
+                _all_events = _ai_evidence_module.identify_ai_candidate_events(
+                    _scan_result, _scanner_history, _scanner_history_module, _prior_risk_flags,
                 )
+                _candidates = _ai_evidence_module.select_ai_analysis_candidates(
+                    _scan_result, _scanner_history, _scanner_history_module, _prior_risk_flags,
+                )
+                _ai_status["totalEventsIdentified"] = len(_all_events)
                 _ai_status["evidenceCandidates"] = len(_candidates)
+                _ai_status["waiting"] = max(0, len(_all_events) - len(_candidates))
                 if _candidates and _ai_status["hasApiKey"]:
-                    print(f"  > AI Evidence Analysis: {len(_candidates)} candidate(s) this run "
-                          f"(capped at {_ai_evidence_module.AI_ANALYSIS_MAX_PER_RUN})")
+                    print(f"  > AI Evidence Analysis: {len(_all_events)} event(s) identified, "
+                          f"{len(_candidates)} selected this run "
+                          f"(capped at {_ai_evidence_module.AI_ANALYSIS_MAX_PER_RUN}, "
+                          f"{_ai_status['waiting']} waiting for a future run)")
                 for _ticker in _candidates:
                     _record = _scan_result.records.get(_ticker)
                     _breakdown = _scan_result.breakdowns.get(_ticker)
@@ -8427,6 +8442,13 @@ def main():
                     if _challenge:
                         _bear_challenges[_ticker] = _challenge
                         _ai_status["bearSucceeded"] += 1
+                # Persist THIS run's risk flags for the NEXT run's
+                # appeared/disappeared comparison - stored as plain
+                # code lists (JSON-serializable), not the RiskFlag
+                # objects themselves.
+                _ai_cache["_prior_risk_flags"] = {
+                    ticker: [f.code for f in flags] for ticker, flags in _scan_result.risk_flags.items() if flags
+                }
                 atomic_write_json(_ai_evidence_state_file, _ai_cache)
             except Exception as e:
                 _ai_status["stepError"] = str(e)

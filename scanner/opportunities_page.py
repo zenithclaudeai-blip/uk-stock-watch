@@ -206,6 +206,18 @@ def render_opportunities_page(scan_result, snapshot_history: dict, dashboard_css
   Stocks with insufficient history for momentum tracking: {insufficient_history_count} (expected — history accumulates over multiple runs)</p>
 </div>
 
+<div class="opp-ai-status">
+  <h3>AI Status</h3>
+  <ul>
+    <li>Candidates identified this run: {ai_status.get("totalEventsIdentified", 0)}</li>
+    <li>Analysed: {ai_status.get("evidenceSucceeded", 0)}</li>
+    <li>Waiting (qualified, budget-limited): {ai_status.get("waiting", 0)}</li>
+    <li>Failed (API/billing/rate-limit error): {max(0, ai_status.get("evidenceCandidates", 0) - ai_status.get("evidenceSucceeded", 0))}</li>
+    <li>No-change runs (nothing materially different): {"yes" if ai_status.get("totalEventsIdentified", 0) == 0 else "no"}</li>
+  </ul>
+  <p class="opp-meta">Candidates are selected by event priority (new opportunity → band change → evidence conflict → risk flag appeared → major score change → risk flag disappeared), never by encounter order — and the {ai_evidence_module.AI_ANALYSIS_MAX_PER_RUN}-candidate budget never limits the underlying market scan, which always covers the full {scan_result.universe_size}-stock universe.</p>
+</div>
+
 <div class="opp-provider-health">
   <h3>Provider Health</h3>
   {"".join(f'<p class="opp-meta">{name}: {rec["status"]} · {rec["totalRequests"]} request(s) · {rec["errorRate"]:.0%} error rate</p>' for name, rec in scan_result.provider_health.items())}
