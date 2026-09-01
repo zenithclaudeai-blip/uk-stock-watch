@@ -6379,9 +6379,9 @@
     "buy_score": 46.8,
     "first_detected": "2026-09-01T16:13:10.037145+00:00",
     "last_detected": "2026-09-01T16:13:10.037145+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T16:53:40.204256+00:00",
+    "status": "FAILED"
   },
   "NWG:risk_flag_disappeared:9eeea7186d17b1c9": {
     "ticker": "NWG",
@@ -6525,6 +6525,30 @@
     "last_detected": "2026-09-01T16:48:06.937343+00:00",
     "attempt_count": 1,
     "last_attempt": "2026-09-01T16:48:07.170001+00:00",
+    "status": "FAILED"
+  },
+  "AAF:band_change:b6371d279000c4b5": {
+    "ticker": "AAF",
+    "event_type": "band_change",
+    "event_priority": 2,
+    "evidence_hash": "b6371d279000c4b5",
+    "buy_score": 71.1,
+    "first_detected": "2026-09-01T16:53:39.717883+00:00",
+    "last_detected": "2026-09-01T16:53:39.717883+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T16:53:39.957195+00:00",
+    "status": "FAILED"
+  },
+  "HLMA:risk_flag_disappeared:848a65d158d311dc": {
+    "ticker": "HLMA",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "848a65d158d311dc",
+    "buy_score": 36.5,
+    "first_detected": "2026-09-01T16:53:39.717883+00:00",
+    "last_detected": "2026-09-01T16:53:39.717883+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-01T16:53:40.447516+00:00",
     "status": "FAILED"
   }
 }
