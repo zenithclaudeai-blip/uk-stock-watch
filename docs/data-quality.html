@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en-GB"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Data / Freshness — UK Stock Watch</title>
+<title>Data Quality — UK Stock Watch</title>
 <style>
 body{background:#0f1115;color:#e8eaed;font-family:-apple-system,sans-serif;margin:0 auto;padding:12px;font-size:17px;line-height:1.6;max-width:1200px;word-wrap:break-word;overflow-wrap:break-word}
 h1{font-size:26px;margin:4px 0;font-weight:800}
@@ -84,11 +84,68 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </head>
 <body>
 <p style="margin:0 0 10px;"><a href="index.html" style="color:#7fb3ff;text-decoration:none;font-size:15px;">← Back to Dashboard</a></p>
-<h1>ℹ️ Data / Freshness</h1>
+<h1>🔍 Scanner Data Quality</h1>
 <main>
 
-<p class="meta">A quick summary of how current each data source is right now, gathered from the same status checks already shown on the main dashboard.</p>
-<div class="meta">Last successful poll: <b>Tue 01 Sep 2026, 01:39 BST (00:39 UTC)</b></div><div class="meta">FTSE universe: <b>healthy</b> (ftse100+ftse250, 350 constituents)</div><div class="meta">Watchlist news fetch: <b>ok</b></div><div class="meta">Mover news fetch: <b>ok</b></div><div class="meta">Market-wide broker alerts: <b>ok</b></div><div class="meta">Screener — Volume: <b>ok</b> · Gainers: <b>ok</b> · Losers: <b>ok</b></div>
+<p class="meta">Every number on this page comes directly from the same scan that produced the Opportunity Scanner results — nothing here is separately estimated. This page exists to make the system's real limitations visible, not to make it look more complete than it is.</p>
+
+<h2>Universe & Model Coverage</h2>
+<table>
+<tr><th>Metric</th><th>Value</th></tr>
+<tr><td>Current live universe</td><td>100 stocks (FTSE 100)</td></tr>
+<tr><td>Universe Coverage</td><td>100.0% (every eligible stock scanned)</td></tr>
+<tr><td>Model Data Coverage</td><td>92.2% (average completeness of scoring evidence)</td></tr>
+<tr><td>Fully covered</td><td>75</td></tr>
+<tr><td>Partially covered</td><td>25</td></tr>
+<tr><td>Unscoreable</td><td>0</td></tr>
+</table>
+
+<h2>Field-Level Coverage</h2>
+<table>
+<tr><th>Field</th><th>Coverage</th></tr>
+<tr><td>Live price</td><td>100/100 (100%)</td></tr>
+<tr><td>52-week range</td><td>100/100 (100%)</td></tr>
+<tr><td>Current volume</td><td>80/100 (80%)</td></tr>
+<tr><td>Average volume</td><td>80/100 (80%)</td></tr>
+<tr><td>Analyst/broker target</td><td>75/100 (75%)</td></tr>
+<tr><td>Same-day news checked</td><td>100/100 (100%)</td></tr>
+<tr><td>Fundamentals (market cap)</td><td>100/100 (100%)</td></tr>
+<tr><td>Quality / Growth / Valuation / Timing</td><td>0/100 — <b>no connected data source</b> (see STATUS.md)</td></tr>
+</table>
+
+<h2>Data Freshness (across all available component values)</h2>
+<table>
+<tr><th>Status</th><th>Count</th></tr>
+<tr><td>🟢 Fresh</td><td>395</td></tr>
+<tr><td>🟢 Recent</td><td>20</td></tr>
+<tr><td>🟡 Stale</td><td>40</td></tr>
+<tr><td>🔴 Expired</td><td>0</td></tr>
+</table>
+
+<h2>Provider Health</h2>
+<table>
+<tr><th>Provider</th><th>Status</th><th>Requests</th><th>Error Rate</th><th>Last Success</th><th>Last Failure</th></tr>
+<tr><td>LSE Heatmap (FTSE 100)</td><td>available</td><td>4</td><td>0%</td><td>2026-09-01T00:39:29.197103+00:00</td><td>—</td></tr><tr><td>Yahoo Finance (enrichment)</td><td>available</td><td>80</td><td>0%</td><td>2026-09-01T00:39:30.723324+00:00</td><td>—</td></tr>
+</table>
+
+<h2>AI Layer Status</h2>
+<table>
+<tr><th>Metric</th><th>Value</th></tr>
+<tr><td>API key configured</td><td>Yes</td></tr>
+<tr><td>AI Evidence Analysis candidates this run</td><td>5</td></tr>
+<tr><td>AI Evidence Analysis succeeded</td><td>0</td></tr>
+<tr><td>Bear Agent candidates this run (80+ scores)</td><td>0</td></tr>
+<tr><td>Bear Agent succeeded</td><td>0</td></tr>
+
+</table>
+
+<h2>Daily Self-Audit</h2>
+<p class="meta">Last scan: 2026-09-01T00:39:29.197112+00:00</p>
+<ul>
+<li>100 of 100 stocks scoreable</li>
+<li>0 opportunities at 90+, 0 at 80-89, 2 at 70-79</li>
+<li>Analyst data refreshed for 20 of 20 cap this run</li>
+</ul>
 
 </main>
 <p style="text-align:center;margin-top:18px;"><a href="index.html" style="color:#7fb3ff;text-decoration:none;font-size:14px;">← Back to Dashboard</a></p>
