@@ -10207,9 +10207,9 @@
     "buy_score": 60.5,
     "first_detected": "2026-09-02T15:58:19.411488+00:00",
     "last_detected": "2026-09-02T15:58:19.411488+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-02T16:08:16.908579+00:00",
+    "status": "FAILED"
   },
   "ANTO:risk_flag_disappeared:1c0f66ca619bd6e5": {
     "ticker": "ANTO",
@@ -10231,9 +10231,9 @@
     "buy_score": 61.4,
     "first_detected": "2026-09-02T15:58:19.411488+00:00",
     "last_detected": "2026-09-02T15:58:19.411488+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-02T16:08:16.719448+00:00",
+    "status": "FAILED"
   },
   "IMI:risk_flag_disappeared:7363e8e63fe2659b": {
     "ticker": "IMI",
@@ -10293,7 +10293,7 @@
     "last_detected": "2026-09-02T15:58:19.411488+00:00",
     "attempt_count": 0,
     "last_attempt": null,
-    "status": "QUEUED"
+    "status": "SUPERSEDED"
   },
   "LAND:major_score_change:2c0ca291b9c42a06": {
     "ticker": "LAND",
@@ -10422,7 +10422,7 @@
     "evidence_hash": "e2aef7a6a83b59e4",
     "buy_score": 38.7,
     "first_detected": "2026-09-02T16:03:30.821723+00:00",
-    "last_detected": "2026-09-02T16:03:30.821723+00:00",
+    "last_detected": "2026-09-02T16:08:15.813234+00:00",
     "attempt_count": 0,
     "last_attempt": null,
     "status": "QUEUED"
@@ -10437,6 +10437,102 @@
     "last_detected": "2026-09-02T16:03:30.821723+00:00",
     "attempt_count": 1,
     "last_attempt": "2026-09-02T16:03:31.325669+00:00",
+    "status": "FAILED"
+  },
+  "INVP:risk_flag_disappeared:3207395516784d44": {
+    "ticker": "INVP",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "3207395516784d44",
+    "buy_score": 60.4,
+    "first_detected": "2026-09-02T16:08:15.813234+00:00",
+    "last_detected": "2026-09-02T16:08:15.813234+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "BRBY:risk_flag_disappeared:c5f5e1ff0d94afbe": {
+    "ticker": "BRBY",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "c5f5e1ff0d94afbe",
+    "buy_score": 47.2,
+    "first_detected": "2026-09-02T16:08:15.813234+00:00",
+    "last_detected": "2026-09-02T16:08:15.813234+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "SHEL:major_score_change:25e4a3c7223fa57c": {
+    "ticker": "SHEL",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "25e4a3c7223fa57c",
+    "buy_score": 67.9,
+    "first_detected": "2026-09-02T16:08:15.813234+00:00",
+    "last_detected": "2026-09-02T16:08:15.813234+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-02T16:08:16.517074+00:00",
+    "status": "FAILED"
+  },
+  "MRO:risk_flag_disappeared:48b826a2336ff393": {
+    "ticker": "MRO",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "48b826a2336ff393",
+    "buy_score": 43.5,
+    "first_detected": "2026-09-02T16:08:15.813234+00:00",
+    "last_detected": "2026-09-02T16:08:15.813234+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "WEIR:risk_flag_disappeared:0b119101680cfdf4": {
+    "ticker": "WEIR",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "0b119101680cfdf4",
+    "buy_score": 43.7,
+    "first_detected": "2026-09-02T16:08:15.813234+00:00",
+    "last_detected": "2026-09-02T16:08:15.813234+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "STJ:risk_flag_disappeared:28f61fcb5d75c295": {
+    "ticker": "STJ",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "28f61fcb5d75c295",
+    "buy_score": 42.0,
+    "first_detected": "2026-09-02T16:08:15.813234+00:00",
+    "last_detected": "2026-09-02T16:08:15.813234+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "SSE:risk_flag_appeared:3131c591ae3cffd2": {
+    "ticker": "SSE",
+    "event_type": "risk_flag_appeared",
+    "event_priority": 4,
+    "evidence_hash": "3131c591ae3cffd2",
+    "buy_score": 48.7,
+    "first_detected": "2026-09-02T16:08:15.813234+00:00",
+    "last_detected": "2026-09-02T16:08:15.813234+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-02T16:08:16.032863+00:00",
+    "status": "FAILED"
+  },
+  "JD.:risk_flag_appeared:21a8227de0f45421": {
+    "ticker": "JD.",
+    "event_type": "risk_flag_appeared",
+    "event_priority": 4,
+    "evidence_hash": "21a8227de0f45421",
+    "buy_score": 48.6,
+    "first_detected": "2026-09-02T16:08:15.813234+00:00",
+    "last_detected": "2026-09-02T16:08:15.813234+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-02T16:08:16.263412+00:00",
     "status": "FAILED"
   }
 }
