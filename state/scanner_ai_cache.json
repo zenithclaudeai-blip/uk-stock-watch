@@ -1,10 +1,10 @@
 {
   "_prior_risk_flags": {
-    "EDV": [
-      "high_volatility",
+    "HLMA": [
       "low_liquidity"
     ],
-    "HLMA": [
+    "EDV": [
+      "high_volatility",
       "low_liquidity"
     ],
     "STAN": [
@@ -17,6 +17,12 @@
     "NWG": [
       "low_liquidity"
     ],
+    "AZN": [
+      "low_liquidity"
+    ],
+    "ADM": [
+      "low_liquidity"
+    ],
     "RR.": [
       "low_liquidity"
     ],
@@ -24,33 +30,24 @@
       "high_volatility",
       "low_liquidity"
     ],
-    "AZN": [
-      "low_liquidity"
-    ],
     "WEIR": [
-      "low_liquidity"
-    ],
-    "ADM": [
       "low_liquidity"
     ],
     "ANTO": [
       "high_volatility",
       "low_liquidity"
     ],
-    "CCEP": [
+    "CTEC": [
       "low_liquidity"
     ],
     "SHEL": [
       "low_liquidity"
     ],
-    "CTEC": [
-      "low_liquidity"
-    ],
-    "AAL": [
+    "HSBA": [
       "high_volatility",
       "low_liquidity"
     ],
-    "HSBA": [
+    "AAL": [
       "high_volatility",
       "low_liquidity"
     ],
@@ -58,7 +55,13 @@
       "high_volatility",
       "low_liquidity"
     ],
+    "GSK": [
+      "low_liquidity"
+    ],
     "DGE": [
+      "low_liquidity"
+    ],
+    "SBRY": [
       "low_liquidity"
     ],
     "IMI": [
@@ -70,23 +73,17 @@
     "SDR": [
       "high_volatility"
     ],
-    "SBRY": [
+    "CCH": [
       "low_liquidity"
-    ],
-    "PSH": [
-      "low_liquidity"
-    ],
-    "GSK": [
-      "low_liquidity"
-    ],
-    "BEZ": [
-      "high_volatility"
     ],
     "SMT": [
       "low_liquidity"
     ],
-    "LLOY": [
+    "INVP": [
       "low_liquidity"
+    ],
+    "BEZ": [
+      "high_volatility"
     ],
     "PCT": [
       "high_volatility",
@@ -96,33 +93,29 @@
       "high_volatility",
       "low_liquidity"
     ],
+    "FCIT": [
+      "low_liquidity"
+    ],
+    "PSH": [
+      "low_liquidity"
+    ],
+    "LLOY": [
+      "low_liquidity"
+    ],
+    "SMIN": [
+      "low_liquidity"
+    ],
     "AV.": [
       "low_liquidity"
     ],
-    "CCH": [
-      "low_liquidity"
-    ],
-    "FCIT": [
+    "HSX": [
       "low_liquidity"
     ],
     "RIO": [
       "high_volatility",
       "low_liquidity"
     ],
-    "INVP": [
-      "low_liquidity"
-    ],
-    "SMIN": [
-      "low_liquidity"
-    ],
     "SGRO": [
-      "high_volatility",
-      "low_liquidity"
-    ],
-    "HSX": [
-      "low_liquidity"
-    ],
-    "GAW": [
       "high_volatility",
       "low_liquidity"
     ],
@@ -130,20 +123,20 @@
       "high_volatility",
       "low_liquidity"
     ],
-    "CRDA": [
+    "TSCO": [
       "low_liquidity"
     ],
-    "TSCO": [
+    "GAW": [
+      "high_volatility",
+      "low_liquidity"
+    ],
+    "CRDA": [
       "low_liquidity"
     ],
     "ALW": [
       "low_liquidity"
     ],
     "BP.": [
-      "low_liquidity"
-    ],
-    "AUTO": [
-      "high_volatility",
       "low_liquidity"
     ],
     "BBOX": [
@@ -155,18 +148,7 @@
     "RTO": [
       "low_liquidity"
     ],
-    "BGEO": [
-      "high_volatility",
-      "low_liquidity"
-    ],
     "LMP": [
-      "low_liquidity"
-    ],
-    "GLEN": [
-      "high_volatility",
-      "low_liquidity"
-    ],
-    "BA.": [
       "low_liquidity"
     ],
     "IGG": [
@@ -176,107 +158,122 @@
     "VOD": [
       "low_liquidity"
     ],
-    "MRO": [
+    "BGEO": [
       "high_volatility",
-      "low_liquidity"
-    ],
-    "ABDN": [
-      "low_liquidity"
-    ],
-    "CPG": [
-      "low_liquidity"
-    ],
-    "BATS": [
-      "low_liquidity"
-    ],
-    "DPLM": [
       "low_liquidity"
     ],
     "BAB": [
       "high_volatility",
       "low_liquidity"
     ],
-    "ABF": [
+    "CPG": [
+      "low_liquidity"
+    ],
+    "BA.": [
       "low_liquidity"
     ],
     "HLN": [
       "low_liquidity"
     ],
-    "BARC": [
+    "ABF": [
+      "low_liquidity"
+    ],
+    "DPLM": [
+      "low_liquidity"
+    ],
+    "GLEN": [
+      "high_volatility",
+      "low_liquidity"
+    ],
+    "BATS": [
+      "low_liquidity"
+    ],
+    "NXT": [
+      "low_liquidity"
+    ],
+    "ABDN": [
       "low_liquidity"
     ],
     "MNG": [
       "low_liquidity",
       "earnings_imminent"
     ],
-    "NXT": [
+    "MRO": [
+      "high_volatility",
       "low_liquidity"
     ],
-    "SDLF": [
-      "earnings_imminent"
-    ],
-    "NG.": [
+    "AUTO": [
+      "high_volatility",
       "low_liquidity"
     ],
     "ENT": [
       "high_volatility",
       "low_liquidity"
     ],
-    "LGEN": [
+    "NG.": [
       "low_liquidity"
+    ],
+    "BARC": [
+      "low_liquidity"
+    ],
+    "SDLF": [
+      "earnings_imminent"
     ],
     "III": [
-      "high_volatility",
-      "low_liquidity"
-    ],
-    "PSN": [
-      "high_volatility",
-      "low_liquidity"
-    ],
-    "AAF": [
       "high_volatility",
       "low_liquidity"
     ],
     "BRBY": [
       "low_liquidity"
     ],
-    "IMB": [
+    "PSN": [
+      "high_volatility",
       "low_liquidity"
     ],
-    "SSE": [
+    "LGEN": [
+      "low_liquidity"
+    ],
+    "AAF": [
       "high_volatility",
+      "low_liquidity"
+    ],
+    "IMB": [
       "low_liquidity"
     ],
     "BLND": [
       "low_liquidity"
     ],
-    "ICG": [
+    "REL": [
+      "high_volatility"
+    ],
+    "RKT": [
       "high_volatility",
       "low_liquidity"
     ],
     "LSEG": [
       "low_liquidity"
     ],
-    "REL": [
-      "high_volatility"
-    ],
     "HWDN": [
       "low_liquidity"
     ],
-    "INF": [
+    "ICG": [
+      "high_volatility",
       "low_liquidity"
     ],
-    "RKT": [
+    "SSE": [
       "high_volatility",
       "low_liquidity"
     ],
     "SVT": [
       "low_liquidity"
     ],
+    "SN.": [
+      "low_liquidity"
+    ],
     "MKS": [
       "low_liquidity"
     ],
-    "SN.": [
+    "INF": [
       "low_liquidity"
     ],
     "LAND": [
@@ -299,16 +296,16 @@
       "high_volatility",
       "low_liquidity"
     ],
+    "CCC": [
+      "high_volatility",
+      "low_liquidity",
+      "earnings_imminent"
+    ],
     "STJ": [
       "low_liquidity"
     ],
     "JD.": [
       "high_volatility"
-    ],
-    "CCC": [
-      "high_volatility",
-      "low_liquidity",
-      "earnings_imminent"
     ]
   }
 }
