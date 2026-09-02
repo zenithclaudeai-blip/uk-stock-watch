@@ -10509,7 +10509,7 @@
     "last_detected": "2026-09-02T16:08:15.813234+00:00",
     "attempt_count": 0,
     "last_attempt": null,
-    "status": "QUEUED"
+    "status": "SUPERSEDED"
   },
   "SSE:risk_flag_appeared:3131c591ae3cffd2": {
     "ticker": "SSE",
@@ -10567,9 +10567,9 @@
     "buy_score": 59.1,
     "first_detected": "2026-09-02T16:13:35.379684+00:00",
     "last_detected": "2026-09-02T16:13:35.379684+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-02T16:33:51.117299+00:00",
+    "status": "FAILED"
   },
   "BGEO:risk_flag_disappeared:47fdb260b796bcc1": {
     "ticker": "BGEO",
@@ -10579,9 +10579,9 @@
     "buy_score": 60.3,
     "first_detected": "2026-09-02T16:13:35.379684+00:00",
     "last_detected": "2026-09-02T16:13:35.379684+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-02T16:33:50.896151+00:00",
+    "status": "FAILED"
   },
   "ULVR:risk_flag_disappeared:73b56401b4557cd3": {
     "ticker": "ULVR",
@@ -10666,5 +10666,41 @@
     "attempt_count": 0,
     "last_attempt": null,
     "status": "QUEUED"
+  },
+  "VOD:major_score_change:b32318136d22450e": {
+    "ticker": "VOD",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "b32318136d22450e",
+    "buy_score": 54.9,
+    "first_detected": "2026-09-02T16:33:49.916493+00:00",
+    "last_detected": "2026-09-02T16:33:49.916493+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-02T16:33:50.152112+00:00",
+    "status": "FAILED"
+  },
+  "STJ:major_score_change:b8ab23e20c4f5010": {
+    "ticker": "STJ",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "b8ab23e20c4f5010",
+    "buy_score": 53.1,
+    "first_detected": "2026-09-02T16:33:49.916493+00:00",
+    "last_detected": "2026-09-02T16:33:49.916493+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-02T16:33:50.665443+00:00",
+    "status": "FAILED"
+  },
+  "SSE:major_score_change:453fc9b908d65d99": {
+    "ticker": "SSE",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "453fc9b908d65d99",
+    "buy_score": 53.3,
+    "first_detected": "2026-09-02T16:33:49.916493+00:00",
+    "last_detected": "2026-09-02T16:33:49.916493+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-02T16:33:50.402145+00:00",
+    "status": "FAILED"
   }
 }
