@@ -10639,9 +10639,9 @@
     "buy_score": 50.6,
     "first_detected": "2026-09-02T16:13:35.379684+00:00",
     "last_detected": "2026-09-02T16:13:35.379684+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-02T16:43:24.917518+00:00",
+    "status": "FAILED"
   },
   "CCC:risk_flag_disappeared:34ce1f13043b6c1e": {
     "ticker": "CCC",
@@ -10737,6 +10737,54 @@
     "last_detected": "2026-09-02T16:38:07.672380+00:00",
     "attempt_count": 1,
     "last_attempt": "2026-09-02T16:38:08.497341+00:00",
+    "status": "FAILED"
+  },
+  "EDV:major_score_change:d5590481e4c32daa": {
+    "ticker": "EDV",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "d5590481e4c32daa",
+    "buy_score": 69.0,
+    "first_detected": "2026-09-02T16:43:23.673104+00:00",
+    "last_detected": "2026-09-02T16:43:23.673104+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-02T16:43:24.150404+00:00",
+    "status": "FAILED"
+  },
+  "GLEN:major_score_change:cb571455efe0c296": {
+    "ticker": "GLEN",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "cb571455efe0c296",
+    "buy_score": 56.9,
+    "first_detected": "2026-09-02T16:43:23.673104+00:00",
+    "last_detected": "2026-09-02T16:43:23.673104+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-02T16:43:24.377713+00:00",
+    "status": "FAILED"
+  },
+  "HSX:risk_flag_appeared:03844b8da0f5ef02": {
+    "ticker": "HSX",
+    "event_type": "risk_flag_appeared",
+    "event_priority": 4,
+    "evidence_hash": "03844b8da0f5ef02",
+    "buy_score": 57.3,
+    "first_detected": "2026-09-02T16:43:23.673104+00:00",
+    "last_detected": "2026-09-02T16:43:23.673104+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-02T16:43:23.925461+00:00",
+    "status": "FAILED"
+  },
+  "RTO:major_score_change:26c88c93938991a7": {
+    "ticker": "RTO",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "26c88c93938991a7",
+    "buy_score": 56.3,
+    "first_detected": "2026-09-02T16:43:23.673104+00:00",
+    "last_detected": "2026-09-02T16:43:23.673104+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-02T16:43:24.582959+00:00",
     "status": "FAILED"
   }
 }
