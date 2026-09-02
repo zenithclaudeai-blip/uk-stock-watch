@@ -6021,6 +6021,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "SSE",
+      "timestamp": "2026-09-02T07:12:43.345785+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 59.9,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 69.1157624946604,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 69% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 48.611004222123725,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.9x the average"
+        },
+        "analyst_evidence": {
+          "score": 72.6932668329177,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +13.6% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "INVP": [
@@ -12045,6 +12094,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "INVP",
+      "timestamp": "2026-09-02T07:12:43.347482+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 63.4,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 83.21408338404079,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 83% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 42.60273612498513,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.7x the average"
+        },
+        "analyst_evidence": {
+          "score": 73.61955420466059,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +14.2% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "HSBA": [
@@ -18024,6 +18122,55 @@
     {
       "ticker": "HSBA",
       "timestamp": "2026-09-02T07:07:18.394357+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 61.6,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 88.46037963241942,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 88% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 53.43519514863071,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 1.1x the average"
+        },
+        "analyst_evidence": {
+          "score": 42.14679796530585,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies -3.1% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "HSBA",
+      "timestamp": "2026-09-02T07:12:43.348002+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 61.6,
       "data_confidence": 53.8,
@@ -24095,6 +24242,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "SVT",
+      "timestamp": "2026-09-02T07:12:43.345607+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 59.8,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 68.94197952218431,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 69% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 58.032905604835236,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 1.3x the average"
+        },
+        "analyst_evidence": {
+          "score": 60.06967123884172,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +6.0% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "STAN": [
@@ -30074,6 +30270,55 @@
     {
       "ticker": "STAN",
       "timestamp": "2026-09-02T07:07:18.391090+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 60.9,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 88.23529411764706,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 88% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 39.09939111692947,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.6x the average"
+        },
+        "analyst_evidence": {
+          "score": 58.54524358383281,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +5.1% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "STAN",
+      "timestamp": "2026-09-02T07:12:43.345704+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 60.9,
       "data_confidence": 53.8,
@@ -36143,6 +36388,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "MRO",
+      "timestamp": "2026-09-02T07:12:43.346955+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 52.8,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 30.861504907306443,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 31% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 51.31767714936853,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 1.1x the average"
+        },
+        "analyst_evidence": {
+          "score": 100.0,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +35.0% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "AV.": [
@@ -42122,6 +42416,55 @@
     {
       "ticker": "AV.",
       "timestamp": "2026-09-02T07:07:18.396863+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 64.6,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 94.1333333333333,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 94% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 56.160621242430096,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 1.2x the average"
+        },
+        "analyst_evidence": {
+          "score": 43.15045094288058,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies -2.7% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "AV.",
+      "timestamp": "2026-09-02T07:12:43.349891+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 64.6,
       "data_confidence": 53.8,
@@ -48191,6 +48534,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "VOD",
+      "timestamp": "2026-09-02T07:12:43.345414+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 52.7,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 75.47169811320757,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 75% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 40.23675379245137,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.6x the average"
+        },
+        "analyst_evidence": {
+          "score": 39.87286432160804,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies -4.1% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "INF": [
@@ -54170,6 +54562,55 @@
     {
       "ticker": "INF",
       "timestamp": "2026-09-02T07:07:18.393690+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 56.1,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 60.28469750889679,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 60% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 38.20520578948799,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.5x the average"
+        },
+        "analyst_evidence": {
+          "score": 83.5059282605433,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +20.1% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "INF",
+      "timestamp": "2026-09-02T07:12:43.347528+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 56.1,
       "data_confidence": 53.8,
@@ -60239,6 +60680,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "SDLF",
+      "timestamp": "2026-09-02T07:12:43.346214+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 64.2,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 91.75412293853074,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 92% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 59.4308061300477,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 1.4x the average"
+        },
+        "analyst_evidence": {
+          "score": 40.72938382193267,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies -3.7% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "BRBY": [
@@ -66218,6 +66708,55 @@
     {
       "ticker": "BRBY",
       "timestamp": "2026-09-02T07:07:18.395878+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 45.1,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 23.470661672908864,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 23% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 45.517078446815376,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.8x the average"
+        },
+        "analyst_evidence": {
+          "score": 83.94158878504672,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +20.4% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "BRBY",
+      "timestamp": "2026-09-02T07:12:43.349057+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 45.1,
       "data_confidence": 53.8,
@@ -72287,6 +72826,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "SHEL",
+      "timestamp": "2026-09-02T07:12:43.346015+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 62.3,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 72.93994993060674,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 73% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 59.21986077379063,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 1.4x the average"
+        },
+        "analyst_evidence": {
+          "score": 63.66584122359795,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +8.2% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "CCEP": [
@@ -78266,6 +78854,55 @@
     {
       "ticker": "CCEP",
       "timestamp": "2026-09-02T07:07:18.395616+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 53.7,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 73.28918322295806,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 73% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 40.37571087163373,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.6x the average"
+        },
+        "analyst_evidence": {
+          "score": 47.825724181360194,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies -0.9% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "CCEP",
+      "timestamp": "2026-09-02T07:12:43.348876+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 53.7,
       "data_confidence": 53.8,
@@ -84588,6 +85225,56 @@
         "Price Momentum",
         "Analyst Evidence"
       ]
+    },
+    {
+      "ticker": "SMT",
+      "timestamp": "2026-09-02T07:12:43.345923+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 59.6,
+      "data_confidence": 41.0,
+      "data_coverage_pct": 55.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 82.18410127470472,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 82% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 41.126312566772654,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.6x the average"
+        },
+        "analyst_evidence": {
+          "score": null,
+          "weight": 15,
+          "available": false,
+          "category": "enhancement",
+          "explanation": "No broker consensus target available for this stock this run."
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum",
+        "Analyst Evidence"
+      ]
     }
   ],
   "CRDA": [
@@ -90567,6 +91254,55 @@
     {
       "ticker": "CRDA",
       "timestamp": "2026-09-02T07:07:18.395360+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 78.4,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 85.20757691991687,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 85% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 6.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 63.621775793650784,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +8.2% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "CRDA",
+      "timestamp": "2026-09-02T07:12:43.348696+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 78.4,
       "data_confidence": 53.8,
@@ -96636,6 +97372,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "MKS",
+      "timestamp": "2026-09-02T07:12:43.347048+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 60.2,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 77.37257410961827,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 77% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 40.48622870494501,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.6x the average"
+        },
+        "analyst_evidence": {
+          "score": 71.52969201973795,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +12.9% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "NG.": [
@@ -102615,6 +103400,55 @@
     {
       "ticker": "NG.",
       "timestamp": "2026-09-02T07:07:18.392765+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 49.3,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 38.2730455075846,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 38% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 46.78883526634719,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.9x the average"
+        },
+        "analyst_evidence": {
+          "score": 77.30054410080183,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +16.4% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "NG.",
+      "timestamp": "2026-09-02T07:12:43.346863+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 49.3,
       "data_confidence": 53.8,
@@ -108684,6 +109518,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "UU.",
+      "timestamp": "2026-09-02T07:12:43.345465+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 61.9,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 77.64705882352942,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 78% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 52.42743004813579,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 1.1x the average"
+        },
+        "analyst_evidence": {
+          "score": 62.86424155967664,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +7.7% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "BARC": [
@@ -114708,6 +115591,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "BARC",
+      "timestamp": "2026-09-02T07:12:43.349709+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 61.0,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 71.74560216508799,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 72% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 43.16049491575156,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.7x the average"
+        },
+        "analyst_evidence": {
+          "score": 80.90413495165603,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +18.5% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "STJ": [
@@ -120687,6 +121619,55 @@
     {
       "ticker": "STJ",
       "timestamp": "2026-09-02T07:07:18.391011+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 47.8,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 23.800652072659524,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 24% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 42.51627647055301,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.7x the average"
+        },
+        "analyst_evidence": {
+          "score": 100.0,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +44.6% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "STJ",
+      "timestamp": "2026-09-02T07:12:43.345654+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 47.8,
       "data_confidence": 53.8,
@@ -126759,6 +127740,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "CCC",
+      "timestamp": "2026-09-02T07:12:43.348922+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 54.6,
+      "data_confidence": 67.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 94.78412054476964,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 95% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.001655905679613,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 36.887965485921896,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies -5.2% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "LGEN": [
@@ -132744,6 +133774,55 @@
       "model_version": "v1.0-provisional",
       "buy_score": 46.7,
       "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 72.44796828543112,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 72% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.68553137908628,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 36.13591112642096,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies -5.5% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "LGEN",
+      "timestamp": "2026-09-02T07:12:43.347252+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 46.7,
+      "data_confidence": 67.0,
       "data_coverage_pct": 70.0,
       "coverage_state": "partially_covered",
       "component_scores": {
@@ -138813,6 +139892,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "ICG",
+      "timestamp": "2026-09-02T07:12:43.347814+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 54.3,
+      "data_confidence": 67.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 57.05504712470974,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 57% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.001508729414095,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 98.26716315699366,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +29.0% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "MNG": [
@@ -144798,6 +145926,55 @@
       "model_version": "v1.0-provisional",
       "buy_score": 49.4,
       "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 82.43130724396335,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 82% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.07003505741406,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 32.96676300578034,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies -6.8% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "MNG",
+      "timestamp": "2026-09-02T07:12:43.347003+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 49.4,
+      "data_confidence": 67.0,
       "data_coverage_pct": 70.0,
       "coverage_state": "partially_covered",
       "component_scores": {
@@ -151118,6 +152295,56 @@
         "Price Momentum",
         "Analyst Evidence"
       ]
+    },
+    {
+      "ticker": "FCIT",
+      "timestamp": "2026-09-02T07:12:43.348338+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 52.6,
+      "data_confidence": 52.0,
+      "data_coverage_pct": 55.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 77.8741865509762,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 78% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 27.432972529487337,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.1x the average"
+        },
+        "analyst_evidence": {
+          "score": null,
+          "weight": 15,
+          "available": false,
+          "category": "enhancement",
+          "explanation": "No broker consensus target available for this stock this run."
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum",
+        "Analyst Evidence"
+      ]
     }
   ],
   "AAL": [
@@ -157145,6 +158372,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "AAL",
+      "timestamp": "2026-09-02T07:12:43.350229+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 53.2,
+      "data_confidence": 67.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 90.12345679012346,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 90% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.001297659639942,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 38.166569414053015,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies -4.7% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "LLOY": [
@@ -163130,6 +164406,55 @@
       "model_version": "v1.0-provisional",
       "buy_score": 56.0,
       "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 81.86080947680156,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 82% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.099683909157253,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 64.80175486205337,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +8.9% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "LLOY",
+      "timestamp": "2026-09-02T07:12:43.347206+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 56.0,
+      "data_confidence": 67.0,
       "data_coverage_pct": 70.0,
       "coverage_state": "partially_covered",
       "component_scores": {
@@ -169201,6 +170526,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "DPLM",
+      "timestamp": "2026-09-02T07:12:43.348519+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 56.7,
+      "data_confidence": 67.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 77.28085867620752,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 77% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.053776149391325,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 75.55224403927069,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +15.3% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "GAW": [
@@ -175186,6 +176560,55 @@
       "model_version": "v1.0-provisional",
       "buy_score": 46.9,
       "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 44.77296726504752,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 45% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.002225610095365,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 84.27089022392136,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +20.6% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "GAW",
+      "timestamp": "2026-09-02T07:12:43.348247+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 46.9,
+      "data_confidence": 67.0,
       "data_coverage_pct": 70.0,
       "coverage_state": "partially_covered",
       "component_scores": {
@@ -181255,6 +182678,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "CPG",
+      "timestamp": "2026-09-02T07:12:43.348744+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 51.8,
+      "data_confidence": 67.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 54.74040632054178,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 55% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.007228714836554,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 90.5345218800648,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +24.3% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "CNA": [
@@ -187240,6 +188712,55 @@
       "model_version": "v1.0-provisional",
       "buy_score": 34.8,
       "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 1.3798111837327767,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 1% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.04574855691361,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 100.0,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +35.2% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "CNA",
+      "timestamp": "2026-09-02T07:12:43.348788+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 34.8,
+      "data_confidence": 67.0,
       "data_coverage_pct": 70.0,
       "coverage_state": "partially_covered",
       "component_scores": {
@@ -193309,6 +194830,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "TSCO",
+      "timestamp": "2026-09-02T07:12:43.345561+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 50.8,
+      "data_confidence": 67.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 60.58763931104358,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 61% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 33.12755306820205,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.3x the average"
+        },
+        "analyst_evidence": {
+          "score": 65.02297631671969,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +9.0% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "ULVR": [
@@ -199294,6 +200864,55 @@
       "model_version": "v1.0-provisional",
       "buy_score": 49.1,
       "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 62.00850159404888,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 62% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.001342117218762,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 65.76494838217972,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +9.5% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "ULVR",
+      "timestamp": "2026-09-02T07:12:43.345515+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 49.1,
+      "data_confidence": 67.0,
       "data_coverage_pct": 70.0,
       "coverage_state": "partially_covered",
       "component_scores": {
@@ -205363,6 +206982,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "ABDN",
+      "timestamp": "2026-09-02T07:12:43.350186+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 50.3,
+      "data_confidence": 67.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 77.13763145861911,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 77% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.00235757985639,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 46.32654081632654,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies -1.5% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "SBRY": [
@@ -211348,6 +213016,55 @@
       "model_version": "v1.0-provisional",
       "buy_score": 45.4,
       "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 55.16293195436265,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 55% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.000879550969486,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 59.995038621509195,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +6.0% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "SBRY",
+      "timestamp": "2026-09-02T07:12:43.346261+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 45.4,
+      "data_confidence": 67.0,
       "data_coverage_pct": 70.0,
       "coverage_state": "partially_covered",
       "component_scores": {
@@ -217417,6 +219134,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "BGEO",
+      "timestamp": "2026-09-02T07:12:43.349528+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 60.5,
+      "data_confidence": 67.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 97.1705137751303,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 97% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.003579098067288,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 60.300335070737155,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +6.2% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "PRU": [
@@ -223444,6 +225210,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "PRU",
+      "timestamp": "2026-09-02T07:12:43.346680+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 44.1,
+      "data_confidence": 67.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 27.547284929835254,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 28% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.00645653699279,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 100.0,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +41.7% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "DGE": [
@@ -229429,6 +231244,55 @@
       "model_version": "v1.0-provisional",
       "buy_score": 47.6,
       "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 48.483473067172824,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 48% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.004423312373333,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 81.20376906969788,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +18.7% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "DGE",
+      "timestamp": "2026-09-02T07:12:43.348563+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 47.6,
+      "data_confidence": 67.0,
       "data_coverage_pct": 70.0,
       "coverage_state": "partially_covered",
       "component_scores": {
@@ -235749,6 +237613,56 @@
         "Price Momentum",
         "Analyst Evidence"
       ]
+    },
+    {
+      "ticker": "ALW",
+      "timestamp": "2026-09-02T07:12:43.350027+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 58.0,
+      "data_confidence": 52.0,
+      "data_coverage_pct": 55.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 84.25925925925925,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 84% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 34.19266110466896,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.4x the average"
+        },
+        "analyst_evidence": {
+          "score": null,
+          "weight": 15,
+          "available": false,
+          "category": "enhancement",
+          "explanation": "No broker consensus target available for this stock this run."
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum",
+        "Analyst Evidence"
+      ]
     }
   ],
   "ENT": [
@@ -241776,6 +243690,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "ENT",
+      "timestamp": "2026-09-02T07:12:43.348430+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 39.2,
+      "data_confidence": 67.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 3.5645472061657193,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 4% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 37.898227242040804,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.5x the average"
+        },
+        "analyst_evidence": {
+          "score": 100.0,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +82.2% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "IGG": [
@@ -247761,6 +249724,55 @@
     {
       "ticker": "IGG",
       "timestamp": "2026-09-02T07:07:18.394026+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 46.9,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 38.51063829787234,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 39% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.00814806666748,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 94.44847605224965,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +26.7% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "IGG",
+      "timestamp": "2026-09-02T07:12:43.347768+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 46.9,
       "data_confidence": 70.0,
@@ -254085,6 +256097,56 @@
         "Price Momentum",
         "Analyst Evidence"
       ]
+    },
+    {
+      "ticker": "PCT",
+      "timestamp": "2026-09-02T07:12:43.346724+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 48.2,
+      "data_confidence": 55.0,
+      "data_coverage_pct": 55.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 69.94436212150865,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 70% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.106253127043875,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": null,
+          "weight": 15,
+          "available": false,
+          "category": "enhancement",
+          "explanation": "No broker consensus target available for this stock this run."
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum",
+        "Analyst Evidence"
+      ]
     }
   ],
   "HSX": [
@@ -260070,6 +262132,55 @@
     {
       "ticker": "HSX",
       "timestamp": "2026-09-02T07:07:18.394293+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 58.5,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 94.43428357634384,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 94% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.112586829716488,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 55.367032476802294,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +3.2% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "HSX",
+      "timestamp": "2026-09-02T07:12:43.347957+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 58.5,
       "data_confidence": 70.0,
@@ -266145,6 +268256,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "RTO",
+      "timestamp": "2026-09-02T07:12:43.346313+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 39.8,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 15.388951521984193,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 15% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.026289270925037,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 100.0,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +33.0% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "BNZL": [
@@ -272130,6 +274290,55 @@
     {
       "ticker": "BNZL",
       "timestamp": "2026-09-02T07:07:18.396023+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 51.9,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 82.98800436205016,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 83% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.15735018767746,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 43.70413931436909,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies -2.5% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "BNZL",
+      "timestamp": "2026-09-02T07:12:43.349439+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 51.9,
       "data_confidence": 70.0,
@@ -278205,6 +280414,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "PSON",
+      "timestamp": "2026-09-02T07:12:43.346544+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 51.1,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 75.98442232799654,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 76% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.17867077502461,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 51.656063077759654,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +1.0% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "RKT": [
@@ -284190,6 +286448,55 @@
     {
       "ticker": "RKT",
       "timestamp": "2026-09-02T07:07:18.392104+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 50.7,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 59.50877192982457,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 60% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.042990305718096,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 77.17005597014925,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +16.3% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "RKT",
+      "timestamp": "2026-09-02T07:12:43.346407+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 50.7,
       "data_confidence": 70.0,
@@ -290265,6 +292572,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "JD.",
+      "timestamp": "2026-09-02T07:12:43.347391+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 49.5,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 47.39224189000262,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 47% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 27.637321899104624,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.1x the average"
+        },
+        "analyst_evidence": {
+          "score": 88.7056322934032,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +23.2% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "IAG": [
@@ -296250,6 +298606,55 @@
     {
       "ticker": "IAG",
       "timestamp": "2026-09-02T07:07:18.394160+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 54.1,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 55.99250936329587,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 56% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.081989927707,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 99.11876578282832,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +29.5% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "IAG",
+      "timestamp": "2026-09-02T07:12:43.347864+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 54.1,
       "data_confidence": 70.0,
@@ -302282,6 +304687,55 @@
     {
       "ticker": "NXT",
       "timestamp": "2026-09-02T07:07:18.392635+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 55.7,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 84.9919051275631,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 85% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.108771650490812,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 58.11124471888203,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +4.9% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "NXT",
+      "timestamp": "2026-09-02T07:12:43.346770+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 55.7,
       "data_confidence": 70.0,
@@ -308606,6 +311060,56 @@
         "Price Momentum",
         "Analyst Evidence"
       ]
+    },
+    {
+      "ticker": "PSH",
+      "timestamp": "2026-09-02T07:12:43.346635+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 22.5,
+      "data_confidence": 55.0,
+      "data_coverage_pct": 55.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 13.433858807402329,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 13% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.000697965291582,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": null,
+          "weight": 15,
+          "available": false,
+          "category": "enhancement",
+          "explanation": "No broker consensus target available for this stock this run."
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum",
+        "Analyst Evidence"
+      ]
     }
   ],
   "LSEG": [
@@ -314591,6 +317095,55 @@
     {
       "ticker": "LSEG",
       "timestamp": "2026-09-02T07:07:18.393107+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 56.5,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 62.268518518518526,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 62% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.003039396659503,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 100.0,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +34.8% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "LSEG",
+      "timestamp": "2026-09-02T07:12:43.347094+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 56.5,
       "data_confidence": 70.0,
@@ -320666,6 +323219,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "IMB",
+      "timestamp": "2026-09-02T07:12:43.347621+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 37.0,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 8.670520231213873,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 9% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.016251016101386,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 98.34108846204103,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +29.0% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "REL": [
@@ -326651,6 +329253,55 @@
     {
       "ticker": "REL",
       "timestamp": "2026-09-02T07:07:18.392234+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 48.3,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 40.467171717171716,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 40% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.01964700323212,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 98.07776722391084,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +28.8% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "REL",
+      "timestamp": "2026-09-02T07:12:43.346499+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 48.3,
       "data_confidence": 70.0,
@@ -332726,6 +335377,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "NWG",
+      "timestamp": "2026-09-02T07:12:43.346817+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 57.6,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 80.86802480070857,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 81% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.019144211526147,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 73.9562658660418,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +14.4% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "CCH": [
@@ -338756,6 +341456,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "CCH",
+      "timestamp": "2026-09-02T07:12:43.348833+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 52.4,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 68.77922077922078,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 69% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.51261727805149,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 69.40857640400523,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +11.6% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "GSK": [
@@ -344741,6 +347490,55 @@
     {
       "ticker": "GSK",
       "timestamp": "2026-09-02T07:07:18.394553+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 47.5,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 51.23023369093869,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 51% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.026168449571543,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 76.47608869890463,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +15.9% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "GSK",
+      "timestamp": "2026-09-02T07:12:43.348155+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 47.5,
       "data_confidence": 70.0,
@@ -350818,6 +353616,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "EDV",
+      "timestamp": "2026-09-02T07:12:43.348474+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 47.3,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 62.50839930666942,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 63% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.00234730763814,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 56.468071662206356,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +3.9% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "GLEN": [
@@ -356848,6 +359695,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "GLEN",
+      "timestamp": "2026-09-02T07:12:43.348203+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 52.4,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 75.59221829086597,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 76% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.00151939053876,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 58.34988555797466,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +5.0% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "BEZ": [
@@ -362833,6 +365729,55 @@
     {
       "ticker": "BEZ",
       "timestamp": "2026-09-02T07:07:18.396222+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 58.7,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 100.0,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 100% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.000856600751238,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 47.39700000000001,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies -1.0% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "BEZ",
+      "timestamp": "2026-09-02T07:12:43.349573+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 58.7,
       "data_confidence": 70.0,
@@ -368911,6 +371856,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "RR.",
+      "timestamp": "2026-09-02T07:12:43.346360+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 57.6,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 77.65638766519825,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 78% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.0,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 79.56528691520467,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +17.7% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "SDR": [
@@ -374925,6 +377919,55 @@
           "available": true,
           "category": "core",
           "explanation": "Volume is 2.1x the average"
+        },
+        "analyst_evidence": {
+          "score": 32.19691780821919,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies -7.1% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "SDR",
+      "timestamp": "2026-09-02T07:12:43.346167+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 53.2,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 93.56579493565795,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 94% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.0,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
         },
         "analyst_evidence": {
           "score": 32.19691780821919,
@@ -380977,6 +384020,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "LAND",
+      "timestamp": "2026-09-02T07:12:43.347298+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 51.8,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 72.97297297297297,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 73% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.0,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 60.10630899155489,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +6.1% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "ITRK": [
@@ -386991,6 +390083,55 @@
           "available": true,
           "category": "core",
           "explanation": "Volume is 1.1x the average"
+        },
+        "analyst_evidence": {
+          "score": 51.63384703196347,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +1.0% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "ITRK",
+      "timestamp": "2026-09-02T07:12:43.347437+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 59.3,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 99.14551240203299,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 99% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.0,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
         },
         "analyst_evidence": {
           "score": 51.63384703196347,
@@ -393043,6 +396184,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "FRES",
+      "timestamp": "2026-09-02T07:12:43.348291+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 43.7,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 45.38634658664667,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 45% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.0,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 68.07066755083997,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +10.8% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "ANTO": [
@@ -399064,6 +402254,55 @@
           "available": true,
           "category": "enhancement",
           "explanation": "Broker target implies -0.3% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "ANTO",
+      "timestamp": "2026-09-02T07:12:43.349983+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 49.4,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 72.58474576271186,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 73% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.0,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 49.72656739811912,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies -0.1% vs current price"
         },
         "news_catalyst": {
           "score": 40,
@@ -405109,6 +408348,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "EXPN",
+      "timestamp": "2026-09-02T07:12:43.348384+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 47.9,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 42.993273542600896,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 43% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.0,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 91.92017957351291,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +25.2% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "MTLN": [
@@ -411123,6 +414411,55 @@
           "available": true,
           "category": "core",
           "explanation": "Volume is 0.7x the average"
+        },
+        "analyst_evidence": {
+          "score": 71.8624602186246,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +13.1% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "MTLN",
+      "timestamp": "2026-09-02T07:12:43.346909+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 53.0,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 69.33333333333334,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 69% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.0,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
         },
         "analyst_evidence": {
           "score": 71.8624602186246,
@@ -417175,6 +420512,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "IHG",
+      "timestamp": "2026-09-02T07:12:43.347718+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 48.2,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 66.8375037684655,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 67% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.0,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 53.534060295060925,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +2.1% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "BP.": [
@@ -423196,6 +426582,55 @@
           "available": true,
           "category": "enhancement",
           "explanation": "Broker target implies +10.3% vs current price"
+        },
+        "news_catalyst": {
+          "score": 90,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "3 matched same-day news item(s)"
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "BP.",
+      "timestamp": "2026-09-02T07:12:43.349386+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 58.6,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 67.57914782194715,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 68% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.0,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 67.50381796908678,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +10.5% vs current price"
         },
         "news_catalyst": {
           "score": 90,
@@ -429241,6 +432676,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "RIO",
+      "timestamp": "2026-09-02T07:12:43.346453+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 47.1,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 66.52865548049685,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 67% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.0,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 49.067781295343615,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies -0.4% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "WEIR": [
@@ -435255,6 +438739,55 @@
           "available": true,
           "category": "core",
           "explanation": "Volume is 1.8x the average"
+        },
+        "analyst_evidence": {
+          "score": 83.54976595220498,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +20.1% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "WEIR",
+      "timestamp": "2026-09-02T07:12:43.345363+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 42.9,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 34.087481146304675,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 34% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.0,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
         },
         "analyst_evidence": {
           "score": 83.54976595220498,
@@ -441307,6 +444840,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "LMP",
+      "timestamp": "2026-09-02T07:12:43.347159+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 39.4,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 21.271393643031768,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 21% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.0,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 88.60958333333332,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +23.2% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "III": [
@@ -447321,6 +450903,55 @@
           "available": true,
           "category": "core",
           "explanation": "Volume is 0.6x the average"
+        },
+        "analyst_evidence": {
+          "score": 85.24268379728764,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +21.1% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "III",
+      "timestamp": "2026-09-02T07:12:43.347670+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 44.2,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 36.56437125748503,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 37% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.0,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
         },
         "analyst_evidence": {
           "score": 85.24268379728764,
@@ -453373,6 +457004,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "SGRO",
+      "timestamp": "2026-09-02T07:12:43.346063+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 56.7,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 88.79310344827587,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 89% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.0,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 56.83191705133584,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +4.1% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "PSN": [
@@ -459387,6 +463067,55 @@
           "available": true,
           "category": "core",
           "explanation": "Volume is 1.3x the average"
+        },
+        "analyst_evidence": {
+          "score": 76.61333333333334,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +16.0% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "PSN",
+      "timestamp": "2026-09-02T07:12:43.346590+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 41.2,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 33.50975851802845,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 34% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.0,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
         },
         "analyst_evidence": {
           "score": 76.61333333333334,
@@ -465439,6 +469168,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "DCC",
+      "timestamp": "2026-09-02T07:12:43.348607+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 55.6,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 85.30564263322884,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 85% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.0,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 57.38994501178318,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +4.4% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "BLND": [
@@ -471453,6 +475231,55 @@
           "available": true,
           "category": "core",
           "explanation": "Volume is 1.6x the average"
+        },
+        "analyst_evidence": {
+          "score": 64.62405817835003,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +8.8% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "BLND",
+      "timestamp": "2026-09-02T07:12:43.349484+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 53.8,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 75.78947368421049,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 76% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.0,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
         },
         "analyst_evidence": {
           "score": 64.62405817835003,
@@ -477507,6 +481334,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "HLN",
+      "timestamp": "2026-09-02T07:12:43.348049+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 52.6,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 67.39590684544811,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 67% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.0,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 73.20987654320987,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +13.9% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "IMI": [
@@ -483521,6 +487397,55 @@
           "available": true,
           "category": "core",
           "explanation": "Volume is 0.9x the average"
+        },
+        "analyst_evidence": {
+          "score": 56.961471294477185,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +4.2% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "IMI",
+      "timestamp": "2026-09-02T07:12:43.347574+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 56.6,
+      "data_confidence": 70.0,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 88.21052631578948,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 88% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 25.0,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.0x the average"
         },
         "analyst_evidence": {
           "score": 56.961471294477185,
@@ -489576,6 +493501,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "BTRW",
+      "timestamp": "2026-09-02T07:12:43.348967+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 46.6,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 44.143041752913334,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 44% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 43.14128638166408,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.7x the average"
+        },
+        "analyst_evidence": {
+          "score": 59.781936447003616,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +5.9% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "SPX": [
@@ -495567,6 +499541,55 @@
     {
       "ticker": "SPX",
       "timestamp": "2026-09-02T07:07:18.391226+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 52.3,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 45.714285714285715,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 46% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 43.5205441653979,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.7x the average"
+        },
+        "analyst_evidence": {
+          "score": 83.00841775205018,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +19.8% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "SPX",
+      "timestamp": "2026-09-02T07:12:43.345830+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 52.3,
       "data_confidence": 53.8,
@@ -502017,6 +506040,57 @@
         "Volume/Liquidity",
         "Analyst Evidence"
       ]
+    },
+    {
+      "ticker": "BT.A",
+      "timestamp": "2026-09-02T07:12:43.349011+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": null,
+      "data_confidence": 0.0,
+      "data_coverage_pct": 35.0,
+      "coverage_state": "unscoreable",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 46.60587639311042,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 47% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": null,
+          "weight": 20,
+          "available": false,
+          "category": "core",
+          "explanation": "Volume/average-volume not available for this stock this run."
+        },
+        "analyst_evidence": {
+          "score": null,
+          "weight": 15,
+          "available": false,
+          "category": "enhancement",
+          "explanation": "No broker consensus target available for this stock this run."
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum",
+        "Volume/Liquidity",
+        "Analyst Evidence"
+      ]
     }
   ],
   "WTB": [
@@ -508008,6 +512082,55 @@
     {
       "ticker": "WTB",
       "timestamp": "2026-09-02T07:07:18.390449+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 42.6,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 24.003322259136212,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 24% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 45.253710651244674,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.8x the average"
+        },
+        "analyst_evidence": {
+          "score": 71.91265186426477,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +13.1% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "WTB",
+      "timestamp": "2026-09-02T07:12:43.345255+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 42.6,
       "data_confidence": 53.8,
@@ -514089,6 +518212,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "SMIN",
+      "timestamp": "2026-09-02T07:12:43.345969+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 62.8,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 70.40171005603615,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 70% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 60.5245475944699,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 1.4x the average"
+        },
+        "analyst_evidence": {
+          "score": 68.50039108330074,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +11.1% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "BATS": [
@@ -520080,6 +524252,55 @@
     {
       "ticker": "BATS",
       "timestamp": "2026-09-02T07:07:18.396357+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 48.5,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 29.390892962743937,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 29% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 46.19033439825,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.8x the average"
+        },
+        "analyst_evidence": {
+          "score": 88.9714103178406,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +23.4% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "BATS",
+      "timestamp": "2026-09-02T07:12:43.349664+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 48.5,
       "data_confidence": 53.8,
@@ -526161,6 +530382,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "ABF",
+      "timestamp": "2026-09-02T07:12:43.350141+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 43.4,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 49.487729330474146,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 49% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 50.96657524511942,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 1.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 25.515801077903003,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies -9.8% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "CTEC": [
@@ -532152,6 +536422,55 @@
     {
       "ticker": "CTEC",
       "timestamp": "2026-09-02T07:07:18.395293+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 61.7,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 55.50779069942833,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 56% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 52.07758094295476,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 1.1x the average"
+        },
+        "analyst_evidence": {
+          "score": 99.30281404119525,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +29.6% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "CTEC",
+      "timestamp": "2026-09-02T07:12:43.348652+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 61.7,
       "data_confidence": 53.8,
@@ -538233,6 +542552,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "KGF",
+      "timestamp": "2026-09-02T07:12:43.347344+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 49.6,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 52.27272727272727,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 52% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 49.86306349072798,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 1.0x the average"
+        },
+        "analyst_evidence": {
+          "score": 51.1256600926824,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +0.7% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "SN.": [
@@ -544224,6 +548592,55 @@
     {
       "ticker": "SN.",
       "timestamp": "2026-09-02T07:07:18.391292+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 41.6,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 6.06826801517067,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 6% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 55.50148592838591,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 1.2x the average"
+        },
+        "analyst_evidence": {
+          "score": 83.37401869158877,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +20.0% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "SN.",
+      "timestamp": "2026-09-02T07:12:43.345876+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 41.6,
       "data_confidence": 53.8,
@@ -550305,6 +554722,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "BBOX",
+      "timestamp": "2026-09-02T07:12:43.349618+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 56.3,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 51.63551401869163,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 52% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 42.93366686590767,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.7x the average"
+        },
+        "analyst_evidence": {
+          "score": 92.549146683949,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +25.5% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "SGE": [
@@ -556296,6 +560762,55 @@
     {
       "ticker": "SGE",
       "timestamp": "2026-09-02T07:07:18.391635+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 58.9,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 73.12747349391704,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 73% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 51.45199828768121,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 1.1x the average"
+        },
+        "analyst_evidence": {
+          "score": 57.61655773420479,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +4.6% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "SGE",
+      "timestamp": "2026-09-02T07:12:43.346108+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 58.9,
       "data_confidence": 53.8,
@@ -562379,6 +566894,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "HLMA",
+      "timestamp": "2026-09-02T07:12:43.348095+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 43.0,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 19.55503512880562,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 20% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 37.8680628946939,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.5x the average"
+        },
+        "analyst_evidence": {
+          "score": 90.99971655328795,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +24.6% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "AZN": [
@@ -568370,6 +572934,55 @@
     {
       "ticker": "AZN",
       "timestamp": "2026-09-02T07:07:18.396798+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 53.6,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 35.44520547945205,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 35% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 48.348686684821836,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.9x the average"
+        },
+        "analyst_evidence": {
+          "score": 100.0,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +31.5% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "AZN",
+      "timestamp": "2026-09-02T07:12:43.349846+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 53.6,
       "data_confidence": 53.8,
@@ -574451,6 +579064,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "ADM",
+      "timestamp": "2026-09-02T07:12:43.350073+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 63.3,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 87.3475028122152,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 87% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 62.44855921191523,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 1.5x the average"
+        },
+        "analyst_evidence": {
+          "score": 39.70583714430894,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies -4.1% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "HWDN": [
@@ -580442,6 +585104,55 @@
     {
       "ticker": "HWDN",
       "timestamp": "2026-09-02T07:07:18.394228+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 49.0,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 27.05223880597015,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 27% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 44.78688187447198,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.8x the average"
+        },
+        "analyst_evidence": {
+          "score": 97.20984510927222,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +28.3% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "HWDN",
+      "timestamp": "2026-09-02T07:12:43.347911+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 49.0,
       "data_confidence": 53.8,
@@ -586523,6 +591234,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "AUTO",
+      "timestamp": "2026-09-02T07:12:43.349939+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 40.3,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 21.209166260360803,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 21% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 43.08257717579801,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.7x the average"
+        },
+        "analyst_evidence": {
+          "score": 68.61023206751055,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +11.2% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "AAF": [
@@ -592514,6 +597274,55 @@
     {
       "ticker": "AAF",
       "timestamp": "2026-09-02T07:07:18.397412+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 68.1,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 58.057995975352384,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 58% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 92.0452774817719,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 2.7x the average"
+        },
+        "analyst_evidence": {
+          "score": 71.52671439703876,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +12.9% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "AAF",
+      "timestamp": "2026-09-02T07:12:43.350275+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 68.1,
       "data_confidence": 53.8,
@@ -598595,6 +603404,55 @@
       "missing_categories": [
         "Price Momentum"
       ]
+    },
+    {
+      "ticker": "BA.",
+      "timestamp": "2026-09-02T07:12:43.349799+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 56.1,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 58.724428399518644,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 59% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 45.32631099466014,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 0.8x the average"
+        },
+        "analyst_evidence": {
+          "score": 76.9202611138655,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +16.2% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
     }
   ],
   "BAB": [
@@ -604586,6 +609444,55 @@
     {
       "ticker": "BAB",
       "timestamp": "2026-09-02T07:07:18.396486+00:00",
+      "model_version": "v1.0-provisional",
+      "buy_score": 50.1,
+      "data_confidence": 53.8,
+      "data_coverage_pct": 70.0,
+      "coverage_state": "partially_covered",
+      "component_scores": {
+        "momentum": {
+          "score": null,
+          "weight": 30,
+          "available": false,
+          "category": "core",
+          "explanation": "No price-change data available this run."
+        },
+        "trend": {
+          "score": 19.468459814281143,
+          "weight": 25,
+          "available": true,
+          "category": "core",
+          "explanation": "Currently 19% of the way through its 52-week range"
+        },
+        "liquidity": {
+          "score": 55.8974501709242,
+          "weight": 20,
+          "available": true,
+          "category": "core",
+          "explanation": "Volume is 1.2x the average"
+        },
+        "analyst_evidence": {
+          "score": 100.0,
+          "weight": 15,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "Broker target implies +37.5% vs current price"
+        },
+        "news_catalyst": {
+          "score": 40,
+          "weight": 10,
+          "available": true,
+          "category": "enhancement",
+          "explanation": "No same-day news matched - genuinely quiet, not unscored."
+        }
+      },
+      "missing_categories": [
+        "Price Momentum"
+      ]
+    },
+    {
+      "ticker": "BAB",
+      "timestamp": "2026-09-02T07:12:43.349755+00:00",
       "model_version": "v1.0-provisional",
       "buy_score": 50.1,
       "data_confidence": 53.8,
