@@ -14119,9 +14119,9 @@
     "buy_score": 60.0,
     "first_detected": "2026-09-03T14:33:25.901482+00:00",
     "last_detected": "2026-09-03T14:33:25.901482+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-03T14:38:08.313693+00:00",
+    "status": "FAILED"
   },
   "LMP:risk_flag_appeared:11f8d433618df034": {
     "ticker": "LMP",
@@ -14169,6 +14169,30 @@
     "last_detected": "2026-09-03T14:33:25.901482+00:00",
     "attempt_count": 1,
     "last_attempt": "2026-09-03T14:33:26.853332+00:00",
+    "status": "FAILED"
+  },
+  "LMP:risk_flag_disappeared:7752237abb5b6b4b": {
+    "ticker": "LMP",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "7752237abb5b6b4b",
+    "buy_score": 46.6,
+    "first_detected": "2026-09-03T14:38:08.047072+00:00",
+    "last_detected": "2026-09-03T14:38:08.047072+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-03T14:38:08.521455+00:00",
+    "status": "FAILED"
+  },
+  "HLN:risk_flag_disappeared:4364c8807696eece": {
+    "ticker": "HLN",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "4364c8807696eece",
+    "buy_score": 46.5,
+    "first_detected": "2026-09-03T14:38:08.047072+00:00",
+    "last_detected": "2026-09-03T14:38:08.047072+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-03T14:38:08.734765+00:00",
     "status": "FAILED"
   }
 }
