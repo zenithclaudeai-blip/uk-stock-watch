@@ -14515,9 +14515,9 @@
     "buy_score": 56.1,
     "first_detected": "2026-09-03T15:53:26.196816+00:00",
     "last_detected": "2026-09-03T15:53:26.196816+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-03T16:03:15.779288+00:00",
+    "status": "FAILED"
   },
   "SDR:risk_flag_disappeared:8da154013abab16e": {
     "ticker": "SDR",
@@ -14527,9 +14527,9 @@
     "buy_score": 55.9,
     "first_detected": "2026-09-03T15:53:26.196816+00:00",
     "last_detected": "2026-09-03T15:53:26.196816+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-03T16:03:16.017778+00:00",
+    "status": "FAILED"
   },
   "IMI:risk_flag_disappeared:c44d83d9935b63ec": {
     "ticker": "IMI",
@@ -14539,9 +14539,9 @@
     "buy_score": 56.4,
     "first_detected": "2026-09-03T15:53:26.196816+00:00",
     "last_detected": "2026-09-03T15:53:26.196816+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-03T16:03:15.444235+00:00",
+    "status": "FAILED"
   },
   "IHG:risk_flag_disappeared:02a4ff235a7d2870": {
     "ticker": "IHG",
@@ -14734,5 +14734,113 @@
     "attempt_count": 1,
     "last_attempt": "2026-09-03T15:58:13.775253+00:00",
     "status": "FAILED"
+  },
+  "INF:band_change:99ce76a8e456edc8": {
+    "ticker": "INF",
+    "event_type": "band_change",
+    "event_priority": 2,
+    "evidence_hash": "99ce76a8e456edc8",
+    "buy_score": 70.9,
+    "first_detected": "2026-09-03T16:03:14.690115+00:00",
+    "last_detected": "2026-09-03T16:03:14.690115+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-03T16:03:14.938156+00:00",
+    "status": "FAILED"
+  },
+  "SMT:risk_flag_disappeared:31c411c7a165ba06": {
+    "ticker": "SMT",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "31c411c7a165ba06",
+    "buy_score": 65.7,
+    "first_detected": "2026-09-03T16:03:14.690115+00:00",
+    "last_detected": "2026-09-03T16:03:14.690115+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "MRO:risk_flag_disappeared:4ccf4c4ec61a7e50": {
+    "ticker": "MRO",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "4ccf4c4ec61a7e50",
+    "buy_score": 58.2,
+    "first_detected": "2026-09-03T16:03:14.690115+00:00",
+    "last_detected": "2026-09-03T16:03:14.690115+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "BARC:risk_flag_disappeared:8b7b2d293fb95896": {
+    "ticker": "BARC",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "8b7b2d293fb95896",
+    "buy_score": 66.4,
+    "first_detected": "2026-09-03T16:03:14.690115+00:00",
+    "last_detected": "2026-09-03T16:03:14.690115+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "HSBA:risk_flag_disappeared:12ed28874b10ee19": {
+    "ticker": "HSBA",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "12ed28874b10ee19",
+    "buy_score": 59.8,
+    "first_detected": "2026-09-03T16:03:14.690115+00:00",
+    "last_detected": "2026-09-03T16:03:14.690115+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "MKS:risk_flag_disappeared:aee5bed6f0a06c03": {
+    "ticker": "MKS",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "aee5bed6f0a06c03",
+    "buy_score": 58.3,
+    "first_detected": "2026-09-03T16:03:14.690115+00:00",
+    "last_detected": "2026-09-03T16:03:14.690115+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "CCEP:major_score_change:074925ea70abafae": {
+    "ticker": "CCEP",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "074925ea70abafae",
+    "buy_score": 58.5,
+    "first_detected": "2026-09-03T16:03:14.690115+00:00",
+    "last_detected": "2026-09-03T16:03:14.690115+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-03T16:03:15.196608+00:00",
+    "status": "FAILED"
+  },
+  "SVT:risk_flag_disappeared:d73377395511aa35": {
+    "ticker": "SVT",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "d73377395511aa35",
+    "buy_score": 52.2,
+    "first_detected": "2026-09-03T16:03:14.690115+00:00",
+    "last_detected": "2026-09-03T16:03:14.690115+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "UU.:risk_flag_disappeared:8847d7ce2935c4d3": {
+    "ticker": "UU.",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "8847d7ce2935c4d3",
+    "buy_score": 55.5,
+    "first_detected": "2026-09-03T16:03:14.690115+00:00",
+    "last_detected": "2026-09-03T16:03:14.690115+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
   }
 }
