@@ -11985,7 +11985,7 @@
     "last_detected": "2026-09-03T07:07:17.752425+00:00",
     "attempt_count": 0,
     "last_attempt": null,
-    "status": "QUEUED"
+    "status": "SUPERSEDED"
   },
   "RKT:risk_flag_appeared:99975839478b2474": {
     "ticker": "RKT",
@@ -12055,9 +12055,9 @@
     "buy_score": 54.9,
     "first_detected": "2026-09-03T07:07:17.752425+00:00",
     "last_detected": "2026-09-03T07:07:17.752425+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-03T07:33:28.550222+00:00",
+    "status": "FAILED"
   },
   "NWG:risk_flag_appeared:953f30a7e887fad1": {
     "ticker": "NWG",
@@ -12067,9 +12067,9 @@
     "buy_score": 58.5,
     "first_detected": "2026-09-03T07:07:17.752425+00:00",
     "last_detected": "2026-09-03T07:07:17.752425+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-03T07:33:28.314034+00:00",
+    "status": "FAILED"
   },
   "LSEG:risk_flag_appeared:3775d4830b2dcc0e": {
     "ticker": "LSEG",
@@ -12079,9 +12079,9 @@
     "buy_score": 53.8,
     "first_detected": "2026-09-03T07:07:17.752425+00:00",
     "last_detected": "2026-09-03T07:07:17.752425+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-03T07:33:28.798938+00:00",
+    "status": "FAILED"
   },
   "JD.:risk_flag_appeared:8105c89a6316af19": {
     "ticker": "JD.",
@@ -12127,9 +12127,9 @@
     "buy_score": 53.6,
     "first_detected": "2026-09-03T07:07:17.752425+00:00",
     "last_detected": "2026-09-03T07:07:17.752425+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-03T07:33:29.046147+00:00",
+    "status": "FAILED"
   },
   "HSX:major_score_change:581958d4938ca529": {
     "ticker": "HSX",
@@ -12211,9 +12211,9 @@
     "buy_score": 59.3,
     "first_detected": "2026-09-03T07:07:17.752425+00:00",
     "last_detected": "2026-09-03T07:07:17.752425+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-03T07:33:28.067157+00:00",
+    "status": "FAILED"
   },
   "WEIR:risk_flag_appeared:c309ce1dc6f06110": {
     "ticker": "WEIR",
@@ -12489,7 +12489,7 @@
     "last_detected": "2026-09-03T07:17:34.123803+00:00",
     "attempt_count": 0,
     "last_attempt": null,
-    "status": "QUEUED"
+    "status": "SUPERSEDED"
   },
   "PRU:major_score_change:8d6e378342741d3d": {
     "ticker": "PRU",
@@ -13243,6 +13243,42 @@
     "buy_score": 36.4,
     "first_detected": "2026-09-03T07:28:16.556805+00:00",
     "last_detected": "2026-09-03T07:28:16.556805+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "AAF:major_score_change:7dad9c2a31498cc9": {
+    "ticker": "AAF",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "7dad9c2a31498cc9",
+    "buy_score": 57.6,
+    "first_detected": "2026-09-03T07:33:27.813176+00:00",
+    "last_detected": "2026-09-03T07:33:27.813176+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "BT.A:major_score_change:2e699529811cae17": {
+    "ticker": "BT.A",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "2e699529811cae17",
+    "buy_score": 50.1,
+    "first_detected": "2026-09-03T07:33:27.813176+00:00",
+    "last_detected": "2026-09-03T07:33:27.813176+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "RTO:risk_flag_appeared:b572e356c825e89e": {
+    "ticker": "RTO",
+    "event_type": "risk_flag_appeared",
+    "event_priority": 4,
+    "evidence_hash": "b572e356c825e89e",
+    "buy_score": 42.0,
+    "first_detected": "2026-09-03T07:33:27.813176+00:00",
+    "last_detected": "2026-09-03T07:33:27.813176+00:00",
     "attempt_count": 0,
     "last_attempt": null,
     "status": "QUEUED"
