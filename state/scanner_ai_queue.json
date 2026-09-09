@@ -30007,9 +30007,9 @@
     "buy_score": 40.7,
     "first_detected": "2026-09-09T16:08:33.428333+00:00",
     "last_detected": "2026-09-09T16:08:33.428333+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-09T16:43:14.681372+00:00",
+    "status": "FAILED"
   },
   "VOD:risk_flag_appeared:9ae16188d6064e18": {
     "ticker": "VOD",
@@ -30067,9 +30067,9 @@
     "buy_score": 39.4,
     "first_detected": "2026-09-09T16:08:33.428333+00:00",
     "last_detected": "2026-09-09T16:08:33.428333+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-09T16:43:15.106874+00:00",
+    "status": "FAILED"
   },
   "BA.:risk_flag_disappeared:0f58469b68961266": {
     "ticker": "BA.",
@@ -30103,9 +30103,9 @@
     "buy_score": 40.6,
     "first_detected": "2026-09-09T16:08:33.428333+00:00",
     "last_detected": "2026-09-09T16:08:33.428333+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-09T16:43:14.909770+00:00",
+    "status": "FAILED"
   },
   "SHEL:risk_flag_disappeared:b13fed919ea3f623": {
     "ticker": "SHEL",
@@ -30115,9 +30115,9 @@
     "buy_score": 62.2,
     "first_detected": "2026-09-09T16:13:14.601376+00:00",
     "last_detected": "2026-09-09T16:13:14.601376+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-09T16:43:15.382813+00:00",
+    "status": "FAILED"
   },
   "SVT:risk_flag_disappeared:daa860529d3c5f98": {
     "ticker": "SVT",
@@ -30382,5 +30382,29 @@
     "attempt_count": 1,
     "last_attempt": "2026-09-09T16:38:04.209357+00:00",
     "status": "FAILED"
+  },
+  "CCC:major_score_change:216401cfec39f89a": {
+    "ticker": "CCC",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "216401cfec39f89a",
+    "buy_score": 66.0,
+    "first_detected": "2026-09-09T16:43:14.139116+00:00",
+    "last_detected": "2026-09-09T16:43:14.139116+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-09T16:43:14.486437+00:00",
+    "status": "FAILED"
+  },
+  "AAL:risk_flag_disappeared:748990a3179df0c6": {
+    "ticker": "AAL",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "748990a3179df0c6",
+    "buy_score": 47.6,
+    "first_detected": "2026-09-09T16:43:14.139116+00:00",
+    "last_detected": "2026-09-09T16:43:14.139116+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
   }
 }
