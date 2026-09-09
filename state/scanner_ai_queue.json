@@ -29995,9 +29995,9 @@
     "buy_score": 52.2,
     "first_detected": "2026-09-09T16:08:33.428333+00:00",
     "last_detected": "2026-09-09T16:08:33.428333+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-09T16:33:47.428060+00:00",
+    "status": "FAILED"
   },
   "ABF:risk_flag_disappeared:5f8e7846fa12c166": {
     "ticker": "ABF",
@@ -30031,9 +30031,9 @@
     "buy_score": 46.7,
     "first_detected": "2026-09-09T16:08:33.428333+00:00",
     "last_detected": "2026-09-09T16:08:33.428333+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-09T16:33:47.663828+00:00",
+    "status": "FAILED"
   },
   "HLMA:risk_flag_disappeared:485981360a0778d1": {
     "ticker": "HLMA",
@@ -30079,9 +30079,9 @@
     "buy_score": 45.1,
     "first_detected": "2026-09-09T16:08:33.428333+00:00",
     "last_detected": "2026-09-09T16:08:33.428333+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-09T16:33:47.901738+00:00",
+    "status": "FAILED"
   },
   "AAF:risk_flag_disappeared:5cd26b81cc3388c5": {
     "ticker": "AAF",
@@ -30310,5 +30310,29 @@
     "attempt_count": 0,
     "last_attempt": null,
     "status": "QUEUED"
+  },
+  "BATS:major_score_change:855bbfb1d2210e1d": {
+    "ticker": "BATS",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "855bbfb1d2210e1d",
+    "buy_score": 49.8,
+    "first_detected": "2026-09-09T16:33:46.665708+00:00",
+    "last_detected": "2026-09-09T16:33:46.665708+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-09T16:33:47.129218+00:00",
+    "status": "FAILED"
+  },
+  "BARC:risk_flag_appeared:a6ae820623b50981": {
+    "ticker": "BARC",
+    "event_type": "risk_flag_appeared",
+    "event_priority": 4,
+    "evidence_hash": "a6ae820623b50981",
+    "buy_score": 52.7,
+    "first_detected": "2026-09-09T16:33:46.665708+00:00",
+    "last_detected": "2026-09-09T16:33:46.665708+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-09T16:33:46.903239+00:00",
+    "status": "FAILED"
   }
 }
