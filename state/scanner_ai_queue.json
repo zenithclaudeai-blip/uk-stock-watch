@@ -30043,9 +30043,9 @@
     "buy_score": 42.0,
     "first_detected": "2026-09-09T16:08:33.428333+00:00",
     "last_detected": "2026-09-09T16:08:33.428333+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-09T16:38:04.949372+00:00",
+    "status": "FAILED"
   },
   "AZN:risk_flag_disappeared:f38368a33e6e7c5a": {
     "ticker": "AZN",
@@ -30055,9 +30055,9 @@
     "buy_score": 45.0,
     "first_detected": "2026-09-09T16:08:33.428333+00:00",
     "last_detected": "2026-09-09T16:08:33.428333+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-09T16:38:04.425215+00:00",
+    "status": "FAILED"
   },
   "KGF:risk_flag_disappeared:268eae39ff8e4655": {
     "ticker": "KGF",
@@ -30091,9 +30091,9 @@
     "buy_score": 43.4,
     "first_detected": "2026-09-09T16:08:33.428333+00:00",
     "last_detected": "2026-09-09T16:08:33.428333+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-09T16:38:04.724146+00:00",
+    "status": "FAILED"
   },
   "SGE:risk_flag_disappeared:6b3e2b4f0a916c7a": {
     "ticker": "SGE",
@@ -30177,7 +30177,7 @@
     "last_detected": "2026-09-09T16:13:14.601376+00:00",
     "attempt_count": 0,
     "last_attempt": null,
-    "status": "QUEUED"
+    "status": "SUPERSEDED"
   },
   "STAN:risk_flag_disappeared:ef408ec6821f5838": {
     "ticker": "STAN",
@@ -30333,6 +30333,54 @@
     "last_detected": "2026-09-09T16:33:46.665708+00:00",
     "attempt_count": 1,
     "last_attempt": "2026-09-09T16:33:46.903239+00:00",
+    "status": "FAILED"
+  },
+  "VOD:risk_flag_disappeared:277c55f904cb7106": {
+    "ticker": "VOD",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "277c55f904cb7106",
+    "buy_score": 53.7,
+    "first_detected": "2026-09-09T16:38:03.646146+00:00",
+    "last_detected": "2026-09-09T16:38:03.646146+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "SMT:major_score_change:42493c226ee0d318": {
+    "ticker": "SMT",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "42493c226ee0d318",
+    "buy_score": 53.4,
+    "first_detected": "2026-09-09T16:38:03.646146+00:00",
+    "last_detected": "2026-09-09T16:38:03.646146+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-09T16:38:03.883091+00:00",
+    "status": "FAILED"
+  },
+  "BARC:risk_flag_disappeared:9021989e5a5af8d9": {
+    "ticker": "BARC",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "9021989e5a5af8d9",
+    "buy_score": 54.6,
+    "first_detected": "2026-09-09T16:38:03.646146+00:00",
+    "last_detected": "2026-09-09T16:38:03.646146+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "MRO:major_score_change:383ba8856dc75eb3": {
+    "ticker": "MRO",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "383ba8856dc75eb3",
+    "buy_score": 43.1,
+    "first_detected": "2026-09-09T16:38:03.646146+00:00",
+    "last_detected": "2026-09-09T16:38:03.646146+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-09T16:38:04.209357+00:00",
     "status": "FAILED"
   }
 }
