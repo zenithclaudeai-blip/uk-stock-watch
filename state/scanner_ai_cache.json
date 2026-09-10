@@ -1,6 +1,7 @@
 {
   "_prior_risk_flags": {
-    "VOD": [
+    "BAB": [
+      "high_volatility",
       "low_liquidity"
     ],
     "BAB": [
@@ -11,6 +12,9 @@
       "low_liquidity"
     ],
     "CPG": [
+      "low_liquidity"
+    ],
+    "BP.": [
       "low_liquidity"
     ],
     "IMB": [
@@ -41,6 +45,14 @@
     ],
     "STAN": [
       "high_volatility",
+      "low_liquidity",
+      "data_stale"
+    ],
+    "UU.": [
+      "low_liquidity",
+      "data_stale"
+    ],
+    "ADM": [
       "low_liquidity"
     ],
     "ENT": [
@@ -60,6 +72,10 @@
       "low_liquidity"
     ],
     "SMT": [
+      "low_liquidity",
+      "data_stale"
+    ],
+    "LSEG": [
       "low_liquidity"
     ],
     "LSEG": [
@@ -201,14 +217,31 @@
     "SBRY": [
       "low_liquidity"
     ],
-    "BNZL": [
+    "LMP": [
       "low_liquidity"
     ],
     "RR.": [
       "low_liquidity"
     ],
+    "GAW": [
+      "high_volatility",
+      "low_liquidity"
+    ],
+    "PSON": [
+      "low_liquidity"
+    ],
+    "BNZL": [
+      "low_liquidity"
+    ],
     "HSBA": [
       "high_volatility",
+      "low_liquidity",
+      "data_stale"
+    ],
+    "ULVR": [
+      "low_liquidity"
+    ],
+    "CTEC": [
       "low_liquidity"
     ],
     "CTEC": [
@@ -240,6 +273,32 @@
     "INVP": [
       "low_liquidity"
     ],
+    "SDLF": [
+      "low_liquidity",
+      "data_stale"
+    ],
+    "GSK": [
+      "low_liquidity"
+    ],
+    "INVP": [
+      "low_liquidity",
+      "data_stale"
+    ],
+    "PCT": [
+      "high_volatility",
+      "low_liquidity"
+    ],
+    "BLND": [
+      "low_liquidity"
+    ],
+    "INF": [
+      "low_liquidity",
+      "data_stale"
+    ],
+    "BTRW": [
+      "high_volatility",
+      "earnings_imminent"
+    ],
     "CCC": [
       "high_volatility",
       "low_liquidity"
@@ -249,9 +308,14 @@
     ],
     "MRO": [
       "high_volatility",
-      "low_liquidity"
+      "low_liquidity",
+      "data_stale"
     ],
     "CRDA": [
+      "low_liquidity",
+      "data_stale"
+    ],
+    "LAND": [
       "low_liquidity"
     ],
     "IMI": [
