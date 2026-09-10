@@ -32959,9 +32959,9 @@
     "buy_score": 52.5,
     "first_detected": "2026-09-10T10:54:42.127740+00:00",
     "last_detected": "2026-09-10T10:54:42.127740+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-10T10:58:20.299047+00:00",
+    "status": "FAILED"
   },
   "IMB:risk_flag_appeared:11cc5a5f244137e6": {
     "ticker": "IMB",
@@ -32973,7 +32973,7 @@
     "last_detected": "2026-09-10T10:54:42.127740+00:00",
     "attempt_count": 0,
     "last_attempt": null,
-    "status": "QUEUED"
+    "status": "SUPERSEDED"
   },
   "CCH:risk_flag_appeared:51ee72b5532de73d": {
     "ticker": "CCH",
@@ -32985,7 +32985,7 @@
     "last_detected": "2026-09-10T10:54:42.127740+00:00",
     "attempt_count": 0,
     "last_attempt": null,
-    "status": "QUEUED"
+    "status": "SUPERSEDED"
   },
   "LSEG:risk_flag_appeared:5bd444912329708b": {
     "ticker": "LSEG",
@@ -33007,9 +33007,9 @@
     "buy_score": 50.5,
     "first_detected": "2026-09-10T10:54:42.127740+00:00",
     "last_detected": "2026-09-10T10:54:42.127740+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-10T10:58:20.884431+00:00",
+    "status": "FAILED"
   },
   "BEZ:risk_flag_appeared:fd435631036eacb8": {
     "ticker": "BEZ",
@@ -33043,9 +33043,9 @@
     "buy_score": 48.2,
     "first_detected": "2026-09-10T10:54:42.127740+00:00",
     "last_detected": "2026-09-10T10:54:42.127740+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-10T10:58:21.444065+00:00",
+    "status": "FAILED"
   },
   "BNZL:risk_flag_appeared:82061336cd1f4b63": {
     "ticker": "BNZL",
@@ -33057,7 +33057,7 @@
     "last_detected": "2026-09-10T10:54:42.127740+00:00",
     "attempt_count": 0,
     "last_attempt": null,
-    "status": "QUEUED"
+    "status": "SUPERSEDED"
   },
   "RTO:risk_flag_appeared:e510990f973d2a87": {
     "ticker": "RTO",
@@ -33103,9 +33103,9 @@
     "buy_score": 49.0,
     "first_detected": "2026-09-10T10:54:42.127740+00:00",
     "last_detected": "2026-09-10T10:54:42.127740+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-10T10:58:21.182960+00:00",
+    "status": "FAILED"
   },
   "NXT:risk_flag_appeared:4edb036a71c01498": {
     "ticker": "NXT",
@@ -33115,9 +33115,9 @@
     "buy_score": 51.3,
     "first_detected": "2026-09-10T10:54:42.127740+00:00",
     "last_detected": "2026-09-10T10:54:42.127740+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-10T10:58:20.637822+00:00",
+    "status": "FAILED"
   },
   "PSON:risk_flag_appeared:2305967bd8eb3d05": {
     "ticker": "PSON",
@@ -33141,7 +33141,7 @@
     "last_detected": "2026-09-10T10:54:42.127740+00:00",
     "attempt_count": 0,
     "last_attempt": null,
-    "status": "QUEUED"
+    "status": "SUPERSEDED"
   },
   "CCC:major_score_change:b6c4eab7f5c16d37": {
     "ticker": "CCC",
@@ -33199,6 +33199,90 @@
     "buy_score": 35.1,
     "first_detected": "2026-09-10T10:54:42.127740+00:00",
     "last_detected": "2026-09-10T10:54:42.127740+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "SUPERSEDED"
+  },
+  "HSX:risk_flag_disappeared:70576b1c8729aa0d": {
+    "ticker": "HSX",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "70576b1c8729aa0d",
+    "buy_score": 60.1,
+    "first_detected": "2026-09-10T10:58:19.994586+00:00",
+    "last_detected": "2026-09-10T10:58:19.994586+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "CCH:risk_flag_disappeared:3cefddac57b74ec5": {
+    "ticker": "CCH",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "3cefddac57b74ec5",
+    "buy_score": 53.4,
+    "first_detected": "2026-09-10T10:58:19.994586+00:00",
+    "last_detected": "2026-09-10T10:58:19.994586+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "IMB:risk_flag_disappeared:270568344b5307fd": {
+    "ticker": "IMB",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "270568344b5307fd",
+    "buy_score": 41.9,
+    "first_detected": "2026-09-10T10:58:19.994586+00:00",
+    "last_detected": "2026-09-10T10:58:19.994586+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "BEZ:risk_flag_disappeared:965a5d87d315886a": {
+    "ticker": "BEZ",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "965a5d87d315886a",
+    "buy_score": 56.5,
+    "first_detected": "2026-09-10T10:58:19.994586+00:00",
+    "last_detected": "2026-09-10T10:58:19.994586+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "BNZL:risk_flag_disappeared:1729ebd041d9942a": {
+    "ticker": "BNZL",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "1729ebd041d9942a",
+    "buy_score": 51.0,
+    "first_detected": "2026-09-10T10:58:19.994586+00:00",
+    "last_detected": "2026-09-10T10:58:19.994586+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "PCT:risk_flag_disappeared:31e3e0719464345c": {
+    "ticker": "PCT",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "31e3e0719464345c",
+    "buy_score": 47.2,
+    "first_detected": "2026-09-10T10:58:19.994586+00:00",
+    "last_detected": "2026-09-10T10:58:19.994586+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "ANTO:major_score_change:298176954a10319f": {
+    "ticker": "ANTO",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "298176954a10319f",
+    "buy_score": 35.9,
+    "first_detected": "2026-09-10T10:58:19.994586+00:00",
+    "last_detected": "2026-09-10T10:58:19.994586+00:00",
     "attempt_count": 0,
     "last_attempt": null,
     "status": "QUEUED"
