@@ -37533,7 +37533,7 @@
     "last_detected": "2026-09-11T07:23:38.695399+00:00",
     "attempt_count": 0,
     "last_attempt": null,
-    "status": "QUEUED"
+    "status": "SUPERSEDED"
   },
   "BAB:risk_flag_appeared:3070efc44089ce99": {
     "ticker": "BAB",
@@ -37555,9 +37555,9 @@
     "buy_score": 53.8,
     "first_detected": "2026-09-11T07:23:38.695399+00:00",
     "last_detected": "2026-09-11T07:23:38.695399+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-11T08:17:59.651364+00:00",
+    "status": "FAILED"
   },
   "BBOX:risk_flag_appeared:31d9cff296c9ae36": {
     "ticker": "BBOX",
@@ -37579,9 +37579,9 @@
     "buy_score": 52.5,
     "first_detected": "2026-09-11T07:23:38.695399+00:00",
     "last_detected": "2026-09-11T07:23:38.695399+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-11T08:17:59.880078+00:00",
+    "status": "FAILED"
   },
   "HWDN:risk_flag_appeared:cd3dee05b0286add": {
     "ticker": "HWDN",
@@ -37603,9 +37603,9 @@
     "buy_score": 49.2,
     "first_detected": "2026-09-11T07:23:38.695399+00:00",
     "last_detected": "2026-09-11T07:23:38.695399+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-11T08:18:00.141517+00:00",
+    "status": "FAILED"
   },
   "WTB:risk_flag_appeared:a6587ebf4f4152c5": {
     "ticker": "WTB",
@@ -37627,9 +37627,9 @@
     "buy_score": 48.4,
     "first_detected": "2026-09-11T07:23:38.695399+00:00",
     "last_detected": "2026-09-11T07:23:38.695399+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-11T08:18:00.662926+00:00",
+    "status": "FAILED"
   },
   "AZN:risk_flag_appeared:6b8c2294296ca663": {
     "ticker": "AZN",
@@ -37675,9 +37675,9 @@
     "buy_score": 48.6,
     "first_detected": "2026-09-11T07:23:38.695399+00:00",
     "last_detected": "2026-09-11T07:23:38.695399+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-11T08:18:00.403555+00:00",
+    "status": "FAILED"
   },
   "BTRW:risk_flag_appeared:808ad419a3168752": {
     "ticker": "BTRW",
@@ -37689,7 +37689,7 @@
     "last_detected": "2026-09-11T07:23:38.695399+00:00",
     "attempt_count": 0,
     "last_attempt": null,
-    "status": "QUEUED"
+    "status": "SUPERSEDED"
   },
   "AUTO:risk_flag_appeared:2f046ca4a76af706": {
     "ticker": "AUTO",
@@ -37857,7 +37857,7 @@
     "last_detected": "2026-09-11T08:14:33.088833+00:00",
     "attempt_count": 0,
     "last_attempt": null,
-    "status": "QUEUED"
+    "status": "SUPERSEDED"
   },
   "INF:risk_flag_appeared:7a1ff1e4c27ed397": {
     "ticker": "INF",
@@ -37881,7 +37881,7 @@
     "last_detected": "2026-09-11T08:14:33.088833+00:00",
     "attempt_count": 0,
     "last_attempt": null,
-    "status": "QUEUED"
+    "status": "SUPERSEDED"
   },
   "UU.:risk_flag_appeared:c971389ffee801ce": {
     "ticker": "UU.",
@@ -37893,7 +37893,7 @@
     "last_detected": "2026-09-11T08:14:33.088833+00:00",
     "attempt_count": 0,
     "last_attempt": null,
-    "status": "QUEUED"
+    "status": "SUPERSEDED"
   },
   "STJ:risk_flag_appeared:703628a99c915931": {
     "ticker": "STJ",
@@ -38037,7 +38037,7 @@
     "last_detected": "2026-09-11T08:14:33.088833+00:00",
     "attempt_count": 0,
     "last_attempt": null,
-    "status": "QUEUED"
+    "status": "SUPERSEDED"
   },
   "LSEG:major_score_change:df3a3d183c1a1872": {
     "ticker": "LSEG",
@@ -38047,6 +38047,90 @@
     "buy_score": 45.3,
     "first_detected": "2026-09-11T08:14:33.088833+00:00",
     "last_detected": "2026-09-11T08:14:33.088833+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "SVT:risk_flag_disappeared:ba3fe1b2c2372700": {
+    "ticker": "SVT",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "ba3fe1b2c2372700",
+    "buy_score": 49.0,
+    "first_detected": "2026-09-11T08:17:59.506092+00:00",
+    "last_detected": "2026-09-11T08:17:59.506092+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "NG.:risk_flag_disappeared:592ba00974a1ba99": {
+    "ticker": "NG.",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "592ba00974a1ba99",
+    "buy_score": 44.7,
+    "first_detected": "2026-09-11T08:17:59.506092+00:00",
+    "last_detected": "2026-09-11T08:17:59.506092+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "SPX:risk_flag_appeared:7b856f05c3aaf517": {
+    "ticker": "SPX",
+    "event_type": "risk_flag_appeared",
+    "event_priority": 4,
+    "evidence_hash": "7b856f05c3aaf517",
+    "buy_score": 48.5,
+    "first_detected": "2026-09-11T08:17:59.506092+00:00",
+    "last_detected": "2026-09-11T08:17:59.506092+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "UU.:risk_flag_disappeared:582a58a90106db93": {
+    "ticker": "UU.",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "582a58a90106db93",
+    "buy_score": 50.6,
+    "first_detected": "2026-09-11T08:17:59.506092+00:00",
+    "last_detected": "2026-09-11T08:17:59.506092+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "BRBY:risk_flag_disappeared:db47baeb3875e920": {
+    "ticker": "BRBY",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "db47baeb3875e920",
+    "buy_score": 39.5,
+    "first_detected": "2026-09-11T08:17:59.506092+00:00",
+    "last_detected": "2026-09-11T08:17:59.506092+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "IGG:risk_flag_appeared:7b90453233893e73": {
+    "ticker": "IGG",
+    "event_type": "risk_flag_appeared",
+    "event_priority": 4,
+    "evidence_hash": "7b90453233893e73",
+    "buy_score": 45.2,
+    "first_detected": "2026-09-11T08:17:59.506092+00:00",
+    "last_detected": "2026-09-11T08:17:59.506092+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "BTRW:risk_flag_appeared:a78dcfb6d9ca3a59": {
+    "ticker": "BTRW",
+    "event_type": "risk_flag_appeared",
+    "event_priority": 4,
+    "evidence_hash": "a78dcfb6d9ca3a59",
+    "buy_score": 40.6,
+    "first_detected": "2026-09-11T08:17:59.506092+00:00",
+    "last_detected": "2026-09-11T08:17:59.506092+00:00",
     "attempt_count": 0,
     "last_attempt": null,
     "status": "QUEUED"
