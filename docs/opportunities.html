@@ -120,11 +120,11 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 <div class="opp-ai-status">
   <h3>AI Status</h3>
   <ul>
-    <li>Candidates identified this run: 0</li>
+    <li>Candidates identified this run: 30</li>
     <li>Analysed: 0</li>
-    <li>Waiting (qualified, budget-limited): 0</li>
-    <li>Failed (API/billing/rate-limit error): 0</li>
-    <li>No-change runs (nothing materially different): yes</li>
+    <li>Waiting (qualified, budget-limited): 25</li>
+    <li>Failed (API/billing/rate-limit error): 5</li>
+    <li>No-change runs (nothing materially different): no</li>
   </ul>
   <p class="opp-meta">Candidates are selected by event priority (new opportunity → band change → evidence conflict → risk flag appeared → major score change → risk flag disappeared), never by encounter order — and the 5-candidate budget never limits the underlying market scan, which always covers the full 100-stock universe.</p>
 </div>
@@ -248,7 +248,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
   
   
   
-  <span class="opp-risk-flags">⚠ Low liquidity (volume 0.3x average)</span>
+  <span class="opp-risk-flags">⚠ Low liquidity (volume 0.1x average)</span>
 </div><div class="opp-row">
   <div class="opp-ticker">BARC</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 59</div>
@@ -263,7 +263,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">IMI</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 59</div>
-  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 25</div>
+  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 25</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">STABLE</span>
   <div class="opp-what-changed"><b>What changed:</b> 59 → 59 (-0.3) · Momentum -0.7</div>
@@ -329,7 +329,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">BEZ</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 57</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 45</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 45</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">STABLE</span>
   <div class="opp-what-changed"><b>What changed:</b> 57 → 57 (+0.1)</div>
@@ -340,7 +340,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">ITRK</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 57</div>
-  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 45</div>
+  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 45</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">📈 IMPROVING</span>
   <div class="opp-what-changed"><b>What changed:</b> 57 → 57 (+0.0)</div>
@@ -378,9 +378,6 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 57 → 57 (+0.0)</div>
   
-  
-  
-  <span class="opp-risk-flags">⚠ High volatility (52wk range 61%)</span>
 </div><div class="opp-row">
   <div class="opp-ticker">HSBA</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 56</div>
@@ -404,9 +401,20 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
   
   <span class="opp-risk-flags">⚠ Low liquidity (volume 0.3x average)</span>
 </div><div class="opp-row">
-  <div class="opp-ticker">GLEN</div>
+  <div class="opp-ticker">HSBA</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 56</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 45</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 45</div>
+  <div class="opp-status">Status: BELOW THRESHOLD</div>
+  <span class="opp-meta">STABLE</span>
+  <div class="opp-what-changed"><b>What changed:</b> 58 → 56 (-1.8) · Momentum -5.4 · Analyst +1.3 · 52W Trend -1.3</div>
+  <div class="opp-conflict">⚠ EVIDENCE CONFLICT: Near its 52-week high (90% of the range) but on thin volume (0.2x average) — the move up isn't backed by strong participation.</div>
+  
+  
+  <span class="opp-risk-flags">⚠ High volatility (52wk range 68%) · ⚠ Low liquidity (volume 0.2x average)</span>
+</div><div class="opp-row">
+  <div class="opp-ticker">GLEN</div>
+  <div class="opp-score">PROVISIONAL BUY SCORE: 55</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 45</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 56 → 56 (+0.0) · Liquidity +0.5 · Momentum -0.5</div>
@@ -504,8 +512,8 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
   <span class="opp-risk-flags">⚠ High volatility (52wk range 92%) · ⚠ Low liquidity (volume 0.2x average)</span>
 </div><div class="opp-row">
   <div class="opp-ticker">ALW</div>
-  <div class="opp-score">PROVISIONAL BUY SCORE: 54</div>
-  <div class="opp-conf">Confidence: 85 · Model Coverage: 85% · Risk: 25</div>
+  <div class="opp-score">PROVISIONAL BUY SCORE: 53</div>
+  <div class="opp-conf">Confidence: 77 · Model Coverage: 85% · Risk: 25</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">STABLE</span>
   <div class="opp-what-changed"><b>What changed:</b> 54 → 54 (+0.0)</div>
@@ -538,7 +546,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">CPG</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 53</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 25</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 25</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">📈 IMPROVING</span>
   <div class="opp-what-changed"><b>What changed:</b> 53 → 53 (+0.1)</div>
@@ -666,7 +674,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
   
   
   
-  <span class="opp-risk-flags">⚠ Low liquidity (volume 0.1x average)</span>
+  <span class="opp-risk-flags">⚠ High volatility (52wk range 70%) · ⚠ Low liquidity (volume 0.2x average)</span>
 </div><div class="opp-row">
   <div class="opp-ticker">BT.A</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 51</div>
@@ -721,9 +729,9 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
   
   
   
-  <span class="opp-risk-flags">⚠ Low liquidity (volume 0.2x average)</span>
+  <span class="opp-risk-flags">⚠ High volatility (52wk range 81%) · ⚠ Low liquidity (volume 0.3x average)</span>
 </div><div class="opp-row">
-  <div class="opp-ticker">HLN</div>
+  <div class="opp-ticker">AAF</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 50</div>
   <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 0</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
@@ -780,7 +788,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">RKT</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 50</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 45</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 45</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 49 → 50 (+0.5) · Momentum +1.2 · Liquidity +0.6</div>
@@ -846,7 +854,18 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">MNG</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 49</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 25</div>
+  <div class="opp-conf">Confidence: 86 · Model Coverage: 100% · Risk: 35</div>
+  <div class="opp-status">Status: BELOW THRESHOLD</div>
+  <span class="opp-meta">Momentum: insufficient history</span>
+  <div class="opp-what-changed"><b>What changed:</b> 50 → 49 (-0.8) · Momentum -2.0</div>
+  
+  
+  
+  <span class="opp-risk-flags">⚠ Low liquidity (volume 0.2x average) · ⚠ Data stale: average volume</span>
+</div><div class="opp-row">
+  <div class="opp-ticker">MNG</div>
+  <div class="opp-score">PROVISIONAL BUY SCORE: 49</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 25</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">STABLE</span>
   <div class="opp-what-changed"><b>What changed:</b> 49 → 49 (-0.1)</div>
@@ -910,9 +929,31 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
   
   <span class="opp-risk-flags">⚠ Low liquidity (volume 0.2x average)</span>
 </div><div class="opp-row">
+  <div class="opp-ticker">CTEC</div>
+  <div class="opp-score">PROVISIONAL BUY SCORE: 48</div>
+  <div class="opp-conf">Confidence: 86 · Model Coverage: 100% · Risk: 35</div>
+  <div class="opp-status">Status: BELOW THRESHOLD</div>
+  <span class="opp-meta">Momentum: insufficient history</span>
+  <div class="opp-what-changed"><b>What changed:</b> 49 → 48 (-1.4) · Momentum -3.7 · 52W Trend -1.2</div>
+  
+  
+  
+  <span class="opp-risk-flags">⚠ Low liquidity (volume 0.1x average) · ⚠ Data stale: average volume</span>
+</div><div class="opp-row">
+  <div class="opp-ticker">BATS</div>
+  <div class="opp-score">PROVISIONAL BUY SCORE: 48</div>
+  <div class="opp-conf">Confidence: 86 · Model Coverage: 100% · Risk: 35</div>
+  <div class="opp-status">Status: BELOW THRESHOLD</div>
+  <span class="opp-meta">Momentum: insufficient history</span>
+  <div class="opp-what-changed"><b>What changed:</b> 47 → 48 (+1.2) · Momentum +3.7 · 52W Trend +0.9 · Analyst -0.8</div>
+  
+  
+  
+  <span class="opp-risk-flags">⚠ Low liquidity (volume 0.5x average) · ⚠ Data stale: average volume</span>
+</div><div class="opp-row">
   <div class="opp-ticker">CCEP</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 48</div>
-  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 25</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 25</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 49 → 48 (-0.5) · Momentum -1.3</div>
@@ -955,8 +996,8 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
   <span class="opp-risk-flags">⚠ High volatility (52wk range 66%) · ⚠ Low liquidity (volume 0.3x average)</span>
 </div><div class="opp-row">
   <div class="opp-ticker">MRO</div>
-  <div class="opp-score">PROVISIONAL BUY SCORE: 47</div>
-  <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 45</div>
+  <div class="opp-score">PROVISIONAL BUY SCORE: 48</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 45</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">📉 DETERIORATING</span>
   <div class="opp-what-changed"><b>What changed:</b> 48 → 47 (-0.8) · Momentum -2.3</div>
@@ -1128,7 +1169,6 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
   
   
   
-  <span class="opp-risk-flags">⚠ High volatility (52wk range 74%) · ⚠ Low liquidity (volume 0.3x average) · ⚠ Earnings imminent (in 5 day(s))</span>
 </div><div class="opp-row">
   <div class="opp-ticker">LMP</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 43</div>
@@ -1154,7 +1194,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 </div><div class="opp-row">
   <div class="opp-ticker">IMB</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 42</div>
-  <div class="opp-conf">Confidence: 100 · Model Coverage: 100% · Risk: 25</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 25</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">STABLE</span>
   <div class="opp-what-changed"><b>What changed:</b> 42 → 42 (+0.1)</div>
@@ -1172,7 +1212,7 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
   
   
   
-  <span class="opp-risk-flags">⚠ High volatility (52wk range 69%) · ⚠ Low liquidity (volume 0.3x average)</span>
+  <span class="opp-risk-flags">⚠ High volatility (52wk range 69%) · ⚠ Low liquidity (volume 0.3x average) · ⚠ Data stale: average volume</span>
 </div><div class="opp-row">
   <div class="opp-ticker">CNA</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 40</div>
@@ -1200,6 +1240,17 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
   <div class="opp-score">PROVISIONAL BUY SCORE: 39</div>
   <div class="opp-conf">Confidence: 97 · Model Coverage: 100% · Risk: 25</div>
   <div class="opp-status">Status: BELOW THRESHOLD</div>
+  <span class="opp-meta">STABLE</span>
+  <div class="opp-what-changed"><b>What changed:</b> 41 → 40 (-0.9) · Momentum -2.6 · 52W Trend -0.5</div>
+  
+  
+  
+  <span class="opp-risk-flags">⚠ Low liquidity (volume 0.2x average)</span>
+</div><div class="opp-row">
+  <div class="opp-ticker">BRBY</div>
+  <div class="opp-score">PROVISIONAL BUY SCORE: 39</div>
+  <div class="opp-conf">Confidence: 92 · Model Coverage: 100% · Risk: 25</div>
+  <div class="opp-status">Status: BELOW THRESHOLD</div>
   <span class="opp-meta">Momentum: insufficient history</span>
   <div class="opp-what-changed"><b>What changed:</b> 40 → 39 (-1.0) · Momentum -2.9 · 52W Trend -0.7 · Analyst +0.6</div>
   
@@ -1216,7 +1267,18 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
   
   
   
-  <span class="opp-risk-flags">⚠ Low liquidity (volume 0.4x average)</span>
+  <span class="opp-risk-flags">⚠ Low liquidity (volume 0.3x average)</span>
+</div><div class="opp-row">
+  <div class="opp-ticker">ABF</div>
+  <div class="opp-score">PROVISIONAL BUY SCORE: 38</div>
+  <div class="opp-conf">Confidence: 86 · Model Coverage: 100% · Risk: 35</div>
+  <div class="opp-status">Status: BELOW THRESHOLD</div>
+  <span class="opp-meta">Momentum: insufficient history</span>
+  <div class="opp-what-changed"><b>What changed:</b> 40 → 38 (-1.8) · Momentum -5.4 · 52W Trend -1.6 · Analyst +1.3</div>
+  
+  
+  
+  <span class="opp-risk-flags">⚠ Low liquidity (volume 0.4x average) · ⚠ Data stale: average volume</span>
 </div><div class="opp-row">
   <div class="opp-ticker">RTO</div>
   <div class="opp-score">PROVISIONAL BUY SCORE: 36</div>
@@ -1250,6 +1312,17 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
   
   
   <span class="opp-risk-flags">⚠ Low liquidity (volume 0.2x average)</span>
+</div><div class="opp-row">
+  <div class="opp-ticker">SN.</div>
+  <div class="opp-score">PROVISIONAL BUY SCORE: 35</div>
+  <div class="opp-conf">Confidence: 86 · Model Coverage: 100% · Risk: 35</div>
+  <div class="opp-status">Status: BELOW THRESHOLD</div>
+  <span class="opp-meta">📉 RAPIDLY DETERIORATING</span>
+  <div class="opp-what-changed"><b>What changed:</b> 36 → 35 (-1.2) · Momentum -3.4 · 52W Trend -0.8 · Analyst +0.7</div>
+  
+  
+  
+  <span class="opp-risk-flags">⚠ Low liquidity (volume 0.2x average) · ⚠ Data stale: average volume</span>
 </div></div>
 
 <h2>📊 Backtesting Status</h2>
@@ -1257,8 +1330,8 @@ nav[aria-label="Section navigation"] a{white-space:nowrap}
 
 <h2>🤖 AI Evidence View</h2>
 <p class="opp-meta">A separate, clearly-labeled interpretive layer — the AI is given only the same verified facts already shown above and asked to interpret them; it never generates a number, price, or target, and never changes the PROVISIONAL BUY SCORE. Only run for a small, cost-bounded set of stocks each run (new 80+/90+ entrants and large score changes) — most stocks will not have an entry here, which is expected.</p>
+<p class="opp-ai-unavailable"><b>AI ANALYSIS: UNAVAILABLE — Reason: 5 stock(s) qualified for analysis but every API call failed this run (see the poller log for the exact error — commonly a billing/credit issue or a rate limit). The deterministic BUY SCORE above is completely unaffected.</b></p>
 
-<p class="opp-empty">No stocks qualified for AI evidence analysis this run.</p>
 
 <h2>🐻 Bear Agent — Mandatory Challenge (80+ scores)</h2>
 <p class="opp-meta">Every stock scoring 80+ receives an independent, adversarial challenge — a separate AI call specifically instructed to find the strongest case AGAINST the opportunity, never a softened version of the bull case above. Capped at 3 per run for cost control.</p>
