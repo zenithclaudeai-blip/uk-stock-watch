@@ -41683,9 +41683,9 @@
     "buy_score": 59.0,
     "first_detected": "2026-09-14T07:28:08.609219+00:00",
     "last_detected": "2026-09-14T07:28:08.609219+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-14T09:08:02.440299+00:00",
+    "status": "FAILED"
   },
   "III:risk_flag_appeared:350537b0af9ef65a": {
     "ticker": "III",
@@ -41779,9 +41779,9 @@
     "buy_score": 56.3,
     "first_detected": "2026-09-14T07:28:08.609219+00:00",
     "last_detected": "2026-09-14T07:28:08.609219+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-14T09:08:02.703229+00:00",
+    "status": "FAILED"
   },
   "SDR:risk_flag_appeared:71d8388c444867f5": {
     "ticker": "SDR",
@@ -42213,6 +42213,78 @@
     "last_detected": "2026-09-14T08:23:38.040827+00:00",
     "attempt_count": 1,
     "last_attempt": "2026-09-14T08:43:46.325405+00:00",
+    "status": "FAILED"
+  },
+  "CCH:risk_flag_appeared:b35ff098d1138252": {
+    "ticker": "CCH",
+    "event_type": "risk_flag_appeared",
+    "event_priority": 4,
+    "evidence_hash": "b35ff098d1138252",
+    "buy_score": 57.9,
+    "first_detected": "2026-09-14T09:08:01.376354+00:00",
+    "last_detected": "2026-09-14T09:08:01.376354+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-14T09:08:01.680395+00:00",
+    "status": "FAILED"
+  },
+  "SBRY:risk_flag_disappeared:e8249fffe5a49c08": {
+    "ticker": "SBRY",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "e8249fffe5a49c08",
+    "buy_score": 52.4,
+    "first_detected": "2026-09-14T09:08:01.376354+00:00",
+    "last_detected": "2026-09-14T09:08:01.376354+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "LGEN:risk_flag_disappeared:d2c5a81491a52faf": {
+    "ticker": "LGEN",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "d2c5a81491a52faf",
+    "buy_score": 55.3,
+    "first_detected": "2026-09-14T09:08:01.376354+00:00",
+    "last_detected": "2026-09-14T09:08:01.376354+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "SSE:risk_flag_disappeared:28871e266d4f84e0": {
+    "ticker": "SSE",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "28871e266d4f84e0",
+    "buy_score": 48.0,
+    "first_detected": "2026-09-14T09:08:01.376354+00:00",
+    "last_detected": "2026-09-14T09:08:01.376354+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "AAL:risk_flag_disappeared:eafa038691fa03d4": {
+    "ticker": "AAL",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "eafa038691fa03d4",
+    "buy_score": 45.5,
+    "first_detected": "2026-09-14T09:08:01.376354+00:00",
+    "last_detected": "2026-09-14T09:08:01.376354+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "WEIR:risk_flag_appeared:7a399560e73d60e4": {
+    "ticker": "WEIR",
+    "event_type": "risk_flag_appeared",
+    "event_priority": 4,
+    "evidence_hash": "7a399560e73d60e4",
+    "buy_score": 37.6,
+    "first_detected": "2026-09-14T09:08:01.376354+00:00",
+    "last_detected": "2026-09-14T09:08:01.376354+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-14T09:08:01.952384+00:00",
     "status": "FAILED"
   }
 }
