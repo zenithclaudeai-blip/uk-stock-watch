@@ -41815,9 +41815,9 @@
     "buy_score": 47.4,
     "first_detected": "2026-09-14T07:28:08.609219+00:00",
     "last_detected": "2026-09-14T07:28:08.609219+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-14T09:13:10.576369+00:00",
+    "status": "FAILED"
   },
   "WTB:risk_flag_disappeared:e74381da3dd45bcf": {
     "ticker": "WTB",
@@ -41887,9 +41887,9 @@
     "buy_score": 55.2,
     "first_detected": "2026-09-14T07:28:08.609219+00:00",
     "last_detected": "2026-09-14T07:28:08.609219+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-14T09:13:09.994318+00:00",
+    "status": "FAILED"
   },
   "EDV:risk_flag_appeared:29dcb1fd26b05877": {
     "ticker": "EDV",
@@ -41947,9 +41947,9 @@
     "buy_score": 47.8,
     "first_detected": "2026-09-14T07:28:08.609219+00:00",
     "last_detected": "2026-09-14T07:28:08.609219+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-14T09:13:10.293259+00:00",
+    "status": "FAILED"
   },
   "IAG:major_score_change:dddeba6ed0770a25": {
     "ticker": "IAG",
@@ -42261,7 +42261,7 @@
     "last_detected": "2026-09-14T09:08:01.376354+00:00",
     "attempt_count": 0,
     "last_attempt": null,
-    "status": "QUEUED"
+    "status": "SUPERSEDED"
   },
   "AAL:risk_flag_disappeared:eafa038691fa03d4": {
     "ticker": "AAL",
@@ -42286,5 +42286,41 @@
     "attempt_count": 1,
     "last_attempt": "2026-09-14T09:08:01.952384+00:00",
     "status": "FAILED"
+  },
+  "BP.:risk_flag_appeared:3c970496e48755cd": {
+    "ticker": "BP.",
+    "event_type": "risk_flag_appeared",
+    "event_priority": 4,
+    "evidence_hash": "3c970496e48755cd",
+    "buy_score": 60.8,
+    "first_detected": "2026-09-14T09:13:09.267622+00:00",
+    "last_detected": "2026-09-14T09:13:09.267622+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-14T09:13:09.525433+00:00",
+    "status": "FAILED"
+  },
+  "STAN:risk_flag_appeared:6ea8dd5afe0dc10c": {
+    "ticker": "STAN",
+    "event_type": "risk_flag_appeared",
+    "event_priority": 4,
+    "evidence_hash": "6ea8dd5afe0dc10c",
+    "buy_score": 59.3,
+    "first_detected": "2026-09-14T09:13:09.267622+00:00",
+    "last_detected": "2026-09-14T09:13:09.267622+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-14T09:13:09.829747+00:00",
+    "status": "FAILED"
+  },
+  "SSE:risk_flag_disappeared:a43217b7d7eacec5": {
+    "ticker": "SSE",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "a43217b7d7eacec5",
+    "buy_score": 48.1,
+    "first_detected": "2026-09-14T09:13:09.267622+00:00",
+    "last_detected": "2026-09-14T09:13:09.267622+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
   }
 }
