@@ -577,8 +577,8 @@
         "company": "Shell",
         "category": "news",
         "broker": null,
-        "detectedAt": "2026-09-14T07:11:42.374559+00:00",
-        "normalizedAt": "2026-09-14T07:11:42.374559+00:00",
+        "detectedAt": "2026-09-14T08:17:28.036271+00:00",
+        "normalizedAt": "2026-09-14T08:17:28.036271+00:00",
         "normalizedAction": null,
         "fetchSource": "g",
         "sourceType": "aggregated_unknown",
@@ -1093,7 +1093,7 @@
       },
       {
         "title": "Standard Life continues cost-cutting and eyes £800m ‘synergies’ from Aegon deal",
-        "link": "https://uk.finance.yahoo.com/news/standard-life-continues-cost-cutting-081946593.html?.tsrc=rss",
+        "link": "https://uk.finance.yahoo.com/news/standard-life-continues-cost-cutting-081946284.html?.tsrc=rss",
         "pubDate": "Mon, 07 Sep 2026 08:19:46 +0000",
         "source": "uk.finance.yahoo.com",
         "ticker": "SDLF",
@@ -1926,10 +1926,10 @@
   },
   "quotes": {
     "LLOY": {
-      "price": 110.825,
+      "price": 110.9,
       "currency": "GBp",
-      "change": -0.32500000000000284,
-      "changePct": -0.292397660818716,
+      "change": -0.25,
+      "changePct": -0.22492127755285649,
       "dayHigh": 111.5,
       "dayLow": 110.35,
       "rangePct": 1.034637876743145,
@@ -2289,7 +2289,7 @@
         "resistance": 574.2999877929688,
         "support": 512.7000122070312
       },
-      "breakoutStatus": "within_range",
+      "breakoutStatus": "breakout",
       "priceVolumeSeries": [
         {
           "close": 552.0999755859375,
@@ -5196,7 +5196,7 @@
       "ma50": 82.13759994506836,
       "ma200": 91.05905006408692,
       "maCrossover": "bullish",
-      "atr14": 1.917428697858538,
+      "atr14": 1.9317141941615514,
       "supportResistance": {
         "resistance": 87.0199966430664,
         "support": 77.0199966430664
@@ -6813,7 +6813,7 @@
           "resistance": 574.2999877929688,
           "support": 512.7000122070312
         },
-        "breakoutStatus": "within_range",
+        "breakoutStatus": "breakout",
         "priceVolumeSeries": [
           {
             "close": 552.0999755859375,
@@ -7269,14 +7269,28 @@
         ]
       },
       {
+        "symbol": "BT.A",
+        "isin": "GB0030913577",
+        "tidm": "BT.A",
+        "identityType": "isin",
+        "name": "ORD 5P",
+        "price": 205,
+        "changePct": 1.737,
+        "netChange": 3.5,
+        "fiftyTwoWeekLow": 173,
+        "fiftyTwoWeekHigh": 242.09,
+        "marketCap": 20084794330,
+        "volume": 1735309
+      },
+      {
         "symbol": "LGEN",
         "isin": "GB0005603997",
         "tidm": "LGEN",
         "identityType": "isin",
         "name": "ORD 2 1/2P",
-        "price": 290.7,
-        "changePct": 1.254,
-        "netChange": 3.6,
+        "price": 291.1,
+        "changePct": 1.393,
+        "netChange": 4,
         "fiftyTwoWeekLow": 217.2,
         "fiftyTwoWeekHigh": 318.1,
         "marketCap": 15744315392,
@@ -9312,14 +9326,14 @@
         "exDividendDate": 1788393600,
         "dividendRate": 0.58,
         "dividendYieldPct": 1.53,
-        "trailingPE": 29.467743,
+        "trailingPE": 29.451612,
         "trailingEps": 1.24,
         "heldPercentInsidersPct": 65.474,
         "sector": "Basic Materials",
         "industry": "Copper",
         "businessSummary": "Antofagasta plc operates as a mining company. It operates through Los Pelambres, Centinela, Antucoya, Zaldívar, Exploration and Evaluation, and Transport Division segments. The company produces copper cathodes and...",
-        "rsi14": 35.14018691588785,
-        "ma20": 3864.3,
+        "rsi14": 35.07462686567165,
+        "ma20": 3864.2,
         "aboveMA20": false,
         "latestVolume": 174197,
         "changePct5d": -6.259620318111852,
@@ -10655,6 +10669,20 @@
       "volume": null
     },
     {
+      "symbol": "SGE",
+      "isin": null,
+      "tidm": "SGE",
+      "identityType": "tidm",
+      "name": "THE SAGE GROUP PLC",
+      "price": 992.8,
+      "changePct": 3.633,
+      "netChange": 34.8,
+      "fiftyTwoWeekLow": 771.66,
+      "fiftyTwoWeekHigh": 1181,
+      "marketCap": 8673680393,
+      "volume": null
+    },
+    {
       "symbol": "REL",
       "isin": null,
       "tidm": "REL",
@@ -10895,7 +10923,7 @@
     {
       "symbol": "DGE",
       "isin": null,
-      "tidm": "DGE",
+      "tidm": "SBRY",
       "identityType": "tidm",
       "name": "DIAGEO PLC",
       "price": 1625,
@@ -11049,7 +11077,7 @@
     {
       "symbol": "HSX",
       "isin": null,
-      "tidm": "HSX",
+      "tidm": "AV.",
       "identityType": "tidm",
       "name": "HISCOX LTD",
       "price": 1889,
@@ -11061,9 +11089,9 @@
       "volume": null
     },
     {
-      "symbol": "VOD",
+      "symbol": "RTO",
       "isin": null,
-      "tidm": "VOD",
+      "tidm": "RTO",
       "identityType": "tidm",
       "name": "VODAFONE GROUP PLC",
       "price": 129.75,
@@ -11161,7 +11189,7 @@
     {
       "symbol": "INF",
       "isin": null,
-      "tidm": "INF",
+      "tidm": "MKS",
       "identityType": "tidm",
       "name": "INFORMA PLC",
       "price": 892.8,
@@ -11327,9 +11355,9 @@
       "volume": null
     },
     {
-      "symbol": "NXT",
+      "symbol": "MNG",
       "isin": null,
-      "tidm": "NXT",
+      "tidm": "MNG",
       "identityType": "tidm",
       "name": "NEXT PLC",
       "price": 14685,
@@ -11394,6 +11422,48 @@
       "fiftyTwoWeekLow": 134.3,
       "fiftyTwoWeekHigh": 175,
       "marketCap": 4265967981,
+      "volume": null
+    },
+    {
+      "symbol": "BRBY",
+      "isin": null,
+      "tidm": "BRBY",
+      "identityType": "tidm",
+      "name": "BURBERRY GROUP PLC",
+      "price": 1017.5,
+      "changePct": -0.049,
+      "netChange": -0.5,
+      "fiftyTwoWeekLow": 976,
+      "fiftyTwoWeekHigh": 1376.5,
+      "marketCap": 3675088112,
+      "volume": null
+    },
+    {
+      "symbol": "MTLN",
+      "isin": null,
+      "tidm": "MTLN",
+      "identityType": "tidm",
+      "name": "METLEN ENERGY & METALS PLC",
+      "price": 47.56,
+      "changePct": -0.084,
+      "netChange": -0.04,
+      "fiftyTwoWeekLow": 30.5,
+      "fiftyTwoWeekHigh": 55.05,
+      "marketCap": 5817635708,
+      "volume": null
+    },
+    {
+      "symbol": "CRDA",
+      "isin": null,
+      "tidm": "CRDA",
+      "identityType": "tidm",
+      "name": "CRODA INTERNATIONAL PLC",
+      "price": 3173,
+      "changePct": -0.126,
+      "netChange": -4,
+      "fiftyTwoWeekLow": 2456,
+      "fiftyTwoWeekHigh": 3520.237,
+      "marketCap": 4436217992,
       "volume": null
     },
     {
@@ -11567,7 +11637,7 @@
     {
       "symbol": "ICG",
       "isin": null,
-      "tidm": "ICG",
+      "tidm": "PSH",
       "identityType": "tidm",
       "name": "ICG PLC",
       "price": 1893,
@@ -11766,9 +11836,9 @@
       "tidm": "FCIT",
       "identityType": "tidm",
       "name": "F&C INVESTMENT TRUST PLC",
-      "price": 338,
-      "changePct": -1.112,
-      "netChange": -3.8,
+      "price": 338.2,
+      "changePct": -1.053,
+      "netChange": -3.6,
       "fiftyTwoWeekLow": 288.75,
       "fiftyTwoWeekHigh": 355.9,
       "marketCap": 6394286579,
@@ -11786,20 +11856,6 @@
       "fiftyTwoWeekLow": 1626.5,
       "fiftyTwoWeekHigh": 2767.5,
       "marketCap": 28636977803,
-      "volume": null
-    },
-    {
-      "symbol": "ABDN",
-      "isin": null,
-      "tidm": "ABDN",
-      "identityType": "tidm",
-      "name": "ABERDEEN GROUP PLC",
-      "price": 245.2,
-      "changePct": -1.209,
-      "netChange": -3,
-      "fiftyTwoWeekLow": 177.52,
-      "fiftyTwoWeekHigh": 265,
-      "marketCap": 4568732130,
       "volume": null
     },
     {
@@ -11856,6 +11912,20 @@
       "fiftyTwoWeekLow": 235.4,
       "fiftyTwoWeekHigh": 410.286,
       "marketCap": 3977124686,
+      "volume": null
+    },
+    {
+      "symbol": "EDV",
+      "isin": null,
+      "tidm": "EDV",
+      "identityType": "tidm",
+      "name": "ENDEAVOUR MINING PLC",
+      "price": 4521,
+      "changePct": -1.568,
+      "netChange": -72,
+      "fiftyTwoWeekLow": 2658,
+      "fiftyTwoWeekHigh": 5620.0,
+      "marketCap": 11099224346,
       "volume": null
     },
     {
@@ -12049,6 +12119,45 @@
     "retrievedAt": "2026-09-14T08:12:25.743934+00:00",
     "stories": [
       {
+        "id": 17785259,
+        "headline": "Special Dividend – Payment Instructions",
+        "companyCode": "ARS",
+        "companyName": "Asiamet Resources Limited",
+        "source": "RNS",
+        "newsSource": "RNS",
+        "rnsNumber": "6179U",
+        "datetime": "2026-09-14T08:15:00.000",
+        "price": 0.3,
+        "percentChange": -85.782,
+        "url": null
+      },
+      {
+        "id": 17785260,
+        "headline": "Director/PDMR Shareholding",
+        "companyCode": "OXIG",
+        "companyName": "Oxford Instruments Plc",
+        "source": "PRN",
+        "newsSource": "RNS",
+        "rnsNumber": "60914-9842",
+        "datetime": "2026-09-14T08:15:00.000",
+        "price": 2590.0,
+        "percentChange": -6.159,
+        "url": null
+      },
+      {
+        "id": 17785258,
+        "headline": "Director/PDMR Shareholding",
+        "companyCode": "BHP",
+        "companyName": "BHP Group Limited",
+        "source": "RNS",
+        "newsSource": "RNS",
+        "rnsNumber": "6187U",
+        "datetime": "2026-09-14T08:14:58.000",
+        "price": 3152,
+        "percentChange": -2.445,
+        "url": null
+      },
+      {
         "id": 17785248,
         "headline": "Hermosa Site Visit",
         "companyCode": "S32",
@@ -12059,6 +12168,32 @@
         "datetime": "2026-09-14T08:00:50.000",
         "price": 255.6,
         "percentChange": -3.255,
+        "url": null
+      },
+      {
+        "id": 17785241,
+        "headline": "TR-1: Notification of major holdings",
+        "companyCode": "SHR",
+        "companyName": "Shaires Holdings Ltd",
+        "source": "RNS",
+        "newsSource": "RNS",
+        "rnsNumber": "6111U",
+        "datetime": "2026-09-14T08:00:01.000",
+        "price": 16.943,
+        "percentChange": null,
+        "url": null
+      },
+      {
+        "id": 17785247,
+        "headline": "TR-1: Notification of major holdings",
+        "companyCode": "SHR",
+        "companyName": "Shaires Holdings Ltd",
+        "source": "RNS",
+        "newsSource": "RNS",
+        "rnsNumber": "6152U",
+        "datetime": "2026-09-14T08:00:01.000",
+        "price": 16.943,
+        "percentChange": null,
         "url": null
       },
       {
@@ -12101,6 +12236,19 @@
         "url": null
       },
       {
+        "id": 17785243,
+        "headline": "TR-1: Notification of major holdings",
+        "companyCode": "SHR",
+        "companyName": "Shaires Holdings Ltd",
+        "source": "RNS",
+        "newsSource": "RNS",
+        "rnsNumber": "6117U",
+        "datetime": "2026-09-14T08:00:01.000",
+        "price": 16.943,
+        "percentChange": null,
+        "url": null
+      },
+      {
         "id": 17785242,
         "headline": "TR-1: Notification of major holdings",
         "companyCode": "SHR",
@@ -12108,32 +12256,6 @@
         "source": "RNS",
         "newsSource": "RNS",
         "rnsNumber": "6116U",
-        "datetime": "2026-09-14T08:00:01.000",
-        "price": 16.943,
-        "percentChange": null,
-        "url": null
-      },
-      {
-        "id": 17785241,
-        "headline": "TR-1: Notification of major holdings",
-        "companyCode": "SHR",
-        "companyName": "Shaires Holdings Ltd",
-        "source": "RNS",
-        "newsSource": "RNS",
-        "rnsNumber": "6111U",
-        "datetime": "2026-09-14T08:00:01.000",
-        "price": 16.943,
-        "percentChange": null,
-        "url": null
-      },
-      {
-        "id": 17785240,
-        "headline": "TR-1: Notification of major holdings",
-        "companyCode": "SHR",
-        "companyName": "Shaires Holdings Ltd",
-        "source": "RNS",
-        "newsSource": "RNS",
-        "rnsNumber": "6113U",
         "datetime": "2026-09-14T08:00:01.000",
         "price": 16.943,
         "percentChange": null,
@@ -12153,26 +12275,13 @@
         "url": null
       },
       {
-        "id": 17785247,
+        "id": 17785240,
         "headline": "TR-1: Notification of major holdings",
         "companyCode": "SHR",
         "companyName": "Shaires Holdings Ltd",
         "source": "RNS",
         "newsSource": "RNS",
-        "rnsNumber": "6152U",
-        "datetime": "2026-09-14T08:00:01.000",
-        "price": 16.943,
-        "percentChange": null,
-        "url": null
-      },
-      {
-        "id": 17785243,
-        "headline": "TR-1: Notification of major holdings",
-        "companyCode": "SHR",
-        "companyName": "Shaires Holdings Ltd",
-        "source": "RNS",
-        "newsSource": "RNS",
-        "rnsNumber": "6117U",
+        "rnsNumber": "6113U",
         "datetime": "2026-09-14T08:00:01.000",
         "price": 16.943,
         "percentChange": null,
@@ -12309,8 +12418,8 @@
         "url": null
       }
     ],
-    "totalElements": 199,
-    "totalPages": 10,
+    "totalElements": 202,
+    "totalPages": 11,
     "error": null
   },
   "ftse100": {
