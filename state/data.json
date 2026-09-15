@@ -1414,7 +1414,7 @@
         "detectedAt": "2026-09-15T16:12:50.605012+00:00",
         "normalizedAt": "2026-09-15T16:12:50.605012+00:00",
         "normalizedAction": null,
-        "fetchSource": "g",
+        "fetchSource": "y",
         "sourceType": "aggregated_unknown",
         "sourceLabel": "Unknown/Aggregated"
       },
@@ -1909,7 +1909,7 @@
         "detectedAt": "2026-09-15T16:13:04.731883+00:00",
         "normalizedAt": "2026-09-15T16:13:04.731883+00:00",
         "normalizedAction": null,
-        "fetchSource": "g",
+        "fetchSource": "y",
         "sourceType": "aggregated_unknown",
         "sourceLabel": "Unknown/Aggregated"
       },
@@ -2140,7 +2140,7 @@
         "detectedAt": "2026-09-15T16:13:11.579660+00:00",
         "normalizedAt": "2026-09-15T16:13:11.579660+00:00",
         "normalizedAction": null,
-        "fetchSource": "g",
+        "fetchSource": "y",
         "sourceType": "aggregated_unknown",
         "sourceLabel": "Unknown/Aggregated"
       }
@@ -4596,7 +4596,9 @@
           "close": 241.0,
           "volume": 2802290
         }
-      ]
+      ],
+      "shortInterestPct": 0.5,
+      "shortInterestDate": "2022-10-03 00:00:00"
     },
     "ASC": {
       "price": 414.0,
@@ -11029,11 +11031,6 @@
         "symbol": "IGG",
         "name": "ORD 0.005P",
         "isin": "GB00B06QFB75"
-      },
-      {
-        "symbol": "ABDN",
-        "name": "ORD 13 61/63P",
-        "isin": "GB00BF8Q6K64"
       }
     ]
   },
@@ -11092,6 +11089,48 @@
       "fiftyTwoWeekLow": 242,
       "fiftyTwoWeekHigh": 372.3,
       "marketCap": 4747312929,
+      "volume": null
+    },
+    {
+      "symbol": "PSN",
+      "isin": null,
+      "tidm": "PSN",
+      "identityType": "tidm",
+      "name": "PERSIMMON PLC",
+      "price": 1100.5,
+      "changePct": 1.475,
+      "netChange": 16,
+      "fiftyTwoWeekLow": 947.4,
+      "fiftyTwoWeekHigh": 1552,
+      "marketCap": 3484448374,
+      "volume": null
+    },
+    {
+      "symbol": "MKS",
+      "isin": null,
+      "tidm": "MKS",
+      "identityType": "tidm",
+      "name": "MARKS AND SPENCER GROUP PLC",
+      "price": 376.1,
+      "changePct": 1.429,
+      "netChange": 5.3,
+      "fiftyTwoWeekLow": 301.1,
+      "fiftyTwoWeekHigh": 418.325,
+      "marketCap": 7714530164,
+      "volume": null
+    },
+    {
+      "symbol": "SPX",
+      "isin": null,
+      "tidm": "SPX",
+      "identityType": "tidm",
+      "name": "SPIRAX GROUP PLC",
+      "price": 6815,
+      "changePct": 1.414,
+      "netChange": 95,
+      "fiftyTwoWeekLow": 5950.0,
+      "fiftyTwoWeekHigh": 8050.0,
+      "marketCap": 4961110426,
       "volume": null
     },
     {
@@ -11347,6 +11386,20 @@
       "volume": null
     },
     {
+      "symbol": "LAND",
+      "isin": null,
+      "tidm": "LAND",
+      "identityType": "tidm",
+      "name": "LAND SECURITIES GROUP PLC",
+      "price": 625,
+      "changePct": 1.215,
+      "netChange": 7.5,
+      "fiftyTwoWeekLow": 525,
+      "fiftyTwoWeekHigh": 726,
+      "marketCap": 4601336942,
+      "volume": null
+    },
+    {
       "symbol": "HWDN",
       "isin": null,
       "tidm": "HWDN",
@@ -11386,6 +11439,20 @@
       "fiftyTwoWeekLow": 14070.0,
       "fiftyTwoWeekHigh": 23540.0,
       "marketCap": 5815953440,
+      "volume": null
+    },
+    {
+      "symbol": "VOD",
+      "isin": null,
+      "tidm": "VOD",
+      "identityType": "tidm",
+      "name": "VODAFONE GROUP PLC",
+      "price": 131.05,
+      "changePct": 0.537,
+      "netChange": 0.7,
+      "fiftyTwoWeekLow": 83.4,
+      "fiftyTwoWeekHigh": 131.1,
+      "marketCap": 30166849863,
       "volume": null
     },
     {
@@ -11517,7 +11584,7 @@
     {
       "symbol": "HSX",
       "isin": null,
-      "tidm": "HSX",
+      "tidm": "NWG",
       "identityType": "tidm",
       "name": "HISCOX LTD",
       "price": 1888,
@@ -11660,9 +11727,9 @@
       "tidm": "DCC",
       "identityType": "tidm",
       "name": "DCC ENERGY PLC",
-      "price": 6335,
-      "changePct": 0.0,
-      "netChange": null,
+      "price": 6340.0,
+      "changePct": 0.079,
+      "netChange": 5,
       "fiftyTwoWeekLow": 4188,
       "fiftyTwoWeekHigh": 6740.0,
       "marketCap": 5411618952,
@@ -11823,9 +11890,9 @@
       "volume": null
     },
     {
-      "symbol": "PRU",
+      "symbol": "AAL",
       "isin": null,
-      "tidm": "PRU",
+      "tidm": "AAL",
       "identityType": "tidm",
       "name": "PRUDENTIAL PLC",
       "price": 973.8,
@@ -12005,6 +12072,48 @@
       "volume": null
     },
     {
+      "symbol": "STJ",
+      "isin": null,
+      "tidm": "STJ",
+      "identityType": "tidm",
+      "name": "ST. JAMES'S PLACE PLC",
+      "price": 1116,
+      "changePct": -0.756,
+      "netChange": -8.5,
+      "fiftyTwoWeekLow": 1038.75,
+      "fiftyTwoWeekHigh": 1575.5,
+      "marketCap": 5739546776,
+      "volume": null
+    },
+    {
+      "symbol": "RIO",
+      "isin": null,
+      "tidm": "RIO",
+      "identityType": "tidm",
+      "name": "RIO TINTO PLC",
+      "price": 7152,
+      "changePct": -0.763,
+      "netChange": -55,
+      "fiftyTwoWeekLow": 4555.5,
+      "fiftyTwoWeekHigh": 9117,
+      "marketCap": 90458914475,
+      "volume": null
+    },
+    {
+      "symbol": "SBRY",
+      "isin": null,
+      "tidm": "SBRY",
+      "identityType": "tidm",
+      "name": "SAINSBURY (J) PLC",
+      "price": 337.6,
+      "changePct": -0.764,
+      "netChange": -2.6,
+      "fiftyTwoWeekLow": 293.7,
+      "fiftyTwoWeekHigh": 380.3,
+      "marketCap": 7534239405,
+      "volume": null
+    },
+    {
       "symbol": "RTO",
       "isin": null,
       "tidm": "RTO",
@@ -12145,9 +12254,9 @@
       "volume": null
     },
     {
-      "symbol": "EDV",
+      "symbol": "IHG",
       "isin": null,
-      "tidm": "EDV",
+      "tidm": "IHG",
       "identityType": "tidm",
       "name": "ENDEAVOUR MINING PLC",
       "price": 4441,
@@ -13510,7 +13619,7 @@
   "marketWideAlertsStatus": "ok",
   "ftFetchStatus": "ok",
   "newsFetchAttempts": 81,
-  "newsFetchFailures": 0,
+  "newsFetchFailures": 54,
   "marketResearch": {},
   "lastPoll": "2026-09-15 16:13:19",
   "ftseUniverseStatus": "healthy",
