@@ -46987,9 +46987,9 @@
     "buy_score": 45.5,
     "first_detected": "2026-09-15T15:38:31.616033+00:00",
     "last_detected": "2026-09-15T15:38:31.616033+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-15T15:43:26.127013+00:00",
+    "status": "FAILED"
   },
   "ULVR:risk_flag_disappeared:1946689270fd6f92": {
     "ticker": "ULVR",
@@ -47001,6 +47001,30 @@
     "last_detected": "2026-09-15T15:38:31.616033+00:00",
     "attempt_count": 1,
     "last_attempt": "2026-09-15T15:38:33.038748+00:00",
+    "status": "FAILED"
+  },
+  "IAG:risk_flag_appeared:a8ccf3cc30268456": {
+    "ticker": "IAG",
+    "event_type": "risk_flag_appeared",
+    "event_priority": 4,
+    "evidence_hash": "a8ccf3cc30268456",
+    "buy_score": 49.6,
+    "first_detected": "2026-09-15T15:43:25.537015+00:00",
+    "last_detected": "2026-09-15T15:43:25.537015+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-15T15:43:25.840802+00:00",
+    "status": "FAILED"
+  },
+  "RTO:risk_flag_disappeared:cb89489c33c88059": {
+    "ticker": "RTO",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "cb89489c33c88059",
+    "buy_score": 41.3,
+    "first_detected": "2026-09-15T15:43:25.537015+00:00",
+    "last_detected": "2026-09-15T15:43:25.537015+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-15T15:43:26.451955+00:00",
     "status": "FAILED"
   }
 }
