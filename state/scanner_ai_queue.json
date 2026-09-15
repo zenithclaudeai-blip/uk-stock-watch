@@ -47503,9 +47503,9 @@
     "buy_score": 60.6,
     "first_detected": "2026-09-15T16:08:00.646205+00:00",
     "last_detected": "2026-09-15T16:08:00.646205+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-15T16:37:56.921204+00:00",
+    "status": "FAILED"
   },
   "CPG:risk_flag_disappeared:2ecab3c9e1655ae4": {
     "ticker": "CPG",
@@ -47515,9 +47515,9 @@
     "buy_score": 55.1,
     "first_detected": "2026-09-15T16:08:00.646205+00:00",
     "last_detected": "2026-09-15T16:08:00.646205+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-15T16:37:57.126453+00:00",
+    "status": "FAILED"
   },
   "ICG:risk_flag_disappeared:3d25b835a44d16d7": {
     "ticker": "ICG",
@@ -47613,7 +47613,7 @@
     "last_detected": "2026-09-15T16:13:23.360509+00:00",
     "attempt_count": 0,
     "last_attempt": null,
-    "status": "QUEUED"
+    "status": "SUPERSEDED"
   },
   "GSK:risk_flag_disappeared:32bded88774bc2c8": {
     "ticker": "GSK",
@@ -47781,6 +47781,42 @@
     "last_detected": "2026-09-15T16:28:30.862782+00:00",
     "attempt_count": 1,
     "last_attempt": "2026-09-15T16:28:31.137899+00:00",
+    "status": "FAILED"
+  },
+  "NWG:major_score_change:0c88ee246960f4bf": {
+    "ticker": "NWG",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "0c88ee246960f4bf",
+    "buy_score": 74.0,
+    "first_detected": "2026-09-15T16:37:56.011936+00:00",
+    "last_detected": "2026-09-15T16:37:56.011936+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-15T16:37:56.210030+00:00",
+    "status": "FAILED"
+  },
+  "NXT:major_score_change:cb25b85307b606a4": {
+    "ticker": "NXT",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "cb25b85307b606a4",
+    "buy_score": 62.9,
+    "first_detected": "2026-09-15T16:37:56.011936+00:00",
+    "last_detected": "2026-09-15T16:37:56.011936+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-15T16:37:56.477610+00:00",
+    "status": "FAILED"
+  },
+  "PCT:major_score_change:b10c1b5186689472": {
+    "ticker": "PCT",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "b10c1b5186689472",
+    "buy_score": 55.0,
+    "first_detected": "2026-09-15T16:37:56.011936+00:00",
+    "last_detected": "2026-09-15T16:37:56.011936+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-15T16:37:56.773969+00:00",
     "status": "FAILED"
   }
 }
