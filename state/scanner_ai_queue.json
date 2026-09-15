@@ -47527,9 +47527,9 @@
     "buy_score": 51.2,
     "first_detected": "2026-09-15T16:08:00.646205+00:00",
     "last_detected": "2026-09-15T16:08:00.646205+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-15T16:43:41.383045+00:00",
+    "status": "FAILED"
   },
   "ALW:major_score_change:e89cee38676a308b": {
     "ticker": "ALW",
@@ -47551,9 +47551,9 @@
     "buy_score": 47.4,
     "first_detected": "2026-09-15T16:08:00.646205+00:00",
     "last_detected": "2026-09-15T16:08:00.646205+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-15T16:43:41.643157+00:00",
+    "status": "FAILED"
   },
   "ABDN:risk_flag_disappeared:e1a7b86d14a32634": {
     "ticker": "ABDN",
@@ -47563,9 +47563,9 @@
     "buy_score": 45.2,
     "first_detected": "2026-09-15T16:08:00.646205+00:00",
     "last_detected": "2026-09-15T16:08:00.646205+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-15T16:43:41.890256+00:00",
+    "status": "FAILED"
   },
   "NWG:band_change:4d98d4e5a0776edc": {
     "ticker": "NWG",
@@ -47818,5 +47818,41 @@
     "attempt_count": 1,
     "last_attempt": "2026-09-15T16:37:56.773969+00:00",
     "status": "FAILED"
+  },
+  "BP.:band_change:572d1dc82884f8b2": {
+    "ticker": "BP.",
+    "event_type": "band_change",
+    "event_priority": 2,
+    "evidence_hash": "572d1dc82884f8b2",
+    "buy_score": 72.4,
+    "first_detected": "2026-09-15T16:43:40.528360+00:00",
+    "last_detected": "2026-09-15T16:43:40.528360+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-15T16:43:40.835362+00:00",
+    "status": "FAILED"
+  },
+  "IMI:major_score_change:af1e842d76b20f65": {
+    "ticker": "IMI",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "af1e842d76b20f65",
+    "buy_score": 65.1,
+    "first_detected": "2026-09-15T16:43:40.528360+00:00",
+    "last_detected": "2026-09-15T16:43:40.528360+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-15T16:43:41.102497+00:00",
+    "status": "FAILED"
+  },
+  "RR.:risk_flag_disappeared:7d7856d3ce2a6b99": {
+    "ticker": "RR.",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "7d7856d3ce2a6b99",
+    "buy_score": 57.7,
+    "first_detected": "2026-09-15T16:43:40.528360+00:00",
+    "last_detected": "2026-09-15T16:43:40.528360+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
   }
 }
