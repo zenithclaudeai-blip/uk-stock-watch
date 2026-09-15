@@ -46915,9 +46915,9 @@
     "buy_score": 46.7,
     "first_detected": "2026-09-15T15:33:17.973714+00:00",
     "last_detected": "2026-09-15T15:33:17.973714+00:00",
-    "attempt_count": 0,
-    "last_attempt": null,
-    "status": "QUEUED"
+    "attempt_count": 1,
+    "last_attempt": "2026-09-15T15:38:32.198211+00:00",
+    "status": "FAILED"
   },
   "STAN:risk_flag_disappeared:881b4e2cbac28dc9": {
     "ticker": "STAN",
@@ -46941,6 +46941,66 @@
     "last_detected": "2026-09-15T15:33:17.973714+00:00",
     "attempt_count": 1,
     "last_attempt": "2026-09-15T15:33:19.088780+00:00",
+    "status": "FAILED"
+  },
+  "CNA:major_score_change:2d806d967f0b66a7": {
+    "ticker": "CNA",
+    "event_type": "major_score_change",
+    "event_priority": 5,
+    "evidence_hash": "2d806d967f0b66a7",
+    "buy_score": 52.5,
+    "first_detected": "2026-09-15T15:38:31.616033+00:00",
+    "last_detected": "2026-09-15T15:38:31.616033+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-15T15:38:31.903228+00:00",
+    "status": "FAILED"
+  },
+  "DPLM:risk_flag_disappeared:2b5a6576b4b4f349": {
+    "ticker": "DPLM",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "2b5a6576b4b4f349",
+    "buy_score": 59.3,
+    "first_detected": "2026-09-15T15:38:31.616033+00:00",
+    "last_detected": "2026-09-15T15:38:31.616033+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-15T15:38:32.496483+00:00",
+    "status": "FAILED"
+  },
+  "MNG:risk_flag_disappeared:92e1743a5089193f": {
+    "ticker": "MNG",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "92e1743a5089193f",
+    "buy_score": 52.3,
+    "first_detected": "2026-09-15T15:38:31.616033+00:00",
+    "last_detected": "2026-09-15T15:38:31.616033+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-15T15:38:32.763682+00:00",
+    "status": "FAILED"
+  },
+  "SBRY:risk_flag_disappeared:b489f1955f8d0f6e": {
+    "ticker": "SBRY",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "b489f1955f8d0f6e",
+    "buy_score": 45.5,
+    "first_detected": "2026-09-15T15:38:31.616033+00:00",
+    "last_detected": "2026-09-15T15:38:31.616033+00:00",
+    "attempt_count": 0,
+    "last_attempt": null,
+    "status": "QUEUED"
+  },
+  "ULVR:risk_flag_disappeared:1946689270fd6f92": {
+    "ticker": "ULVR",
+    "event_type": "risk_flag_disappeared",
+    "event_priority": 6,
+    "evidence_hash": "1946689270fd6f92",
+    "buy_score": 47.4,
+    "first_detected": "2026-09-15T15:38:31.616033+00:00",
+    "last_detected": "2026-09-15T15:38:31.616033+00:00",
+    "attempt_count": 1,
+    "last_attempt": "2026-09-15T15:38:33.038748+00:00",
     "status": "FAILED"
   }
 }
